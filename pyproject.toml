@@ -1,0 +1,17 @@
+[project]
+name = "jor-mcp"
+version = "0.1.0"
+description = "Servidor MCP para a Ambiental Media"
+requires-python = ">=3.12"
+
+dependencies = [
+    "fastmcp==3.0.0",
+    "uvicorn==0.41.0",
+    "httpx==0.28.1",
+]
+
+[dependency-groups]
+dev = [
+    "ruff==0.15.5",
+    "pytest>=9.0.0",
+]
