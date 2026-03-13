@@ -459,6 +459,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "fastmcp" },
     { name = "httpx" },
+    { name = "pyjwt" },
     { name = "uvicorn" },
 ]
 
@@ -472,6 +473,7 @@ dev = [
 requires-dist = [
     { name = "fastmcp", specifier = "==3.0.0" },
     { name = "httpx", specifier = "==0.28.1" },
+    { name = "pyjwt", specifier = ">=2.8.0" },
     { name = "uvicorn", specifier = "==0.41.0" },
 ]
 

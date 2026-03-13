@@ -16,6 +16,9 @@ RUN uv sync --frozen --no-dev --no-cache
 # ─── Stage 2: Runtime ────────────────────────────────────────
 FROM python:3.13-slim AS runtime
 
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 WORKDIR /app
