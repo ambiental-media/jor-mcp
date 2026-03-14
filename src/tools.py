@@ -6,6 +6,8 @@ from html import unescape
 
 import httpx
 
+from fastmcp.exceptions import ToolError
+
 from src.app import mcp
 from src.config import GITHUB_REPOS, GITHUB_TOKEN, WORDPRESS_API_URL
 
@@ -114,7 +116,7 @@ async def search_ambiental(query: str) -> str:
     results = [item for sublist in all_results for item in sublist]
 
     if not results:
-        raise ValueError(
+        raise ToolError(
             f"Nenhum resultado encontrado para '{query}'. "
             "Tente termos mais amplos ou verifique a ortografia."
         )
@@ -139,32 +141,58 @@ async def search_ambiental(query: str) -> str:
 
 @mcp.tool(
     description=(
-        "Recupera o conteúdo completo de um artigo da Ambiental Media pelo ID do WordPress. "
+        "Recupera o conteúdo completo de um artigo da Ambiental Media. "
+        "Aceita a URL completa do artigo ou o ID numérico do WordPress. "
         "Retorna o texto limpo e formatado para leitura por LLM. "
-        "Use o ID retornado por search_ambiental ou list_latest_news."
+        "Use a URL ou o ID retornado por search_ambiental ou list_latest_news."
     )
 )
-async def get_full_article(article_id: int) -> str:
+async def get_full_article(url_or_id: str) -> str:
     client = _get_client()
+
+    article_id: int | None = None
+    slug: str | None = None
+
+    if url_or_id.isdigit():
+        article_id = int(url_or_id)
+    else:
+        slug = url_or_id.rstrip("/").rsplit("/", 1)[-1]
+
     try:
-        resp = await client.get(
+        if article_id is not None:
+            resp = await client.get(
                 f"{WORDPRESS_API_URL}/posts/{article_id}",
                 params={"_fields": "id,title,content,date,link"},
+            )
+        else:
+            resp = await client.get(
+                f"{WORDPRESS_API_URL}/posts",
+                params={"slug": slug, "_fields": "id,title,content,date,link"},
             )
         resp.raise_for_status()
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
-            raise ValueError(
-                f"Artigo com ID {article_id} não encontrado. "
+            raise ToolError(
+                f"Artigo '{url_or_id}' não encontrado. "
                 "Tente buscar por palavra-chave usando search_ambiental."
             )
-        raise ValueError(
+        raise ToolError(
             f"Erro ao acessar o artigo: HTTP {e.response.status_code}"
         )
     except httpx.HTTPError:
-        raise ValueError("Erro de conexão ao acessar o WordPress.")
+        raise ToolError("Erro de conexão ao acessar o WordPress.")
 
-    post = resp.json()
+    data = resp.json()
+    if isinstance(data, list):
+        if not data:
+            raise ToolError(
+                f"Artigo '{url_or_id}' não encontrado. "
+                "Tente buscar por palavra-chave usando search_ambiental."
+            )
+        post = data[0]
+    else:
+        post = data
+
     title = _strip_html(post["title"]["rendered"])
     content = _strip_html(post["content"]["rendered"])
     date = post["date"][:10]
@@ -202,7 +230,7 @@ async def list_latest_news(limit: int = 5) -> str:
         )
         resp.raise_for_status()
     except httpx.HTTPError:
-        raise ValueError(
+        raise ToolError(
             "Erro ao acessar o WordPress. Tente novamente em instantes."
         )
 
