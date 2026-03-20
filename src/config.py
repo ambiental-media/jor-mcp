@@ -1,3 +1,4 @@
+
 import os
 
 # Server
@@ -20,4 +21,9 @@ GITHUB_REPOS = [
     for r in os.environ.get("GITHUB_REPOS", "").split(",")
     if r.strip()
 ]
+
+# ─── OpenTelemetry ────────────────────────────────────────────
+# Deixe vazio para usar console exporter (modo dev).
+# Em produção aponte para o endpoint do OTLP collector / Cloud Trace.
+OTEL_EXPORTER_OTLP_ENDPOINT = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 
