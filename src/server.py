@@ -11,12 +11,14 @@ from src.app import mcp
 from src.config import (
     JWT_SECRET,
     LOG_LEVEL,
+    OTEL_EXPORTER_OTLP_ENDPOINT,
     PORT,
     RATE_LIMIT_MAX,
     RATE_LIMIT_WINDOW,
 )
+from src.telemetry import get_tracer, setup_telemetry
 
-import src.tools 
+import src.tools
 
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
@@ -26,6 +28,8 @@ logging.basicConfig(
     ),
 )
 logger = logging.getLogger("jor-mcp")
+
+setup_telemetry(otlp_endpoint=OTEL_EXPORTER_OTLP_ENDPOINT)
 
 
 class MCPMiddleware:
@@ -49,46 +53,61 @@ class MCPMiddleware:
         client_ip = client[0] if client else "unknown"
         now = time.time()
 
-        self._requests[client_ip] = [
-            t for t in self._requests[client_ip] if now - t < RATE_LIMIT_WINDOW
-        ]
+        tracer = get_tracer()
+        method = scope.get("method", "")
+        with tracer.start_as_current_span(f"{method} {path}") as span:
+            span.set_attribute("http.method", method)
+            span.set_attribute("http.path", path)
+            span.set_attribute("client.address", client_ip)
 
-        if len(self._requests[client_ip]) >= RATE_LIMIT_MAX:
-            logger.warning("Rate limit exceeded for %s", client_ip)
-            resp = JSONResponse(
-                {"error": "Too many requests. Please try again later."},
-                status_code=429,
-            )
-            await resp(scope, receive, send)
-            return
+            self._requests[client_ip] = [
+                t for t in self._requests[client_ip] if now - t < RATE_LIMIT_WINDOW
+            ]
 
-        self._requests[client_ip].append(now)
-
-        if JWT_SECRET:
-            headers = dict(scope.get("headers", []))
-            auth = headers.get(b"authorization", b"").decode()
-
-            if not auth.startswith("Bearer "):
-                logger.warning("Missing auth header from %s on %s", client_ip, path)
+            if len(self._requests[client_ip]) >= RATE_LIMIT_MAX:
+                logger.warning("Rate limit exceeded for %s", client_ip)
+                span.set_attribute("http.status_code", 429)
                 resp = JSONResponse(
-                    {"error": "Missing or invalid Authorization header"},
-                    status_code=401,
+                    {"error": "Too many requests. Please try again later."},
+                    status_code=429,
                 )
                 await resp(scope, receive, send)
                 return
 
-            token = auth[7:]
-            try:
-                jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-            except jwt.InvalidTokenError:
-                logger.warning("Invalid JWT from %s on %s", client_ip, path)
-                resp = JSONResponse(
-                    {"error": "Invalid token"}, status_code=401
-                )
-                await resp(scope, receive, send)
-                return
+            self._requests[client_ip].append(now)
 
-        await self.app(scope, receive, send)
+            if JWT_SECRET:
+                headers = dict(scope.get("headers", []))
+                auth = headers.get(b"authorization", b"").decode()
+
+                if not auth.startswith("Bearer "):
+                    logger.warning("Missing auth header from %s on %s", client_ip, path)
+                    span.set_attribute("http.status_code", 401)
+                    resp = JSONResponse(
+                        {"error": "Missing or invalid Authorization header"},
+                        status_code=401,
+                    )
+                    await resp(scope, receive, send)
+                    return
+
+                token = auth[7:]
+                try:
+                    jwt.decode(
+                        token,
+                        JWT_SECRET,
+                        algorithms=["HS256"],
+                        options={"require": ["exp"]},
+                    )
+                except jwt.InvalidTokenError:
+                    logger.warning("Invalid JWT from %s on %s", client_ip, path)
+                    span.set_attribute("http.status_code", 401)
+                    resp = JSONResponse(
+                        {"error": "Invalid token"}, status_code=401
+                    )
+                    await resp(scope, receive, send)
+                    return
+
+            await self.app(scope, receive, send)
 
 
 mcp_http = mcp.http_app()

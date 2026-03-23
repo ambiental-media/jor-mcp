@@ -81,32 +81,90 @@ async def search_ambiental(query: str) -> str:
 
     async def _search_gh(repo: str) -> list[dict]:
         results = []
+        query_lower = query.lower()
+
+        import unicodedata
+
+        def normalize(text):
+            if not isinstance(text, str):
+                return ""
+            return unicodedata.normalize("NFKD", text).encode("ASCII", "ignore").decode("ASCII").lower()
+
+        def search_json(obj, query_norm, path=None):
+            matches = []
+            if path is None:
+                path = []
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    matches += search_json(v, query_norm, path + [str(k)])
+            elif isinstance(obj, list):
+                for idx, item in enumerate(obj):
+                    matches += search_json(item, query_norm, path + [str(idx)])
+            elif isinstance(obj, str):
+                if query_norm in normalize(obj):
+                    matches.append(("/".join(path), obj))
+            return matches
+
         try:
-            gh_resp = await client.get(
-                f"https://api.github.com/repos/{repo}/contents/messages/pt.json",
+            # 1. Buscar o SHA da branch default
+            repo_resp = await client.get(
+                f"https://api.github.com/repos/{repo}",
                 headers=_github_headers(),
             )
-            gh_resp.raise_for_status()
-            content = b64decode(gh_resp.json()["content"]).decode()
-            messages = json.loads(content)
+            repo_resp.raise_for_status()
+            default_branch = repo_resp.json()["default_branch"]
 
-            query_lower = query.lower()
-            for key, value in messages.items():
-                if isinstance(value, str) and query_lower in value.lower():
+            # 2. Buscar o SHA da árvore da branch default
+            branch_resp = await client.get(
+                f"https://api.github.com/repos/{repo}/git/trees/{default_branch}?recursive=1",
+                headers=_github_headers(),
+            )
+            branch_resp.raise_for_status()
+            tree = branch_resp.json()["tree"]
+
+            # 3. Filtrar arquivos pt.json e en.json
+            json_files = [
+                f["path"]
+                for f in tree
+                if f["type"] == "blob" and (f["path"].endswith("pt.json") or f["path"].endswith("en.json"))
+            ]
+
+            # 4. Buscar e processar cada arquivo
+            async def _fetch_json_file(path: str) -> None:
+                try:
+                    gh_resp = await client.get(
+                        f"https://api.github.com/repos/{repo}/contents/{path}",
+                        headers=_github_headers(),
+                    )
+                    gh_resp.raise_for_status()
+                    content = b64decode(gh_resp.json()["content"]).decode()
+                    messages = json.loads(content)
+                    query_norm = normalize(query)
+                    matches = search_json(messages, query_norm)
+                    for match_path, match_val in matches:
+                        results.append(
+                            {
+                                "title": match_path,
+                                "summary": match_val[:200],
+                                "date": None,
+                                "link": f"https://github.com/{repo}/blob/{default_branch}/{path}",
+                                "source": f"github:{repo}:{path}",
+                            }
+                        )
+                except Exception as e:
                     results.append(
                         {
-                            "title": key,
-                            "summary": value[:200],
-                            "date": None,
-                            "link": f"https://github.com/{repo}",
-                            "source": f"github:{repo}",
+                            "source": f"github:{repo}:{path}",
+                            "error": f"Erro ao acessar {path} em {repo}: {e}",
                         }
                     )
-        except httpx.HTTPError:
+
+            await asyncio.gather(*[_fetch_json_file(p) for p in json_files])
+        except Exception as e:
             results.append(
                 {
                     "source": f"github:{repo}",
-                    "error": f"Não foi possível acessar o repositório {repo}.",
+                    "error": f"Erro ao buscar arquivos JSON no repositório: {e}",
                 }
             )
         return results
