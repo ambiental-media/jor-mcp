@@ -90,7 +90,19 @@ We use **pytest** (along with `pytest-asyncio` for our async code) to ensure fun
 ---
 
 ## Submitting Changes
-*(Placeholder: Instructions on creating branches, commit message conventions, and opening Pull Requests.)*
+
+When you are ready to submit a Pull Request, please ensure your contributions align with our versioning automations.
+
+### Conventional Commits
+
+We strictly use **[Conventional Commits (v1.0.0)](https://www.conventionalcommits.org/en/v1.0.0/)** for our commit messages. 
+
+We have automations in place that parse merged Pull Requests to automatically bump project versions according to the **[Semantic Versioning 2.0.0 (SemVer)](https://semver.org/)** specification, and to populate GitHub tags and release notes.
+
+**The Rules:**
+1. **Minimum Requirement:** At least **one commit** within the scope of your Pull Request must strictly respect the Conventional Commits format (e.g., `feat: add new search parameter`, `fix: resolve JWT validation error`).
+2. **Version Bumping (Precedence):** If your Pull Request contains multiple conventional commits, the automated version bump (`MAJOR.MINOR.PATCH`) will be determined by the commit with the **highest precedence**. For example, a `feat` triggers a `MINOR` bump, taking precedence over a `fix` (which triggers a `PATCH` bump). A `BREAKING CHANGE` triggers a `MAJOR` bump and overrides everything else.
+3. **Release Notes:** Even though only the highest precedence commit dictates the version number change, **all** information provided by all conventional commits in the Pull Request will be aggregated and used to populate the GitHub release notes.
 
 ---
 
