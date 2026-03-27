@@ -93,6 +93,18 @@ We use **pytest** (along with `pytest-asyncio` for our async code) to ensure fun
 
 When you are ready to submit a Pull Request, please ensure your contributions align with our versioning automations.
 
+### Branching Strategy & Naming
+
+This repository strictly uses the strategy of **[Trunk-Based Development with Short-Lived Feature Branches](https://trunkbaseddevelopment.com/short-lived-feature-branches/)**. Please ensure your branches are small, focused, and merged frequently.
+
+Branch names must follow the **[Conventional Branch Specification](https://conventional-branch.github.io/)**. 
+
+**For Internal Collaborators (Ambiental Media):**
+If you are an internal contributor, you are **required** to include the relevant Issue ID in your branch declaration using the following format:
+`<type>/<issue-id>-<short-description>`
+
+*Example:* `feature/0fr4hyt6-wordpress-tool`
+
 ### Conventional Commits
 
 We strictly use **[Conventional Commits (v1.0.0)](https://www.conventionalcommits.org/en/v1.0.0/)** for our commit messages. 
