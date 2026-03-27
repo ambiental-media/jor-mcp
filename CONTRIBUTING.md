@@ -41,6 +41,19 @@ Before contributing to `jor-mcp`, ensure you have the following installed on you
 
 ## Development Standards
 
+### 🌐 Default Language: English
+
+While this project originated in Brazil and supports Portuguese tools, **English is the strict default language for all technical contributions** due to our global funding and audience. 
+
+All information targeted to users and developers must be in English. This explicitly includes:
+*   Pull Request descriptions and general communication
+*   Commit messages
+*   Code comments and variable names
+*   Repository documentation (like this file)
+*   Technical/Architecture documentation
+
+*(Note: The only exception is the `description` parameter inside `@mcp.tool()` decorators, which currently target Brazilian LLM contexts, as noted in the Docstrings section below).*
+
 This project uses modern Python (>= 3.12) and relies heavily on asynchronous programming. To maintain high code quality and consistency, we strictly enforce the following standards. Please ensure your code adheres to these before submitting a Pull Request.
 
 *(Note: AI agents contributing to this project must additionally adhere to the rules defined in `AGENTS.md`)*.

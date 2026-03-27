@@ -13,6 +13,7 @@ Welcome, AI Agent. This `AGENTS.md` file defines the standard operating procedur
 
 ## Prerequisite: Development Standards
 Before making any changes, you **must read and adhere to the rules defined in `CONTRIBUTING.md`**. This includes:
+- **Language Constraint: All technical communication (commit messages, PR descriptions, code comments, variable names, and documentation) MUST be in English.** (The only exception is the `@mcp.tool()` description parameter, which must remain in Portuguese).
 - Using `uv` for all dependency management and task execution.
 - Enforcing strict typing, linting (`ruff`), and formatting.
 - Ensuring all new code maintains the **90% test coverage minimum**.

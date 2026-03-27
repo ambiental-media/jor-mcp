@@ -5,7 +5,7 @@
 
 `jor-mcp` is an open-source [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server specifically designed for journalism organizations. 
 
-Originally developed by [Ambiental Media](https://ambiental.media/), this server bridges the gap between Large Language Models (LLMs) and standard newsroom infrastructure, allowing AI agents to securely search, retrieve, and analyze content across your organization's WordPress instances and internal GitHub repositories.
+Originally developed by [Ambiental Media](https://ambiental.media/) with support from global journalism initiatives, this server bridges the gap between Large Language Models (LLMs) and standard newsroom infrastructure, allowing AI agents to securely search, retrieve, and analyze content across your organization's WordPress instances and internal GitHub repositories.
 
 By deploying your own instance of `jor-mcp`, your newsroom can empower AI workflows to fact-check against your own archives, summarize internal reports, and seamlessly access proprietary data context.
 
@@ -73,6 +73,13 @@ We welcome contributions from other journalism organizations and the open-source
 Please read our [Contributing Guidelines](CONTRIBUTING.md) to learn about our development standards, environment setup, and code quality requirements before submitting a Pull Request.
 
 AI Agents assisting with this repository must adhere to the rules in [AGENTS.md](AGENTS.md).
+
+## Acknowledgements & Funding
+
+The development of `jor-mcp` was made possible through the generous support of two major journalism initiatives:
+
+*   **[Codesinfo](https://codesinfo.com.br/):** Supported via "Projor" and the "Google News Initiative," targeting the Brazilian journalism ecosystem.
+*   **Journalism AI Innovation Challenge:** Supported via "JournalismAI" with "POLIS Journalism at LSE" and the "Google News Initiative," targeting the global journalism market.
 
 ## License
 
