@@ -17,6 +17,14 @@ By deploying your own instance of `jor-mcp`, your newsroom can empower AI workfl
 *   **Containerized:** Easy to deploy anywhere using Docker.
 *   **Easily Forkable:** Designed to be easily cloned, configured via environment variables, and deployed on standard cloud infrastructure.
 
+## Documentation
+
+Comprehensive documentation for all audiences is available in the [`docs/`](docs/README.md) directory:
+*   [Technical Architecture](docs/1-technical/)
+*   [Deployment Guides](docs/2-deployment/)
+*   [Usage & Connecting LLMs](docs/3-usage/)
+*   [Research, Learnings & Metrics](docs/4-research-and-learnings/)
+
 ## Getting Started
 
 ### Prerequisites
@@ -49,7 +57,7 @@ The easiest way to get `jor-mcp` running is via Docker.
 
 To adapt `jor-mcp` for your specific organization, you only need to update the environment variables in your `.env` file. The core logic is designed to be agnostic and will dynamically query the WordPress and GitHub endpoints you provide.
 
-*(Placeholder: Provide any additional details here if specific WordPress plugins or GitHub organizational settings are required).*
+For detailed configuration options (like setting up the `.env` file for your specific newsroom) and deployment guides for various cloud providers, please refer to our **[Deployment Guides](docs/2-deployment/)**.
 
 ## Advanced: Installation from Source (For Developers)
 
@@ -64,7 +72,7 @@ If you wish to modify the code or run the server outside of a container, you wil
 
 Once deployed, you can connect your preferred LLM interface (e.g., Claude Desktop, custom AI agents) to your `jor-mcp` instance using the standard Model Context Protocol.
 
-*(Placeholder: Provide a brief example of the JSON configuration required by clients to connect to this server, including how to pass the JWT token).*
+For instructions on connecting Claude Desktop or other AI agents, and a reference of available tools, see our **[Usage Guides](docs/3-usage/)**.
 
 ## Contributing
 

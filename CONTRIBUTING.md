@@ -54,7 +54,9 @@ All information targeted to users and developers must be in English. This explic
 
 *(Note: The only exception is the `description` parameter inside `@mcp.tool()` decorators, which currently target Brazilian LLM contexts, as noted in the Docstrings section below).*
 
-This project uses modern Python (>= 3.12) and relies heavily on asynchronous programming. To maintain high code quality and consistency, we strictly enforce the following standards. Please ensure your code adheres to these before submitting a Pull Request.
+This project uses modern Python (>= 3.12) and relies heavily on asynchronous programming. To understand the high-level system design and integration specifics before contributing, please review our **[Technical Documentation](docs/1-technical/)**.
+
+To maintain high code quality and consistency, we strictly enforce the following standards. Please ensure your code adheres to these before submitting a Pull Request.
 
 *(Note: AI agents contributing to this project must additionally adhere to the rules defined in `AGENTS.md`)*.
 
@@ -104,7 +106,17 @@ We use **pytest** (along with `pytest-asyncio` for our async code) to ensure fun
 
 ## Submitting Changes
 
-When you are ready to submit a Pull Request, please ensure your contributions align with our versioning automations.
+When you are ready to submit a Pull Request, please ensure your contributions align with our versioning automations and documentation standards.
+
+### Documentation Review Requirements
+
+Before any proposed change can be integrated into the `main` branch, you **must** review the `docs/` directory to ensure all relevant documentation is up-to-date with your code changes.
+
+*   **New Features/Tools:** Update the [Usage Guides](docs/3-usage/).
+*   **Architecture/Logic Changes:** Update the [Technical Documentation](docs/1-technical/).
+*   **New Environment Variables/Dependencies:** Update the [Deployment Guides](docs/2-deployment/).
+
+Pull Requests that introduce changes without corresponding documentation updates will be blocked from merging.
 
 ### Branching Strategy & Naming
 
