@@ -17,6 +17,7 @@ Before making any changes, you **must read and adhere to the rules defined in `C
 - Using `uv` for all dependency management and task execution.
 - Enforcing strict typing, linting (`ruff`), and formatting.
 - Ensuring all new code maintains the **90% test coverage minimum**.
+- **Validation:** After writing or modifying code, use the `make check` command to run all linters, formatters, type checkers, and tests at once. Do not propose a Pull Request or consider a task finished until `make check` passes completely.
 - **Documentation Sync:** For every proposed change, you MUST review and update the `docs/` directory to ensure it accurately reflects the new code, new environment variables, or new architecture. Never submit code changes without checking if the technical, deployment, or usage documentation needs updating.
 
 ---

@@ -68,6 +68,13 @@ We use [`uv`](https://github.com/astral-sh/uv) as our standard dependency manage
 *   **Add a new dependency:** `uv add <package>`
 *   **Run a command in the isolated environment:** `uv run <command>`
 
+### 🛠️ Quick Utilities (Makefile)
+
+To streamline local development, this project provides a `Makefile` with bundled commands:
+
+*   **`make check`**: Runs the entire validation suite in one go. This includes linting (`ruff`), strict formatting checks, static type checking (`mypy`), and running all tests while enforcing the 90% coverage rule. **You should run this before opening a Pull Request.**
+*   **`make run`**: Builds the Docker image locally and starts the container on port 8080, reading configuration from your `.env` file.
+
 ### Linting & Formatting
 
 We use **Ruff** for all code linting and formatting.

@@ -48,10 +48,12 @@ The easiest way to get `jor-mcp` running is via Docker.
     PORT=8080
     ```
 
-3.  **Run the container:**
+3.  **Build and Run the container:**
+    You can build and start the server instantly using the provided Makefile:
     ```bash
-    docker run -d -p 8080:8080 --env-file .env jor-mcp:latest
+    make run
     ```
+    *(Alternatively, run `docker build -t jor-mcp:latest .` followed by `docker run --rm -p 8080:8080 --env-file .env jor-mcp:latest`)*
 
 ## Configuration for Your Newsroom
 
