@@ -7,6 +7,7 @@ This document provides a high-level overview of the Jor-MCP system architecture,
 This diagram illustrates the Jor-MCP server in its environment. It acts as an orchestrator, receiving requests from an AI Agent (Client), validating authentication via Firebase, applying rate limits via Redis, and fetching data from WordPress and GitHub.
 
 ```mermaid
+%%{init: {'theme': 'base'}}%%
 graph TD
     %% External Actors
     Client[AI Agent / LLM Client]
@@ -48,6 +49,7 @@ graph TD
 This sequence diagram details the strict order of operations for every incoming request. It highlights the security layers (Auth and Rate Limiting) executing before the business logic (FastMCP Tools).
 
 ```mermaid
+%%{init: {'theme': 'base'}}%%
 sequenceDiagram
     participant C as LLM Client
     participant Auth as Auth Middleware
