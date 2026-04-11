@@ -32,11 +32,6 @@ graph TD
     JorMCP -- "5. Fetch Posts/Pages" --> WP
     JorMCP -- "6. Fetch JSON Content" --> GH
     
-    %% Styling
-    classDef external fill:#f9f9f9,stroke:#333,stroke-width:2px;
-    classDef internal fill:#e1f5fe,stroke:#0288d1,stroke-width:2px;
-    classDef db fill:#e8f5e9,stroke:#388e3c,stroke-width:2px;
-    classDef gateway fill:#fff3e0,stroke:#e65100,stroke-width:2px;
     
     class Client,FirebaseAuth,WP,GH external;
     class JorMCP internal;
