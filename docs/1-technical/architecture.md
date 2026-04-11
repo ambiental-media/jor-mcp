@@ -32,7 +32,6 @@ graph TD
     JorMCP -- "5. Fetch Posts/Pages" --> WP
     JorMCP -- "6. Fetch JSON Content" --> GH
     
-    
     class Client,FirebaseAuth,WP,GH external;
     class JorMCP internal;
     class LB gateway;
@@ -44,7 +43,7 @@ graph TD
 This sequence diagram details the strict order of operations for every incoming request. It highlights the security layers (Auth and Rate Limiting) executing before the business logic (FastMCP Tools).
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 sequenceDiagram
     participant C as LLM Client
     participant Auth as Auth Middleware
