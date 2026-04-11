@@ -7,7 +7,7 @@ This document provides a high-level overview of the Jor-MCP system architecture,
 This diagram illustrates the Jor-MCP server in its environment. It acts as an orchestrator, receiving requests from an AI Agent (Client), validating authentication via Firebase, applying rate limits via Redis, and fetching data from WordPress and GitHub.
 
 ```mermaid
-%%{init: {'theme': 'dark'}}%%
+%%{init: {'theme': 'neutral'}}%%
 graph TD
     %% External Actors
     Client[AI Agent / LLM Client]
