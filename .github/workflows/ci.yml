@@ -7,7 +7,7 @@ env:
   REGISTRY: us-central1-docker.pkg.dev
   PROJECT_ID: jor-mcp
   REPOSITORY: jor-mcp
-  IMAGE: jor-mcp
+  IMAGE: jor-mcp-server
 
 jobs:
   check:
@@ -58,10 +58,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Decode credentials
+        id: decode_si
+        run: |
+          DECODED_CREDENTIALS="$(echo -n ${{ secrets.GCP_SA_KEY }} | base64 --decode)"
+          echo "::add-mask::$DECODED_CREDENTIALS"
+          echo "creds=$DECODED_CREDENTIALS" >> "$GITHUB_OUTPUT"
+
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v1
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: '${{ steps.decode_si.outputs.creds }}'
 
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
