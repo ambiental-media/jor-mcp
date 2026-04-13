@@ -5,10 +5,10 @@ description = "Servidor MCP para a Ambiental Media"
 requires-python = ">=3.12"
 
 dependencies = [
-    "fastmcp==3.0.0",
+    "fastmcp>=3.2.0",
     "uvicorn==0.41.0",
     "httpx==0.28.1",
-    "pyjwt>=2.8.0",
+    "pyjwt>=2.12.0",
     "opentelemetry-sdk>=1.25.0",
     "opentelemetry-exporter-otlp-proto-http>=1.25.0",
     "opentelemetry-instrumentation-httpx>=0.46b0",
