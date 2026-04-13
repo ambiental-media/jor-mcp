@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  pull_request:
+
+env:
+  REGISTRY: us-central1-docker.pkg.dev
+  PROJECT_ID: jor-mcp
+  REPOSITORY: jor-mcp
+  IMAGE: jor-mcp
+
+jobs:
+  check:
+    name: Code Quality & Security
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Lint (Ruff)
+        run: uv run ruff check .
+
+      - name: Format check (Ruff)
+        run: uv run ruff format --check .
+
+      - name: Type check (Mypy)
+        run: uv run mypy .
+
+      - name: Tests & Coverage (Pytest)
+        run: uv run pytest --cov=src --cov-fail-under=90
+
+      - name: SAST (Bandit)
+        run: uv run bandit -c pyproject.toml -r src/
+
+      - name: SCA - Dependency audit (pip-audit)
+        run: |
+          uv export --no-hashes --all-groups -o requirements-ci.txt
+          uv run pip-audit -r requirements-ci.txt
+
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: check
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:test .
+
+      - name: Security scan (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:test
+          format: table
+          exit-code: "1"
+          severity: CRITICAL
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:test

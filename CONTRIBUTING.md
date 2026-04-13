@@ -15,6 +15,8 @@ This document provides guidelines and instructions for contributing to this proj
   - [Docstrings & Comments](#docstrings--comments)
   - [Testing](#testing)
 - [Submitting Changes](#submitting-changes)
+- [Continuous Integration (CI)](#continuous-integration-ci)
+- [Security Scanning](#security-scanning)
 - [Reporting Bugs](#reporting-bugs)
 
 ---
@@ -31,6 +33,7 @@ Before contributing to `jor-mcp`, ensure you have the following installed on you
 *   **Python:** Version `3.12` or higher is required.
 *   **uv:** We use `uv` as our extremely fast Python package and project manager. Follow the [installation instructions here](https://docs.astral.sh/uv/getting-started/installation/).
 *   **Docker / Container Runtime:** (Optional but recommended) Useful for running local test instances of dependencies or spinning up the server in a containerized environment. You can use Docker Desktop, Docker community edition, or open-source alternatives like [Colima](https://github.com/abiosoft/colima) or [Podman](https://podman.io/).
+*   **Trivy:** Required to run the full local validation suite (`make check` and `make check-container`). Follow the [installation instructions here](https://aquasecurity.github.io/trivy/latest/getting-started/installation/).
 
 ---
 
@@ -72,7 +75,10 @@ We use [`uv`](https://github.com/astral-sh/uv) as our standard dependency manage
 
 To streamline local development, this project provides a `Makefile` with bundled commands:
 
-*   **`make check`**: Runs the entire validation suite in one go. This includes linting (`ruff`), strict formatting checks, static type checking (`mypy`), and running all tests while enforcing the 90% coverage rule. **You should run this before opening a Pull Request.**
+*   **`make check`**: Runs the entire validation suite in one go. This includes linting (`ruff`), strict formatting checks, static type checking (`mypy`), tests with 90% coverage enforcement, SAST (`bandit`), dependency audit (`pip-audit`), and a container vulnerability scan (`trivy`). **You should run this before opening a Pull Request.**
+*   **`make check-sast`**: Runs static application security testing on the source code using `bandit`.
+*   **`make check-deps`**: Audits project dependencies for known vulnerabilities using `pip-audit`.
+*   **`make check-container`**: Builds the Docker image and scans it for critical vulnerabilities using `trivy`.
 *   **`make run`**: Builds the Docker image locally and starts the container on port 8080, reading configuration from your `.env` file.
 
 ### Linting & Formatting
@@ -147,6 +153,88 @@ We have automations in place that parse merged Pull Requests to automatically bu
 1. **Minimum Requirement:** At least **one commit** within the scope of your Pull Request must strictly respect the Conventional Commits format (e.g., `feat: add new search parameter`, `fix: resolve JWT validation error`).
 2. **Version Bumping (Precedence):** If your Pull Request contains multiple conventional commits, the automated version bump (`MAJOR.MINOR.PATCH`) will be determined by the commit with the **highest precedence**. For example, a `feat` triggers a `MINOR` bump, taking precedence over a `fix` (which triggers a `PATCH` bump). A `BREAKING CHANGE` triggers a `MAJOR` bump and overrides everything else.
 3. **Release Notes:** Even though only the highest precedence commit dictates the version number change, **all** information provided by all conventional commits in the Pull Request will be aggregated and used to populate the GitHub release notes.
+
+---
+
+## Continuous Integration (CI)
+
+Every Pull Request automatically triggers the CI pipeline configured in `.github/workflows/ci.yml`. The pipeline is divided into two jobs that must pass before any code can be merged.
+
+### Job: `check`
+
+Runs all code quality and security validations. This job mirrors the local `make check` command, but executes each step individually to prevent any bypass through local Makefile modifications.
+
+| Step | Tool | Behavior |
+|---|---|---|
+| Lint | `ruff check .` | Reports issues, never auto-fixes |
+| Format check | `ruff format --check .` | Reports issues, never auto-fixes |
+| Type check | `mypy .` | Fails the job on any type error |
+| Tests & Coverage | `pytest --cov=src --cov-fail-under=90` | Fails if coverage drops below 90% |
+| SAST | `bandit -c pyproject.toml -r src/` | Fails on critical severity findings |
+| Dependency audit | `pip-audit` | Fails on known vulnerabilities |
+
+### Job: `build-and-push`
+
+Only runs if the `check` job completes successfully. Builds the Docker image, scans it for critical vulnerabilities with Trivy, and pushes it to the Artifact Registry with the tag `:test`.
+
+| Step | Detail |
+|---|---|
+| Build | Docker image built from the project `Dockerfile` |
+| Security scan | Trivy scans the image — fails if `CRITICAL` vulnerabilities are found |
+| Push | Image pushed to Artifact Registry with tag `:test` |
+
+### Required GitHub Secrets
+
+For the `build-and-push` job to authenticate with Google Cloud, the following secret must be configured in the repository settings by a maintainer:
+
+| Secret | Description |
+|---|---|
+| `GCP_SA_KEY` | JSON key of a GCP Service Account with `roles/artifactregistry.writer` permission |
+
+### Interpreting CI Failures
+
+*   **Lint/Format failure:** Run `uv run ruff check .` and `uv run ruff format --check .` locally to see the reported issues.
+*   **Type check failure:** Run `uv run mypy .` locally and fix all reported type errors.
+*   **Test/Coverage failure:** Run `uv run pytest --cov=src --cov-fail-under=90` locally. Ensure new code has corresponding tests.
+*   **SAST/Dependency failure:** Run `make check-sast` or `make check-deps` locally to inspect the findings.
+*   **Container scan failure:** A critical vulnerability was found in the Docker image. Review the Trivy report in the CI logs and update the affected dependency or base image.
+
+---
+
+## Security Scanning
+
+This project integrates three open-source security scanning tools to mitigate vulnerabilities before any code is published. All three tools run automatically in the CI pipeline, and two of them (`bandit` and `pip-audit`) can be run locally via the `Makefile`.
+
+### Tools
+
+*   **Bandit** — Static Application Security Testing (SAST). Analyzes the Python source code in `src/` for common security issues such as hardcoded credentials, unsafe function calls, and injection risks.
+
+*   **pip-audit** — Software Composition Analysis (SCA). Audits all project dependencies (including dev dependencies) against known vulnerability databases (PyPA Advisory Database and OSV) to detect packages with published CVEs.
+
+*   **Trivy** — Container vulnerability scanner. Scans the built Docker image for critical vulnerabilities in OS packages and application dependencies. Trivy runs in the CI pipeline via a GitHub Action and **must also be installed locally** to run `make check` and `make check-container` on your machine.
+
+### Running Locally
+```bash
+# SAST only
+make check-sast
+
+# Dependency audit only
+make check-deps
+
+# Container scan only (requires Docker and Trivy installed locally)
+make check-container
+
+# Full suite including all security scans
+make check
+```
+
+### Installing Trivy Locally
+
+Trivy is the only security tool that requires a separate local installation (Bandit and pip-audit are installed automatically via `uv sync`). Follow the official [Trivy installation guide](https://aquasecurity.github.io/trivy/latest/getting-started/installation/) for your operating system.
+
+### Severity Policy
+
+The CI pipeline is configured to **fail only on `CRITICAL` severity findings** for both Bandit and Trivy. This is intentional — lower severity findings are reported in the logs for awareness but do not block the pipeline. This threshold can be adjusted in `pyproject.toml` (`[tool.bandit]`) and in the `ci.yml` workflow file.
 
 ---
 
