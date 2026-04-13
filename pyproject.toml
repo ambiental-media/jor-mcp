@@ -59,4 +59,4 @@ omit = ["src/jor_mcp.egg-info/*"]
 
 [tool.bandit]
 exclude_dirs = ["tests/"]
-severity = "high"
+skips = ["B104"]
