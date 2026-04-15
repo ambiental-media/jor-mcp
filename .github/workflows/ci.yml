@@ -42,7 +42,7 @@ jobs:
         run: uv run pytest --cov=src --cov-fail-under=90
 
       - name: SAST (Bandit)
-        run: uv run bandit -c pyproject.toml -r src/
+        run: uv run bandit -c pyproject.toml -r src/ -ll
 
       - name: SCA - Dependency audit (pip-audit)
         run: |
