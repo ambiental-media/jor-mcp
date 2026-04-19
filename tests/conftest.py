@@ -1,10 +1,11 @@
+from collections.abc import Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 
 @pytest.fixture(autouse=True, scope="session")
-def mock_firebase_init() -> MagicMock:
+def mock_firebase_init() -> Generator[MagicMock, None, None]:
     """Prevent actual Firebase Admin SDK initialization during all tests.
 
     Patches get_app() to return a mock (simulating an already-initialized app)
