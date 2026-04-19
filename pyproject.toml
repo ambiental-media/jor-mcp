@@ -12,6 +12,7 @@ dependencies = [
     "opentelemetry-sdk>=1.25.0",
     "opentelemetry-exporter-otlp-proto-http>=1.25.0",
     "opentelemetry-instrumentation-httpx>=0.46b0",
+    "firebase-admin>=7.4.0",
 ]
 
 [dependency-groups]
