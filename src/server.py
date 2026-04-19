@@ -23,7 +23,7 @@ _starlette_app = Starlette(
     routes=[
         Route("/health", health_check),
         Mount("/", app=_mcp_http_app),
-    ]
+    ],
 )
 
 app = AuthMiddleware(_starlette_app)

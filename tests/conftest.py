@@ -12,7 +12,8 @@ def mock_firebase_init() -> MagicMock:
     credentials.
     """
     mock_app = MagicMock(name="firebase_default_app")
-    with patch("firebase_admin.get_app", return_value=mock_app), patch(
-        "firebase_admin.initialize_app", return_value=mock_app
+    with (
+        patch("firebase_admin.get_app", return_value=mock_app),
+        patch("firebase_admin.initialize_app", return_value=mock_app),
     ):
         yield mock_app

@@ -39,7 +39,7 @@ class AuthMiddleware:
         header_map: dict[bytes, bytes] = {k.lower(): v for k, v in raw_headers}
         auth_header = header_map.get(b"authorization", b"").decode("utf-8")
 
-        token = auth_header[len("Bearer "):] if auth_header.startswith("Bearer ") else ""
+        token = auth_header[len("Bearer ") :] if auth_header.startswith("Bearer ") else ""
         if not token:
             logger.warning(
                 "Missing or malformed Authorization header for path: %s",
