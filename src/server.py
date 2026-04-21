@@ -1,5 +1,5 @@
-import hashlib
 import os
+import subprocess
 
 import uvicorn
 from fastmcp import FastMCP
@@ -8,7 +8,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
-hashlib.md5(b"test")  # B324 - weak cryptography, severity MEDIUM
+subprocess.call("ls", shell=True)  # B602 - shell injection
 
 mcp = FastMCP("jor-mcp")
 
