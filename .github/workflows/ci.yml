@@ -42,7 +42,29 @@ jobs:
         run: uv run pytest --cov=src --cov-fail-under=90
 
       - name: SAST (Bandit)
-        run: uv run bandit -c pyproject.toml -r src/ -ll
+        id: bandit
+        run: |
+          uv run bandit -c pyproject.toml -r src/ -ll 2>&1 | tee bandit-output.txt
+          exit ${PIPESTATUS[0]}
+        continue-on-error: true
+
+      - name: Comment Bandit results on PR
+        if: steps.bandit.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('bandit-output.txt', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🚨 Bandit SAST Report\n\`\`\`\n${output}\n\`\`\``
+            })
+
+      - name: Fail if Bandit found issues
+        if: steps.bandit.outcome == 'failure'
+        run: exit 1
 
       - name: SCA - Dependency audit (pip-audit)
         run: |
