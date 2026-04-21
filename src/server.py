@@ -1,4 +1,3 @@
-import hashlib
 import os
 
 import uvicorn
@@ -8,7 +7,6 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
-hashlib.md5(b"test")  # B324 - weak cryptography, severity MEDIUM
 
 mcp = FastMCP("jor-mcp")
 
