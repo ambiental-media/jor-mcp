@@ -85,13 +85,17 @@ We use **Ruff** for all code linting and formatting.
 
 *Imports must always be absolute (anchored at `src`) and correctly sorted (enforced by Ruff).*
 
-### Type Checking
+### Type Checking & Data Validation
 
-All functions, methods, and variables must be fully type-hinted using modern Python 3.12+ syntax (e.g., `list[dict[str, Any]]`, `str | None`). Do not use capitalized imports from the `typing` module like `List`, `Dict`, or `Optional`.
+We employ a dual-strategy for type safety to ensure robust code:
 
-We enforce strict static type checking.
+1.  **Static Type Checking (Internal):** All functions, methods, and variables must be fully type-hinted using modern Python 3.12+ syntax (e.g., `list[dict[str, Any]]`, `str | None`). Do not use capitalized imports from the `typing` module like `List`, `Dict`, or `Optional`.
+    *   **Run type checker:** `uv run mypy .` *(or `pyright` depending on exact pyproject.toml configuration)*
+2.  **Runtime Validation (Boundaries):** We use **Pydantic (v2)** to validate all data entering the system from external sources. Whenever you are parsing external API responses (like WordPress/GitHub JSON), configuration files, or user inputs, you must define and use a Pydantic `BaseModel` to ensure the data matches the expected schema before it enters internal application logic.
 
-*   **Run type checker:** `uv run mypy .` *(or `pyright` depending on exact pyproject.toml configuration)*
+### Logging
+We rely on OpenTelemetry auto-instrumentation. Do not import or use OpenTelemetry SDKs manually in the application code.
+Use the standard Python `logging` module (`logger = logging.getLogger(__name__)`). When logging contextual data, do not use string interpolation; instead, pass variables via the `extra={}` dictionary (e.g., `logger.info("Request successful", extra={"target_url": url})`). This allows OpenTelemetry to index the variables as searchable attributes.
 
 ### Docstrings & Comments
 
