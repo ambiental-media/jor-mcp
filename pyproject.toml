@@ -16,6 +16,7 @@ dependencies = [
     "opentelemetry-sdk>=1.25.0",
     "opentelemetry-exporter-otlp-proto-http>=1.25.0",
     "opentelemetry-instrumentation-httpx>=0.46b0",
+    "pydantic>=2.8.0",
 ]
 
 [dependency-groups]
@@ -42,6 +43,7 @@ python_version = "3.13"
 strict = true
 ignore_missing_imports = true
 exclude = ["build/", "src/jor_mcp.egg-info/"]
+plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = "src.tools"
