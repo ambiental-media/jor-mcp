@@ -875,6 +875,7 @@ dependencies = [
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "opentelemetry-instrumentation-httpx" },
     { name = "opentelemetry-sdk" },
+    { name = "pydantic" },
     { name = "pyjwt" },
     { name = "uvicorn" },
 ]
@@ -897,6 +898,7 @@ requires-dist = [
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.25.0" },
     { name = "opentelemetry-instrumentation-httpx", specifier = ">=0.46b0" },
     { name = "opentelemetry-sdk", specifier = ">=1.25.0" },
+    { name = "pydantic", specifier = ">=2.8.0" },
     { name = "pyjwt", specifier = ">=2.8.0" },
     { name = "uvicorn", specifier = "==0.41.0" },
 ]
