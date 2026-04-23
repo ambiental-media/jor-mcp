@@ -5,10 +5,14 @@ description = "Servidor MCP para a Ambiental Media"
 requires-python = ">=3.12"
 
 dependencies = [
-    "fastmcp==3.0.0",
+    "fastmcp>=3.2.0",
     "uvicorn==0.41.0",
     "httpx==0.28.1",
-    "pyjwt>=2.8.0",
+    "pyjwt>=2.12.0",
+    "cryptography>=46.0.7",
+    "pygments>=2.20.0",
+    "authlib>=1.6.11",
+    "python-multipart>=0.0.26",
     "opentelemetry-sdk>=1.25.0",
     "opentelemetry-exporter-otlp-proto-http>=1.25.0",
     "opentelemetry-instrumentation-httpx>=0.46b0",
@@ -17,8 +21,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "bandit>=1.9.4",
     "mypy>=1.10.0",
-    "pytest>=9.0.0",
+    "pip-audit>=2.10.0",
+    "pytest>=9.0.3",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=5.0.0",
     "respx>=0.21.0",
@@ -56,3 +62,8 @@ pythonpath = ["."]
 [tool.coverage.run]
 source = ["src"]
 omit = ["src/jor_mcp.egg-info/*"]
+
+[tool.bandit]
+exclude_dirs = ["tests/"]
+skips = ["B104"]
+severity = "medium"
