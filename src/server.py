@@ -1,5 +1,8 @@
+import contextlib
 import os
+from collections.abc import AsyncGenerator
 
+import firebase_admin
 import uvicorn
 from fastmcp import FastMCP
 from starlette.applications import Starlette
@@ -18,8 +21,20 @@ async def health_check(request: Request) -> JSONResponse:
 
 _mcp_http_app = mcp.http_app()
 
+
+@contextlib.asynccontextmanager
+async def server_lifespan(app: Starlette) -> AsyncGenerator[None, None]:
+    try:
+        firebase_admin.get_app()
+    except ValueError:
+        firebase_admin.initialize_app()
+
+    async with _mcp_http_app.lifespan(app):
+        yield
+
+
 _starlette_app = Starlette(
-    lifespan=_mcp_http_app.lifespan,
+    lifespan=server_lifespan,
     routes=[
         Route("/health", health_check),
         Mount("/", app=_mcp_http_app),

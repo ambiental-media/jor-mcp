@@ -4,7 +4,7 @@ from typing import Any, cast
 import firebase_admin
 import firebase_admin.exceptions
 from firebase_admin import auth
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
@@ -30,10 +30,6 @@ class AuthMiddleware:
 
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
-        try:
-            firebase_admin.get_app()
-        except ValueError:
-            firebase_admin.initialize_app()
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] not in ("http", "websocket"):
@@ -60,7 +56,7 @@ class AuthMiddleware:
         try:
             decoded_dict: dict[str, Any] = auth.verify_id_token(token, clock_skew_seconds=60)
             decoded_token = DecodedToken.model_validate(decoded_dict)
-        except (firebase_admin.exceptions.FirebaseError, ValueError) as exc:
+        except (firebase_admin.exceptions.FirebaseError, ValueError, ValidationError) as exc:
             logger.warning("Firebase token verification failed", extra={"error": str(exc)})
             await _send_unauthorized(send)
             return

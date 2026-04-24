@@ -9,8 +9,8 @@ def mock_firebase_init() -> Generator[MagicMock, None, None]:
     """Prevent actual Firebase Admin SDK initialization during all tests.
 
     Patches get_app() to return a mock (simulating an already-initialized app)
-    so AuthMiddleware.__init__ never calls initialize_app() against real GCP
-    credentials.
+    so the server_lifespan in src/server.py never calls initialize_app() against
+    real GCP credentials.
     """
     mock_app = MagicMock(name="firebase_default_app")
     with (

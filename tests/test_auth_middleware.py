@@ -1,5 +1,5 @@
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from starlette.testclient import TestClient
@@ -172,30 +172,10 @@ async def test_non_http_scope_passes_through_without_auth() -> None:
     assert called["app"] is True
 
 
-# ---------------------------------------------------------------------------
-# __init__ branch coverage
-# ---------------------------------------------------------------------------
-
-
-def test_auth_middleware_init_initializes_app_when_not_present() -> None:
-    """__init__ calls initialize_app() when no Firebase app exists yet."""
-    from src.middleware.auth import AuthMiddleware
-
-    with (
-        patch("firebase_admin.get_app", side_effect=ValueError("No app")),
-        patch("firebase_admin.initialize_app") as mock_init,
-    ):
-        AuthMiddleware(MagicMock())
-        mock_init.assert_called_once()
-
-
-def test_auth_middleware_init_skips_init_when_app_exists() -> None:
-    """__init__ does NOT call initialize_app() when an app is already registered."""
-    from src.middleware.auth import AuthMiddleware
-
-    with (
-        patch("firebase_admin.get_app", return_value=MagicMock()),
-        patch("firebase_admin.initialize_app") as mock_init,
-    ):
-        AuthMiddleware(MagicMock())
-        mock_init.assert_not_called()
+def test_validation_error_on_token_returns_401(client: TestClient) -> None:
+    """A Pydantic ValidationError during token validation returns 401."""
+    # verify_id_token returns a dict missing the required 'uid' field,
+    # which causes DecodedToken.model_validate() to raise ValidationError.
+    with patch("firebase_admin.auth.verify_id_token", return_value={"email": "test@example.com"}):
+        resp = client.get("/mcp/", headers={"Authorization": "Bearer valid.jwt.token"})
+    assert resp.status_code == 401
