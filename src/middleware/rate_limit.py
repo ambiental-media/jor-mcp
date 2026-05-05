@@ -72,7 +72,7 @@ class RateLimitMiddleware:
             allowed, retry_after = await _check_sliding_window(
                 redis_client, uid, max_requests, window_seconds
             )
-        except Exception as exc:
+        except (ConnectionError, TimeoutError, RuntimeError) as exc:
             logger.warning(
                 "Redis rate-limit check failed; failing open",
                 extra={"uid": uid, "error": str(exc)},
