@@ -94,15 +94,17 @@ def main() -> None:
                 print(colored(f"  [{i:02d}] {status} passed through rate limiter", GREEN))
 
         print("\n--- Checking Redis ---")
+        from typing import cast
+
         import redis
 
         r = redis.Redis.from_url(REDIS_URL, decode_responses=True)
-        all_keys = r.keys("rl:*")
+        all_keys = cast(list[str], r.keys("rl:*"))
         if not all_keys:
             print("No rl:* keys found in Redis.")
         for key in all_keys:
             count = r.zcard(key)
-            entries = r.zrange(key, 0, -1, withscores=True)
+            entries = cast(list[tuple[str, float]], r.zrange(key, 0, -1, withscores=True))
             print(f"Redis key : {key}")
             print(f"Entries   : {count}")
             for member, score in entries:
