@@ -14,7 +14,7 @@ check:
 	uv run bandit -c pyproject.toml -r src/
 	@echo "[6/7] Dependency Audit (pip-audit)..."
 	uv export --no-hashes --all-groups -o requirements-ci.txt
-	uv run pip-audit -r requirements-ci.txt
+	uv run pip-audit -r requirements-ci.txt --no-deps
 	@echo "[7/7] Container Scan (Trivy)..."
 	docker build -t jor-mcp:latest .
 	trivy image --exit-code 1 --severity CRITICAL jor-mcp:latest
@@ -27,7 +27,7 @@ check-sast:
 # SCA: audit dependencies for known vulnerabilities
 check-deps:
 	uv export --no-hashes --all-groups -o requirements-ci.txt
-	uv run pip-audit -r requirements-ci.txt
+	uv run pip-audit -r requirements-ci.txt --no-deps
 
 # Container scan: scan the Docker image for vulnerabilities
 check-container:
