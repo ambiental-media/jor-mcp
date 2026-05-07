@@ -104,8 +104,8 @@ jobs:
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:test
           format: table
-          exit-code: "1"
-          severity: CRITICAL
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
 
       - name: Push Docker image
         run: |
