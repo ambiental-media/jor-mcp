@@ -69,7 +69,7 @@ jobs:
       - name: SCA - Dependency audit (pip-audit)
         run: |
           uv export --no-hashes --all-groups -o requirements-ci.txt
-          uv run pip-audit -r requirements-ci.txt --no-deps
+          uv run pip-audit -r requirements-ci.txt --no-deps --disable-pip
 
   build-and-push:
     name: Build & Push Docker Image
