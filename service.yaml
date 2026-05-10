@@ -1,0 +1,79 @@
+# =============================================================================
+# Jor-MCP — Cloud Run Service Manifest
+# =============================================================================
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+
+metadata:
+  name: jor-mcp-server
+  labels:
+    cloud.googleapis.com/location: us-central1
+  annotations:
+    run.googleapis.com/ingress: internal-and-cloud-load-balancing
+
+spec:
+  template:
+    metadata:
+      annotations:
+        # ── Auto-scaling ──────────────────────────────────────────────────────
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "5"
+
+        # ── Secret Manager — lookup names → resource IDs ──────────────────────
+        run.googleapis.com/secrets: >-
+          redis-url:projects/${GCP_PROJECT_NUMBER}/secrets/REDIS_URL,
+          github-token:projects/${GCP_PROJECT_NUMBER}/secrets/GITHUB_TOKEN,
+          jwt-secret:projects/${GCP_PROJECT_NUMBER}/secrets/JWT_SECRET
+
+    spec:
+      # ← ALTERAÇÃO 1: service account preenchida com o valor real do GCP
+      serviceAccountName: 959918358302-compute@developer.gserviceaccount.com
+
+      containers:
+        - image: ${IMAGE_URL}
+
+          ports:
+            - name: http1
+              containerPort: 8080
+
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+
+          env:
+            # ── Variáveis abertas ─────────────────────────────────────────────
+            - name: PORT
+              value: "8080"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: FIREBASE_PROJECT_ID
+              value: "${FIREBASE_PROJECT_ID}"
+            - name: WORDPRESS_API_URL
+              value: "${WORDPRESS_API_URL}"
+            - name: GITHUB_REPOS
+              value: "${GITHUB_REPOS}"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "${OTEL_EXPORTER_OTLP_ENDPOINT}"
+
+            # ── Segredos via Secret Manager ───────────────────────────────────
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: redis-url
+                  key: latest
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: github-token
+                  key: latest
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: jwt-secret
+                  key: latest
+
+  traffic:
+    - percent: 100
+      latestRevision: true
