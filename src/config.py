@@ -20,15 +20,9 @@ REDIS_SOCKET_TIMEOUT: float = float(os.environ.get("REDIS_SOCKET_TIMEOUT", "1.0"
 REDIS_CONNECT_TIMEOUT: float = float(os.environ.get("REDIS_CONNECT_TIMEOUT", "1.0"))
 """Seconds to wait when opening a new Redis connection."""
 
-# Rate-limit quotas per tier: (max_requests, window_seconds)
-RATE_LIMIT_BASIC: tuple[int, int] = (
-    int(os.environ.get("RATE_LIMIT_BASIC_REQUESTS", "20")),
-    int(os.environ.get("RATE_LIMIT_BASIC_WINDOW", "60")),
-)
-"""Quota for 'basic' tier users: (requests, window_in_seconds)."""
+# Rate-limit quotas per tier: monthly request allowance (Fixed Window)
+RATE_LIMIT_BASIC: int = int(os.environ.get("RATE_LIMIT_BASIC_REQUESTS", "500"))
+"""Monthly request quota for 'basic' tier users."""
 
-RATE_LIMIT_PRO: tuple[int, int] = (
-    int(os.environ.get("RATE_LIMIT_PRO_REQUESTS", "100")),
-    int(os.environ.get("RATE_LIMIT_PRO_WINDOW", "60")),
-)
-"""Quota for 'pro' tier users: (requests, window_in_seconds)."""
+RATE_LIMIT_PRO: int = int(os.environ.get("RATE_LIMIT_PRO_REQUESTS", "2000"))
+"""Monthly request quota for 'pro' tier users."""
