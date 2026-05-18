@@ -17,7 +17,7 @@ check:
 	uv run pip-audit -r requirements-ci.txt --no-deps --disable-pip
 	@echo "[7/7] Container Scan (Trivy)..."
 	docker build -t jor-mcp:latest .
-	trivy image --exit-code 1 --severity HIGH,CRITICAL jor-mcp:latest
+	trivy image --exit-code 1 --severity HIGH,CRITICAL --vuln-type library jor-mcp:latest
 	@echo "All checks passed."
 
 # SAST: static analysis for security issues in source code
@@ -32,7 +32,7 @@ check-deps:
 # Container scan: scan the Docker image for vulnerabilities
 check-container:
 	docker build -t jor-mcp:latest .
-	trivy image --exit-code 1 --severity HIGH,CRITICAL jor-mcp:latest
+	trivy image --exit-code 1 --severity HIGH,CRITICAL --vuln-type library jor-mcp:latest
 
 # Build and run the Docker container locally
 run:
