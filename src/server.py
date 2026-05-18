@@ -3,6 +3,7 @@ import os
 from collections.abc import AsyncGenerator
 
 import firebase_admin
+import httpx
 import redis.asyncio as aioredis
 import uvicorn
 from fastmcp import FastMCP
@@ -12,7 +13,15 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
-from src.config import REDIS_CONNECT_TIMEOUT, REDIS_SOCKET_TIMEOUT, REDIS_URL
+import src.http_client as _http_client_mod
+from src.config import (
+    HTTP_MAX_CONNECTIONS,
+    HTTP_MAX_KEEPALIVE_CONNECTIONS,
+    HTTP_TIMEOUT,
+    REDIS_CONNECT_TIMEOUT,
+    REDIS_SOCKET_TIMEOUT,
+    REDIS_URL,
+)
 from src.middleware.auth import AuthMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 
@@ -57,10 +66,20 @@ async def server_lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     )
     _redis_client = aioredis.Redis(connection_pool=pool)
 
+    _http_client_mod._http_client = httpx.AsyncClient(
+        limits=httpx.Limits(
+            max_keepalive_connections=HTTP_MAX_KEEPALIVE_CONNECTIONS,
+            max_connections=HTTP_MAX_CONNECTIONS,
+        ),
+        timeout=HTTP_TIMEOUT,
+    )
+
     try:
         async with _mcp_http_app.lifespan(app):
             yield
     finally:
+        await _http_client_mod._http_client.aclose()
+        _http_client_mod._http_client = None
         await _redis_client.aclose()
         _redis_client = None
 

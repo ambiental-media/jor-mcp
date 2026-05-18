@@ -39,12 +39,14 @@ async def test_server_lifespan_initializes_firebase_when_not_present() -> None:
         yield
 
     fake_redis = _make_fake_redis()
+    fake_http_client = AsyncMock()
     with (
         patch("firebase_admin.get_app", side_effect=ValueError("No app")),
         patch("firebase_admin.initialize_app") as mock_init,
         patch("src.server._mcp_http_app") as mock_mcp_app,
         patch("redis.asyncio.ConnectionPool.from_url", return_value=MagicMock()),
         patch("redis.asyncio.Redis", return_value=fake_redis),
+        patch("httpx.AsyncClient", return_value=fake_http_client),
     ):
         mock_mcp_app.lifespan = fake_mcp_lifespan
         async with server_lifespan(MagicMock()):
@@ -62,12 +64,14 @@ async def test_server_lifespan_skips_init_when_firebase_already_present() -> Non
         yield
 
     fake_redis = _make_fake_redis()
+    fake_http_client = AsyncMock()
     with (
         patch("firebase_admin.get_app", return_value=MagicMock()),
         patch("firebase_admin.initialize_app") as mock_init,
         patch("src.server._mcp_http_app") as mock_mcp_app,
         patch("redis.asyncio.ConnectionPool.from_url", return_value=MagicMock()),
         patch("redis.asyncio.Redis", return_value=fake_redis),
+        patch("httpx.AsyncClient", return_value=fake_http_client),
     ):
         mock_mcp_app.lifespan = fake_mcp_lifespan
         async with server_lifespan(MagicMock()):
