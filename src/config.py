@@ -39,3 +39,15 @@ HTTP_MAX_KEEPALIVE_CONNECTIONS: int = int(os.environ.get("HTTP_MAX_KEEPALIVE_CON
 
 HTTP_MAX_CONNECTIONS: int = int(os.environ.get("HTTP_MAX_CONNECTIONS", "100"))
 """Maximum total concurrent connections allowed in the pool."""
+
+# ---------------------------------------------------------------------------
+# WordPress REST API
+# ---------------------------------------------------------------------------
+
+WP_API_BASE_URL: str = os.environ.get(
+    "WORDPRESS_API_URL", "https://ambiental.media/wp-json"
+).rstrip("/")
+"""Base URL for the WordPress REST API (no trailing slash).
+
+Example: https://ambiental.media/wp-json
+"""
