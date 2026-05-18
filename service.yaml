@@ -21,11 +21,7 @@ spec:
         autoscaling.knative.dev/maxScale: "5"
 
         # ── Secret Manager — lookup names → resource IDs ──────────────────────
-        run.googleapis.com/secrets: >-
-          redis-url:projects/${GCP_PROJECT_NUMBER}/secrets/REDIS_URL,
-          github-token:projects/${GCP_PROJECT_NUMBER}/secrets/GITHUB_TOKEN,
-          jwt-secret:projects/${GCP_PROJECT_NUMBER}/secrets/JWT_SECRET
-
+        run.googleapis.com/secrets: "redis-url:projects/${GCP_PROJECT_NUMBER}/secrets/REDIS_URL,github-token:projects/${GCP_PROJECT_NUMBER}/secrets/GITHUB_TOKEN,jwt-secret:projects/${GCP_PROJECT_NUMBER}/secrets/JWT_SECRET"
     spec:
       # ← ALTERAÇÃO 1: service account preenchida com o valor real do GCP
       serviceAccountName: 959918358302-compute@developer.gserviceaccount.com
@@ -44,8 +40,6 @@ spec:
 
           env:
             # ── Variáveis abertas ─────────────────────────────────────────────
-            - name: PORT
-              value: "8080"
             - name: LOG_LEVEL
               value: "INFO"
             - name: FIREBASE_PROJECT_ID
