@@ -104,6 +104,7 @@ jobs:
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:test
           format: table
+          # TO-DO: include 'os,library' once official debian based python image is patched in Docker hub
           vuln-type: 'library'
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
