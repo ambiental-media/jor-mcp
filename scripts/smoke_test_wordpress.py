@@ -8,12 +8,14 @@ Usage:
     uv run python scripts/smoke_test_wordpress.py
 
     # Test against a different WordPress installation:
-    WORDPRESS_API_URL=https://sua-redacao.com.br/wp-json uv run python scripts/smoke_test_wordpress.py
+    WORDPRESS_API_URL=https://sua-redacao.com.br/wp-json \
+        uv run python scripts/smoke_test_wordpress.py
 
     # Optionally override the article to fetch:
     WP_SMOKE_IDENTIFIER=1234 uv run python scripts/smoke_test_wordpress.py
-    WP_SMOKE_IDENTIFIER=https://ambiental.media/alguma-materia/ uv run python scripts/smoke_test_wordpress.py
     WP_SMOKE_IDENTIFIER=algum-slug uv run python scripts/smoke_test_wordpress.py
+    WP_SMOKE_IDENTIFIER=https://ambiental.media/alguma-materia/ \
+        uv run python scripts/smoke_test_wordpress.py
 """
 
 import asyncio
@@ -64,9 +66,7 @@ async def _discover_identifier() -> str:
         print(f"{RED}✗ No posts found at {url}{RESET}")
         sys.exit(1)
     post = posts[0]
-    print(
-        f"{YELLOW}  Auto-discovered post: id={post['id']}  link={post['link']}{RESET}"
-    )
+    print(f"{YELLOW}  Auto-discovered post: id={post['id']}  link={post['link']}{RESET}")
     return str(post["id"])
 
 
@@ -107,7 +107,7 @@ async def run() -> None:
     print(f"  Date    : {date}")
     print(f"  Link    : {link}")
     print(f"  Content : {len(content)} chars")
-    print(f"\n--- First 500 chars of cleaned content ---")
+    print("\n--- First 500 chars of cleaned content ---")
     print(content[:500])
     print("---\n")
 
@@ -135,7 +135,8 @@ async def run() -> None:
 
     print(f"\n{GREEN}All smoke tests passed.{RESET}\n")
 
-    await _http_client_mod._http_client.aclose()
+    if _http_client_mod._http_client is not None:
+        await _http_client_mod._http_client.aclose()
 
 
 if __name__ == "__main__":
