@@ -10,6 +10,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from redis import exceptions as redis_exceptions
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -30,30 +31,17 @@ async def _noop_receive() -> dict[str, Any]:
     return {"type": "http.request", "body": b"", "more_body": False}
 
 
-def _make_redis_mock(*, count_before: int = 0, oldest_ms: int = 0) -> MagicMock:
-    """Build a Redis mock whose pipeline simulates *count_before* prior requests.
+def _make_redis_mock(*, count: int = 1) -> MagicMock:
+    """Build a Redis mock whose INCR returns *count*.
 
     Args:
-        count_before: The ZCARD result returned by the pipeline (requests already
-            counted within the current window before the new one is added).
-        oldest_ms: Score of the oldest entry returned by ZRANGE (used only when
-            count_before >= limit to compute Retry-After).
+        count: The value returned by ``redis.incr()``, representing the total
+            number of requests for the current billing cycle after this one is
+            counted.
     """
-    pipeline_mock = MagicMock()
-    pipeline_mock.zremrangebyscore = MagicMock()
-    pipeline_mock.zcard = MagicMock()
-    pipeline_mock.zadd = MagicMock()
-    pipeline_mock.expire = MagicMock()
-    pipeline_mock.execute = AsyncMock(return_value=[0, count_before, 1, True])
-
     redis_mock = MagicMock()
-    redis_mock.pipeline = MagicMock(return_value=pipeline_mock)
-
-    if oldest_ms:
-        redis_mock.zrange = AsyncMock(return_value=[(b"entry", float(oldest_ms))])
-    else:
-        redis_mock.zrange = AsyncMock(return_value=[])
-
+    redis_mock.incr = AsyncMock(return_value=count)
+    redis_mock.expire = AsyncMock(return_value=True)
     return redis_mock
 
 
@@ -78,7 +66,7 @@ async def test_health_path_bypasses_rate_limit() -> None:
     await middleware(scope, _noop_receive, AsyncMock())
 
     assert called["app"] is True
-    redis_mock.pipeline.assert_not_called()
+    redis_mock.incr.assert_not_called()
 
 
 async def test_non_http_scope_passes_through() -> None:
@@ -95,7 +83,7 @@ async def test_non_http_scope_passes_through() -> None:
     await middleware({"type": "lifespan"}, _noop_receive, AsyncMock())
 
     assert called["app"] is True
-    redis_mock.pipeline.assert_not_called()
+    redis_mock.incr.assert_not_called()
 
 
 async def test_missing_user_scope_passes_through() -> None:
@@ -114,7 +102,7 @@ async def test_missing_user_scope_passes_through() -> None:
     await middleware(scope, _noop_receive, AsyncMock())
 
     assert called["app"] is True
-    redis_mock.pipeline.assert_not_called()
+    redis_mock.incr.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -126,7 +114,7 @@ async def test_request_within_limit_is_allowed() -> None:
     """A request under quota reaches the inner application."""
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    redis_mock = _make_redis_mock(count_before=5)  # well below any tier limit
+    redis_mock = _make_redis_mock(count=5)  # well below any tier monthly limit
     called = {"app": False}
 
     async def inner_app(scope: Any, receive: Any, send: Any) -> None:
@@ -140,10 +128,10 @@ async def test_request_within_limit_is_allowed() -> None:
 
 @pytest.mark.parametrize("tier", ["basic", "pro"])
 async def test_first_request_always_allowed(tier: str) -> None:
-    """The very first request (count_before=0) is always allowed for any tier."""
+    """The very first request of a billing cycle (count=1) is always allowed."""
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    redis_mock = _make_redis_mock(count_before=0)
+    redis_mock = _make_redis_mock(count=1)
     called = {"app": False}
 
     async def inner_app(scope: Any, receive: Any, send: Any) -> None:
@@ -155,18 +143,41 @@ async def test_first_request_always_allowed(tier: str) -> None:
     assert called["app"] is True
 
 
+async def test_first_request_sets_expire() -> None:
+    """When count==1 (new billing cycle), EXPIRE is set on the Redis key."""
+    from src.middleware.rate_limit import RateLimitMiddleware
+
+    redis_mock = _make_redis_mock(count=1)
+
+    middleware = RateLimitMiddleware(AsyncMock(), lambda: redis_mock)
+    await middleware(_make_scope(), _noop_receive, AsyncMock())
+
+    redis_mock.expire.assert_called_once()
+
+
+async def test_subsequent_request_does_not_set_expire() -> None:
+    """When count > 1 (existing key), EXPIRE is not called again."""
+    from src.middleware.rate_limit import RateLimitMiddleware
+
+    redis_mock = _make_redis_mock(count=2)
+
+    middleware = RateLimitMiddleware(AsyncMock(), lambda: redis_mock)
+    await middleware(_make_scope(), _noop_receive, AsyncMock())
+
+    redis_mock.expire.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # Rate-limit exceeded tests
 # ---------------------------------------------------------------------------
 
 
 async def test_request_over_limit_returns_429() -> None:
-    """When count_before >= limit, the middleware short-circuits with HTTP 429."""
+    """When count > limit, the middleware short-circuits with HTTP 429."""
     from src.config import RATE_LIMIT_BASIC
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    max_requests, _ = RATE_LIMIT_BASIC
-    redis_mock = _make_redis_mock(count_before=max_requests)
+    redis_mock = _make_redis_mock(count=RATE_LIMIT_BASIC + 1)
 
     responses: list[dict[str, Any]] = []
 
@@ -190,17 +201,10 @@ async def test_request_over_limit_returns_429() -> None:
 
 async def test_429_response_includes_retry_after_header() -> None:
     """The Retry-After header value is a positive integer string."""
-    import time
-
     from src.config import RATE_LIMIT_BASIC
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    max_requests, window_seconds = RATE_LIMIT_BASIC
-    now_ms = int(time.time() * 1000)
-    # oldest entry is 10 seconds ago, so retry_after ~ window_seconds - 10
-    oldest_ms = now_ms - 10_000
-
-    redis_mock = _make_redis_mock(count_before=max_requests, oldest_ms=oldest_ms)
+    redis_mock = _make_redis_mock(count=RATE_LIMIT_BASIC + 1)
 
     responses: list[dict[str, Any]] = []
 
@@ -217,21 +221,18 @@ async def test_429_response_includes_retry_after_header() -> None:
 
 
 async def test_pro_tier_has_higher_limit_than_basic() -> None:
-    """Pro-tier users are allowed more requests than basic-tier users."""
+    """Pro-tier users are allowed more requests per month than basic-tier users."""
     from src.config import RATE_LIMIT_BASIC, RATE_LIMIT_PRO
 
-    basic_max, _ = RATE_LIMIT_BASIC
-    pro_max, _ = RATE_LIMIT_PRO
-    assert pro_max > basic_max
+    assert RATE_LIMIT_PRO > RATE_LIMIT_BASIC
 
 
 async def test_basic_tier_limit_is_enforced() -> None:
-    """Exactly at the basic limit, the request is blocked."""
+    """Exactly one over the basic monthly limit, the request is blocked."""
     from src.config import RATE_LIMIT_BASIC
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    max_requests, _ = RATE_LIMIT_BASIC
-    redis_mock = _make_redis_mock(count_before=max_requests)
+    redis_mock = _make_redis_mock(count=RATE_LIMIT_BASIC + 1)
 
     responses: list[dict[str, Any]] = []
 
@@ -245,12 +246,11 @@ async def test_basic_tier_limit_is_enforced() -> None:
 
 
 async def test_pro_tier_limit_is_enforced() -> None:
-    """Exactly at the pro limit, the request is blocked."""
+    """Exactly one over the pro monthly limit, the request is blocked."""
     from src.config import RATE_LIMIT_PRO
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    max_requests, _ = RATE_LIMIT_PRO
-    redis_mock = _make_redis_mock(count_before=max_requests)
+    redis_mock = _make_redis_mock(count=RATE_LIMIT_PRO + 1)
 
     responses: list[dict[str, Any]] = []
 
@@ -264,12 +264,11 @@ async def test_pro_tier_limit_is_enforced() -> None:
 
 
 async def test_unknown_tier_falls_back_to_basic_limit() -> None:
-    """An unrecognised tier string defaults to basic-tier quota."""
+    """An unrecognised tier string defaults to basic-tier monthly quota."""
     from src.config import RATE_LIMIT_BASIC
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    max_requests, _ = RATE_LIMIT_BASIC
-    redis_mock = _make_redis_mock(count_before=max_requests)
+    redis_mock = _make_redis_mock(count=RATE_LIMIT_BASIC + 1)
 
     responses: list[dict[str, Any]] = []
 
@@ -288,13 +287,11 @@ async def test_unknown_tier_falls_back_to_basic_limit() -> None:
 
 
 async def test_redis_exception_fails_open() -> None:
-    """When Redis raises an exception the request passes through (fail-open)."""
+    """When Redis raises a RedisError the request passes through (fail-open)."""
     from src.middleware.rate_limit import RateLimitMiddleware
 
     redis_mock = MagicMock()
-    pipeline_mock = MagicMock()
-    pipeline_mock.execute = AsyncMock(side_effect=ConnectionError("Redis unreachable"))
-    redis_mock.pipeline = MagicMock(return_value=pipeline_mock)
+    redis_mock.incr = AsyncMock(side_effect=redis_exceptions.ConnectionError("Redis unreachable"))
 
     called = {"app": False}
 
@@ -311,13 +308,11 @@ async def test_redis_exception_fails_open() -> None:
 
 
 async def test_redis_timeout_fails_open() -> None:
-    """A TimeoutError from Redis also triggers fail-open behaviour."""
+    """A redis TimeoutError also triggers fail-open behaviour."""
     from src.middleware.rate_limit import RateLimitMiddleware
 
     redis_mock = MagicMock()
-    pipeline_mock = MagicMock()
-    pipeline_mock.execute = AsyncMock(side_effect=TimeoutError("timed out"))
-    redis_mock.pipeline = MagicMock(return_value=pipeline_mock)
+    redis_mock.incr = AsyncMock(side_effect=redis_exceptions.TimeoutError("timed out"))
 
     called = {"app": False}
 

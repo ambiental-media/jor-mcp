@@ -1,19 +1,25 @@
-"""Rate-limiting ASGI middleware using Redis Sliding Window algorithm.
+"""Rate-limiting ASGI middleware using Redis Fixed Window algorithm.
 
 This middleware must be placed after AuthMiddleware in the middleware
 stack.  It reads ``scope["user"]["uid"]`` and ``scope["user"]["tier"]``
-injected by AuthMiddleware, then enforces per-tier quotas stored in Redis.
+injected by AuthMiddleware, then enforces per-tier monthly quotas stored
+in Redis.
+
+The Fixed Window algorithm uses a simple INCR counter per user per billing
+month (key: ``rl:{uid}:YYYY-MM``).  When a new key is created (INCR returns
+1), an EXPIRE is set to the exact start of the next calendar month so the
+counter resets cleanly on the billing date without accumulating stale data.
 
 Fail-open policy: if Redis is unreachable or times out, the request is
 allowed through and the failure is logged for observability.
 """
 
 import logging
-import time
 from collections.abc import Callable
-from typing import Any
+from datetime import UTC, datetime
 
 from redis.asyncio import Redis
+from redis.exceptions import RedisError
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from src.config import RATE_LIMIT_BASIC, RATE_LIMIT_PRO
@@ -22,21 +28,20 @@ logger = logging.getLogger(__name__)
 
 _HEALTH_PATH = "/health"
 
-_TIER_QUOTAS: dict[str, tuple[int, int]] = {
+_TIER_QUOTAS: dict[str, int] = {
     "basic": RATE_LIMIT_BASIC,
     "pro": RATE_LIMIT_PRO,
 }
-"""Map of tier name -> (max_requests, window_seconds)."""
+"""Map of tier name -> max_requests_per_month."""
 
 
 class RateLimitMiddleware:
-    """ASGI middleware that enforces per-user, per-tier rate limits via Redis.
+    """ASGI middleware that enforces per-user, per-tier monthly rate limits via Redis.
 
-    Uses the Sliding Window algorithm: for each request a sorted set is
-    maintained in Redis keyed by ``rl:{uid}``.  Timestamps of prior requests
-    within the current window are stored as members; members older than the
-    window are pruned on every call so the cardinality always reflects the
-    true request count within the sliding window.
+    Uses the Fixed Window algorithm: for each request an integer counter is
+    maintained in Redis keyed by ``rl:{uid}:YYYY-MM``.  The counter is
+    incremented atomically with INCR and expires at the start of the next
+    calendar month, guaranteeing that limits reset cleanly on the billing date.
 
     On Redis failure the middleware is fail-open: a warning is logged and the
     request is forwarded to the next layer unchanged.
@@ -65,14 +70,12 @@ class RateLimitMiddleware:
 
         uid: str = user["uid"]
         tier: str = user.get("tier", "basic")
-        max_requests, window_seconds = _TIER_QUOTAS.get(tier, RATE_LIMIT_BASIC)
+        max_requests: int = _TIER_QUOTAS.get(tier, RATE_LIMIT_BASIC)
 
         try:
             redis_client = self._redis_factory()
-            allowed, retry_after = await _check_sliding_window(
-                redis_client, uid, max_requests, window_seconds
-            )
-        except (ConnectionError, TimeoutError, RuntimeError) as exc:
+            allowed, retry_after = await _check_fixed_window(redis_client, uid, max_requests)
+        except (RedisError, RuntimeError) as exc:
             logger.warning(
                 "Redis rate-limit check failed; failing open",
                 extra={"uid": uid, "error": str(exc)},
@@ -87,54 +90,61 @@ class RateLimitMiddleware:
         await self.app(scope, receive, send)
 
 
-async def _check_sliding_window(
+def _seconds_until_next_month(now: datetime) -> int:
+    """Calculate the number of seconds from *now* until the start of next month.
+
+    Args:
+        now: A timezone-aware datetime representing the current instant.
+
+    Returns:
+        Number of seconds until midnight UTC on the first day of the next
+        calendar month, minimum 1.
+    """
+    if now.month == 12:
+        next_month_start = now.replace(
+            year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+    else:
+        next_month_start = now.replace(
+            month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+    return max(1, int((next_month_start - now).total_seconds()))
+
+
+async def _check_fixed_window(
     redis: Redis,
     uid: str,
     max_requests: int,
-    window_seconds: int,
 ) -> tuple[bool, int]:
-    """Apply the Sliding Window algorithm against Redis.
+    """Apply the Fixed Window algorithm against Redis.
+
+    Uses a single atomic INCR per request.  If this is the first request in
+    the current billing cycle (count == 1), an EXPIRE is set so the key is
+    automatically removed at the start of next month.
 
     Args:
         redis: An active async Redis client.
         uid: The unique user identifier (used as part of the Redis key).
-        max_requests: Maximum number of requests allowed within the window.
-        window_seconds: Duration of the sliding window in seconds.
+        max_requests: Maximum number of requests allowed within the month.
 
     Returns:
         A tuple of (allowed, retry_after_seconds).  When allowed is True,
         retry_after is 0.  When False, retry_after indicates how many seconds
-        the caller should wait before retrying.
+        remain until the billing window resets (start of next month).
     """
-    now_ms = int(time.time() * 1000)
-    window_ms = window_seconds * 1000
-    cutoff_ms = now_ms - window_ms
-    key = f"rl:{uid}"
+    now = datetime.now(UTC)
+    key = f"rl:{uid}:{now.strftime('%Y-%m')}"
 
-    pipe = redis.pipeline()
-    # Remove timestamps outside the current window
-    pipe.zremrangebyscore(key, "-inf", cutoff_ms)
-    # Count remaining (within window) BEFORE adding this request
-    pipe.zcard(key)
-    # Add current timestamp (use ms timestamp as both score and member;
-    # append uid to avoid score collisions in high-concurrency scenarios)
-    pipe.zadd(key, {f"{now_ms}-{uid}": now_ms})
-    # Expire the key after the window so Redis doesn't accumulate stale keys
-    pipe.expire(key, window_seconds + 1)
-    results: list[Any] = await pipe.execute()
+    count: int = await redis.incr(key)
 
-    count_before: int = int(results[1])
+    if count == 1:
+        # New billing cycle: set key to expire at the start of next month.
+        expire_seconds = _seconds_until_next_month(now)
+        await redis.expire(key, expire_seconds)
 
-    if count_before >= max_requests:
-        # Calculate the oldest timestamp still in the window to determine
-        # how long the caller must wait for a slot to free up.
-        oldest: list[tuple[bytes, float]] = await redis.zrange(key, 0, 0, withscores=True)
-        if oldest:
-            oldest_ms = int(oldest[0][1])
-            retry_after = max(1, ((oldest_ms + window_ms) - now_ms) // 1000)
-        else:
-            retry_after = window_seconds
-        return False, int(retry_after)
+    if count > max_requests:
+        retry_after = _seconds_until_next_month(now)
+        return False, retry_after
 
     return True, 0
 

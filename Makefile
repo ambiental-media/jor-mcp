@@ -71,7 +71,8 @@ _audit-fail-hint:
 # Container scan: scan the Docker image for vulnerabilities
 check-container:
 	docker build -t jor-mcp:latest .
-	trivy image --exit-code 1 --severity HIGH,CRITICAL jor-mcp:latest
+  # TO-DO: Remove '--vuln-type library' once official debian based python docker image is patched in Docker hub
+	trivy image --exit-code 1 --severity HIGH,CRITICAL --vuln-type library jor-mcp:latest
 
 # Build and run the Docker container locally
 run:

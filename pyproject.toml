@@ -19,6 +19,7 @@ dependencies = [
     "firebase-admin>=7.4.0",
     "pydantic>=2.8.0",
     "redis[hiredis]>=5.0.0",
+    "urllib3>=2.7.0",
 ]
 
 [dependency-groups]
