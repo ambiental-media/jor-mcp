@@ -31,7 +31,7 @@ The system relies on a stateless FastMCP ASGI application hosted on Google Cloud
 - **Entrypoint:** Global External Application Load Balancer. Provides a secure public endpoint, handles SSL termination, and fully supports Server-Sent Events (SSE) streaming required by the MCP protocol.
 - **Application Server:** Python 3.12+ using `fastmcp` and `uvicorn`, hosted on Cloud Run with ingress restricted to "Internal and Cloud Load Balancing traffic only."
 - **Authentication Middleware:** Validates OAuth 2.0 JWTs issued by Firebase Auth using the `firebase-admin` SDK. Extracts custom claims (e.g., `tier`) for authorization rules.
-- **Rate Limit Middleware:** A sliding window algorithm backed by GCP Memorystore (Redis). It applies different quotas based on the user's tier (Basic vs. Pro).
+- **Rate Limit Middleware:** A fixed window counter algorithm backed by GCP Memorystore (Redis) to enforce monthly quotas. It applies different monthly request limits based on the user's tier (Basic vs. Pro), resetting automatically at the end of the billing cycle.
 - **HTTP Client:** A shared, global `httpx.AsyncClient` singleton configured with connection pooling and timeouts to interact with external APIs.
 - **Telemetry:** OpenTelemetry auto-instrumentation for FastAPI/ASGI, HTTPX, and Redis, exporting structured JSON logs compatible with Google Cloud Logging/Trace.
 

@@ -3,16 +3,34 @@ import os
 from collections.abc import AsyncGenerator
 
 import firebase_admin
+import redis.asyncio as aioredis
 import uvicorn
 from fastmcp import FastMCP
+from redis.asyncio import Redis
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
+from src.config import REDIS_CONNECT_TIMEOUT, REDIS_SOCKET_TIMEOUT, REDIS_URL
 from src.middleware.auth import AuthMiddleware
+from src.middleware.rate_limit import RateLimitMiddleware
 
 mcp = FastMCP("jor-mcp")
+
+# Module-level reference; populated during lifespan startup.
+_redis_client: Redis | None = None
+
+
+def get_redis_client() -> Redis:
+    """Return the active Redis client.
+
+    Raises:
+        RuntimeError: If called before the ASGI lifespan has started.
+    """
+    if _redis_client is None:
+        raise RuntimeError("Redis client is not initialized")
+    return _redis_client
 
 
 async def health_check(request: Request) -> JSONResponse:
@@ -24,13 +42,27 @@ _mcp_http_app = mcp.http_app()
 
 @contextlib.asynccontextmanager
 async def server_lifespan(app: Starlette) -> AsyncGenerator[None, None]:
+    global _redis_client
+
     try:
         firebase_admin.get_app()
     except ValueError:
         firebase_admin.initialize_app()
 
-    async with _mcp_http_app.lifespan(app):
-        yield
+    pool = aioredis.ConnectionPool.from_url(
+        REDIS_URL,
+        socket_timeout=REDIS_SOCKET_TIMEOUT,
+        socket_connect_timeout=REDIS_CONNECT_TIMEOUT,
+        decode_responses=False,
+    )
+    _redis_client = aioredis.Redis(connection_pool=pool)
+
+    try:
+        async with _mcp_http_app.lifespan(app):
+            yield
+    finally:
+        await _redis_client.aclose()
+        _redis_client = None
 
 
 _starlette_app = Starlette(
@@ -41,7 +73,12 @@ _starlette_app = Starlette(
     ],
 )
 
-app = AuthMiddleware(_starlette_app)
+# Middleware stack (outermost → innermost):
+#   request → AuthMiddleware → RateLimitMiddleware → Starlette app
+# get_redis_client is passed as a factory so it resolves the client lazily
+# (after lifespan has initialised _redis_client).
+_rate_limited_app = RateLimitMiddleware(_starlette_app, get_redis_client)
+app = AuthMiddleware(_rate_limited_app)
 
 if __name__ == "__main__":  # pragma: no cover
     port = int(os.environ.get("PORT", 8080))
