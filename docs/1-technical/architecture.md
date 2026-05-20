@@ -61,7 +61,7 @@ sequenceDiagram
         Auth->>RL: Forward Request (User ID, Tier)
     end
 
-    Note over RL: Sliding Window Check
+    Note over RL: Fixed Window (Monthly) Check
     RL->>Redis: GET / SET user requests
     Redis-->>RL: Current Count
     
