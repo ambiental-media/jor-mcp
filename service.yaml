@@ -23,7 +23,7 @@ spec:
         # ── Secret Manager — lookup names → resource IDs ──────────────────────
         run.googleapis.com/secrets: "redis-url:projects/${GCP_PROJECT_NUMBER}/secrets/REDIS_URL,github-token:projects/${GCP_PROJECT_NUMBER}/secrets/GITHUB_TOKEN,jwt-secret:projects/${GCP_PROJECT_NUMBER}/secrets/JWT_SECRET"
     spec:
-      # ← ALTERAÇÃO 1: service account preenchida com o valor real do GCP
+      # ← Service account configured with the actual GCP value
       serviceAccountName: 959918358302-compute@developer.gserviceaccount.com
 
       containers:
@@ -39,7 +39,7 @@ spec:
               memory: 512Mi
 
           env:
-            # ── Variáveis abertas ─────────────────────────────────────────────
+            # ── Plain-text variables ─────────────────────────────────────────────
             - name: LOG_LEVEL
               value: "INFO"
             - name: FIREBASE_PROJECT_ID
@@ -51,7 +51,7 @@ spec:
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "${OTEL_EXPORTER_OTLP_ENDPOINT}"
 
-            # ── Segredos via Secret Manager ───────────────────────────────────
+            # ── Secrets via Secret Manager ───────────────────────────────────
             - name: REDIS_URL
               valueFrom:
                 secretKeyRef:

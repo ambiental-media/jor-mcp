@@ -41,9 +41,6 @@ check-sast:
 # Security: Audit dependencies for known vulnerabilities
 check-deps:
 	uv export --no-hashes --all-groups -o requirements-ci.txt
-<<<<<<< HEAD
-	uv run pip-audit -r requirements-ci.txt --no-deps --disable-pip
-=======
 	uv run pip-audit -r requirements-ci.txt --no-deps --disable-pip || { \
 		exit_code=$$?; \
 		$(MAKE) _audit-fail-hint; \
@@ -70,17 +67,12 @@ _audit-fail-hint:
 	@echo "      uv lock --upgrade-package <vuln-lib>"
 	@echo "======================================================================"
 	@echo ""
->>>>>>> 710eb5a6979b9599cc276c7ed4b931602f81811b
 
 # Container scan: scan the Docker image for vulnerabilities
 check-container:
 	docker build -t jor-mcp:latest .
-<<<<<<< HEAD
-	trivy image --exit-code 1 --severity HIGH,CRITICAL jor-mcp:latest
-=======
   # TO-DO: Remove '--vuln-type library' once official debian based python docker image is patched in Docker hub
 	trivy image --exit-code 1 --severity HIGH,CRITICAL --vuln-type library jor-mcp:latest
->>>>>>> 710eb5a6979b9599cc276c7ed4b931602f81811b
 
 # Build and run the Docker container locally
 run:
