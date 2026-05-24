@@ -210,7 +210,9 @@ async def _discover_i18n_paths(
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         logger.warning(
-            "HTTP error fetching repo tree",
+            "HTTP error fetching repo tree: status=%d body=%s",
+            exc.response.status_code,
+            exc.response.text[:500],
             extra={"repo": repo, "status": exc.response.status_code},
         )
         return []

@@ -99,6 +99,10 @@ _starlette_app = Starlette(
 _rate_limited_app = RateLimitMiddleware(_starlette_app, get_redis_client)
 app = AuthMiddleware(_rate_limited_app)
 
+# Import tools module as a side-effect to register all @mcp.tool() handlers.
+# This must come after `mcp` is defined to avoid a circular import error.
+import src.tools  # noqa: E402, F401
+
 if __name__ == "__main__":  # pragma: no cover
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
