@@ -12,6 +12,7 @@ defensively and validates the decoded structure through Pydantic before
 returning it to the caller.
 """
 
+import asyncio
 import base64
 import json
 import logging
@@ -258,10 +259,14 @@ async def _fetch_repo_files(
     """
     paths = await _discover_i18n_paths(client, repo)
     results: list[GitHubFileResult] = []
-    for path in paths:
-        result = await _fetch_file(client, repo, path)
-        if result is not None:
+
+    async with asyncio.TaskGroup() as tg:
+        tasks = [tg.create_task(_fetch_file(client, repo, path)) for path in paths]
+
+    for task in tasks:
+        if (result := task.result()) is not None:
             results.append(result)
+
     return results
 
 
@@ -295,15 +300,18 @@ async def fetch_github_i18n_content() -> list[dict[str, Any]]:
     client = get_http_client()
     consolidated: list[dict[str, Any]] = []
 
-    for repo in repos:
-        try:
-            files = await _fetch_repo_files(client, repo)
-            for file_result in files:
+    try:
+        async with asyncio.TaskGroup() as tg:
+            tasks = [tg.create_task(_fetch_repo_files(client, repo)) for repo in repos]
+    except* Exception as eg:
+        logger.exception(
+            "Unexpected error fetching GitHub repo content",
+            extra={"errors": [str(e) for e in eg.exceptions]},
+        )
+
+    for task in tasks:
+        if not task.cancelled() and task.exception() is None:
+            for file_result in task.result():
                 consolidated.append(file_result.model_dump())
-        except Exception:
-            logger.exception(
-                "Unexpected error fetching GitHub repo content",
-                extra={"repo": repo},
-            )
 
     return consolidated

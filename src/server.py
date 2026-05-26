@@ -58,29 +58,35 @@ async def server_lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     except ValueError:
         firebase_admin.initialize_app()
 
-    pool = aioredis.ConnectionPool.from_url(
-        REDIS_URL,
-        socket_timeout=REDIS_SOCKET_TIMEOUT,
-        socket_connect_timeout=REDIS_CONNECT_TIMEOUT,
-        decode_responses=False,
-    )
-    _redis_client = aioredis.Redis(connection_pool=pool)
-
-    _http_client_mod._http_client = httpx.AsyncClient(
-        limits=httpx.Limits(
-            max_keepalive_connections=HTTP_MAX_KEEPALIVE_CONNECTIONS,
-            max_connections=HTTP_MAX_CONNECTIONS,
-        ),
-        timeout=HTTP_TIMEOUT,
-    )
-
     try:
+        pool = aioredis.ConnectionPool.from_url(
+            REDIS_URL,
+            socket_timeout=REDIS_SOCKET_TIMEOUT,
+            socket_connect_timeout=REDIS_CONNECT_TIMEOUT,
+            decode_responses=False,
+        )
+        _redis_client = aioredis.Redis(connection_pool=pool)
+        transport = httpx.AsyncHTTPTransport(
+            retries=3,
+            limits=httpx.Limits(
+                max_keepalive_connections=HTTP_MAX_KEEPALIVE_CONNECTIONS,
+                max_connections=HTTP_MAX_CONNECTIONS,
+            ),
+        )
+        _http_client_mod._http_client = httpx.AsyncClient(
+            transport=transport,
+            timeout=HTTP_TIMEOUT,
+        )
         async with _mcp_http_app.lifespan(app):
             yield
     finally:
-        await _http_client_mod._http_client.aclose()
+        if _http_client_mod._http_client is not None:
+            with contextlib.suppress(Exception):
+                await _http_client_mod._http_client.aclose()
         _http_client_mod._http_client = None
-        await _redis_client.aclose()
+        if _redis_client is not None:
+            with contextlib.suppress(Exception):
+                await _redis_client.aclose()
         _redis_client = None
 
 
