@@ -62,6 +62,16 @@ class WordPressPost(BaseModel):
     content: _RenderedField
 
 
+class _WpLatestPost(BaseModel):
+    """Validated representation of a WordPress post summary used for latest-news listings."""
+
+    id: int
+    title: _RenderedField
+    excerpt: _RenderedField
+    date: str
+    link: str
+
+
 # ---------------------------------------------------------------------------
 # HTML cleaning
 # ---------------------------------------------------------------------------
@@ -253,3 +263,53 @@ async def fetch_full_article(identifier: str) -> dict[str, Any]:
         "link": post.link,
         "content": _strip_html(post.content.rendered),
     }
+
+
+async def fetch_latest_posts(limit: int) -> list[dict[str, Any]]:
+    """Fetch the most recently published WordPress posts.
+
+    Args:
+        limit: Number of posts to retrieve, ordered by publication date descending.
+
+    Returns:
+        A list of dicts with keys ``id``, ``title``, ``excerpt``, ``date``,
+        ``link``, and ``source``.
+
+    Raises:
+        httpx.HTTPStatusError: If the WordPress API returns a non-2xx status.
+        httpx.RequestError: If a network error occurs.
+    """
+    # Fields requested from WordPress to keep the payload small.
+    _fields = "id,title,excerpt,date,link"
+
+    client = get_http_client()
+    url = f"{WP_API_BASE_URL}/wp/v2/posts"
+    params: dict[str, str] = {
+        "orderby": "date",
+        "order": "desc",
+        "per_page": str(limit),
+        "_fields": _fields,
+    }
+
+    response = await client.get(url, params=params)
+    response.raise_for_status()
+
+    results: list[dict[str, Any]] = []
+    for raw_post in response.json():
+        post = _WpLatestPost.model_validate(raw_post)
+        results.append(
+            {
+                "id": str(post.id),
+                "title": _strip_html(post.title.rendered),
+                "excerpt": _strip_html(post.excerpt.rendered),
+                "date": post.date[:10],
+                "link": post.link,
+                "source": "wordpress",
+            }
+        )
+
+    logger.info(
+        "WordPress latest posts fetched",
+        extra={"limit": limit, "result_count": len(results)},
+    )
+    return results

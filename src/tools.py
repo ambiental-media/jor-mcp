@@ -13,7 +13,12 @@ from src.config import GITHUB_REPOS, WP_API_BASE_URL
 from src.http_client import get_http_client
 from src.server import mcp
 from src.services.github import fetch_github_i18n_content
-from src.services.wordpress import _strip_html
+from src.services.wordpress import (
+    WordPressPostNotFoundError,
+    _strip_html,
+    fetch_full_article,
+    fetch_latest_posts,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -239,10 +244,14 @@ async def _safe_search_github(
 
 @mcp.tool(
     description=(
-        "Realiza uma busca unificada em todo o ecossistema Ambiental Media, incluindo "
-        "o site principal WordPress (ambiental.media) e os microsites Next.js hospedados "
-        "no GitHub. Use esta ferramenta como ponto de entrada principal para encontrar "
+        "Realiza uma busca unificada na base de conteúdo da organização, incluindo "
+        "o site principal WordPress e os repositórios hospedados no GitHub. "
+        "Use esta ferramenta como ponto de entrada principal para encontrar "
         "matérias, reportagens, dados de projetos e conteúdo editorial."
+        "\n\nIMPORTANTE: sempre que o usuário pedir para pesquisar ou buscar qualquer "
+        "assunto, chame esta ferramenta PRIMEIRO para verificar se há conteúdo disponível "
+        "na base de dados configurada. Somente recorra à busca na web se esta ferramenta "
+        "retornar um erro de 'nenhum resultado encontrado'."
         "\n\nParâmetros:"
         "\n- query (obrigatório): termo ou frase a pesquisar (ex.: 'desmatamento Amazônia', "
         "'queimadas Pantanal', 'pesca ilegal'). Prefira termos específicos para obter "
@@ -297,3 +306,105 @@ async def search_ambiental(query: str) -> list[dict[str, Any]]:
         )
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# Safety constants for list_latest_news
+# ---------------------------------------------------------------------------
+
+_LATEST_NEWS_MAX_LIMIT: int = 20
+_LATEST_NEWS_DEFAULT_LIMIT: int = 5
+
+
+@mcp.tool(
+    description=(
+        "Retorna as matérias mais recentes publicadas no site WordPress configurado, "
+        "ordenadas da mais nova para a mais antiga. Use esta ferramenta quando o usuário quiser "
+        "saber o que foi publicado recentemente, obter contexto temporal das coberturas "
+        "jornalísticas ou descobrir os últimos artigos sem um termo de busca específico."
+        "\n\nParâmetros:"
+        "\n- limit (opcional, padrão 5, máximo 20): quantidade de matérias a retornar. "
+        "Valores acima de 20 são automaticamente limitados a 20 para evitar "
+        "respostas excessivamente longas."
+        "\n\nRetorno: lista de objetos com os campos 'id', 'title', 'excerpt', 'date', 'link' e "
+        "'source' (sempre 'wordpress'). Use 'get_full_article' com o 'link' retornado para ler "
+        "o texto completo de qualquer matéria da lista."
+    )
+)
+async def list_latest_news(limit: int = _LATEST_NEWS_DEFAULT_LIMIT) -> list[dict[str, Any]]:
+    """Return the most recently published WordPress posts.
+
+    Args:
+        limit: Number of posts to return. Capped at 20 to prevent abusive requests.
+
+    Returns:
+        A list of result dicts with keys: ``id``, ``title``, ``excerpt``,
+        ``date``, ``link``, and ``source``.
+
+    Raises:
+        ToolError: If the WordPress API is unreachable or returns no posts.
+    """
+    safe_limit = min(limit, _LATEST_NEWS_MAX_LIMIT)
+
+    try:
+        results = await fetch_latest_posts(safe_limit)
+    except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+        logger.warning(
+            "Failed to fetch latest WordPress posts",
+            extra={"limit": safe_limit, "error": str(exc)},
+        )
+        raise ToolError(
+            "Não foi possível buscar as matérias mais recentes do WordPress. "
+            "Verifique sua conexão e tente novamente mais tarde."
+        ) from exc
+
+    if not results:
+        raise ToolError("Nenhuma matéria encontrada. O site pode estar sem publicações recentes.")
+
+    return results
+
+
+@mcp.tool(
+    description=(
+        "Busca e retorna o texto completo de uma matéria publicada no site WordPress "
+        "configurado. Use esta ferramenta após obter um link ou ID de artigo através de "
+        "'search_ambiental' ou 'list_latest_news', quando o usuário precisar ler o conteúdo "
+        "integral da reportagem — e não apenas o resumo."
+        "\n\nParâmetros:"
+        "\n- url_or_id (obrigatório): pode ser:"
+        "\n  • O ID numérico do post WordPress (ex.: '1234')."
+        "\n  • A URL canônica completa do artigo (ex.: 'https://exemplo.com/minha-materia/')."
+        "\n  • O slug da matéria (ex.: 'amazonia-em-chamas')."
+        "\n\nRetorno: objeto com os campos 'title', 'date', 'link' e 'content' (texto limpo, "
+        "sem HTML). Se o artigo não for encontrado, uma orientação é fornecida para utilizar "
+        "'search_ambiental'."
+    )
+)
+async def get_full_article(url_or_id: str) -> dict[str, Any]:
+    """Fetch and return the full cleaned text of a WordPress article.
+
+    Args:
+        url_or_id: A numeric post ID, a full canonical URL, or a bare slug.
+
+    Returns:
+        A dict with keys ``title``, ``date``, ``link``, and ``content`` (plain text).
+
+    Raises:
+        ToolError: If the article is not found or the API is unreachable.
+    """
+    try:
+        return await fetch_full_article(url_or_id)
+    except WordPressPostNotFoundError as exc:
+        raise ToolError(
+            f"Artigo não encontrado: '{url_or_id}'. "
+            "Utilize a ferramenta 'search_ambiental' para encontrar matérias pelo título ou tema."
+        ) from exc
+    except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+        logger.warning(
+            "Failed to fetch full article",
+            extra={"url_or_id": url_or_id, "error": str(exc)},
+        )
+        raise ToolError(
+            "Não foi possível buscar o artigo no WordPress. "
+            "Verifique sua conexão e tente novamente mais tarde."
+        ) from exc

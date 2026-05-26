@@ -14,6 +14,8 @@ from src.tools import (
     _safe_search_wp,
     _search_github,
     _search_wp,
+    get_full_article,
+    list_latest_news,
     search_ambiental,
 )
 
@@ -434,3 +436,198 @@ class TestSearchAmbiental:
         ):
             with pytest.raises(ToolError, match="WordPress"):
                 await search_ambiental("amazonia")
+
+
+# ---------------------------------------------------------------------------
+# get_full_article (the MCP tool)
+# ---------------------------------------------------------------------------
+
+_SAMPLE_FULL_ARTICLE: dict[str, str] = {
+    "title": "Amazônia em Chamas",
+    "date": "2024-08-01T12:00:00",
+    "link": "https://ambiental.media/amazonia-em-chamas/",
+    "content": "Conteúdo completo do artigo sobre a Amazônia.",
+}
+
+
+class TestGetFullArticle:
+    async def test_returns_article_by_id(self) -> None:
+        with patch(
+            "src.tools.fetch_full_article",
+            new=AsyncMock(return_value=_SAMPLE_FULL_ARTICLE),
+        ):
+            result = await get_full_article("42")
+
+        assert result["title"] == "Amazônia em Chamas"
+        assert result["content"] == "Conteúdo completo do artigo sobre a Amazônia."
+
+    async def test_returns_article_by_url(self) -> None:
+        with patch(
+            "src.tools.fetch_full_article",
+            new=AsyncMock(return_value=_SAMPLE_FULL_ARTICLE),
+        ):
+            result = await get_full_article("https://ambiental.media/amazonia-em-chamas/")
+
+        assert result["link"] == "https://ambiental.media/amazonia-em-chamas/"
+
+    async def test_returns_article_by_slug(self) -> None:
+        with patch(
+            "src.tools.fetch_full_article",
+            new=AsyncMock(return_value=_SAMPLE_FULL_ARTICLE),
+        ):
+            result = await get_full_article("amazonia-em-chamas")
+
+        assert set(result.keys()) == {"title", "date", "link", "content"}
+
+    async def test_not_found_raises_tool_error_with_search_hint(self) -> None:
+        from src.services.wordpress import WordPressPostNotFoundError
+
+        with patch(
+            "src.tools.fetch_full_article",
+            new=AsyncMock(side_effect=WordPressPostNotFoundError("Post not found")),
+        ):
+            with pytest.raises(ToolError, match="search_ambiental"):
+                await get_full_article("slug-inexistente")
+
+    async def test_not_found_error_mentions_identifier(self) -> None:
+        from src.services.wordpress import WordPressPostNotFoundError
+
+        with patch(
+            "src.tools.fetch_full_article",
+            new=AsyncMock(side_effect=WordPressPostNotFoundError("Post not found")),
+        ):
+            with pytest.raises(ToolError, match="slug-inexistente"):
+                await get_full_article("slug-inexistente")
+
+    async def test_http_error_raises_tool_error(self) -> None:
+        with patch(
+            "src.tools.fetch_full_article",
+            new=AsyncMock(
+                side_effect=httpx.HTTPStatusError(
+                    "HTTP 500", request=MagicMock(), response=MagicMock()
+                )
+            ),
+        ):
+            with pytest.raises(ToolError, match="WordPress"):
+                await get_full_article("42")
+
+    async def test_request_error_raises_tool_error(self) -> None:
+        with patch(
+            "src.tools.fetch_full_article",
+            new=AsyncMock(side_effect=httpx.RequestError("timeout")),
+        ):
+            with pytest.raises(ToolError):
+                await get_full_article("42")
+
+
+# ---------------------------------------------------------------------------
+# list_latest_news (the MCP tool)
+# ---------------------------------------------------------------------------
+
+_SAMPLE_LATEST_POSTS: list[dict[str, str]] = [
+    {
+        "id": "10",
+        "title": "Amazônia em Chamas",
+        "excerpt": "Resumo da matéria sobre a Amazônia.",
+        "date": "2024-08-01",
+        "link": "https://ambiental.media/amazonia-em-chamas/",
+        "source": "wordpress",
+    },
+    {
+        "id": "11",
+        "title": "Pantanal sob Ameaça",
+        "excerpt": "Resumo da matéria sobre o Pantanal.",
+        "date": "2024-07-28",
+        "link": "https://ambiental.media/pantanal-sob-ameaca/",
+        "source": "wordpress",
+    },
+]
+
+
+class TestListLatestNews:
+    async def test_returns_latest_posts(self) -> None:
+        with patch(
+            "src.tools.fetch_latest_posts",
+            new=AsyncMock(return_value=_SAMPLE_LATEST_POSTS),
+        ):
+            results = await list_latest_news(limit=2)
+
+        assert len(results) == 2
+        assert results[0]["title"] == "Amazônia em Chamas"
+        assert results[0]["source"] == "wordpress"
+
+    async def test_default_limit_is_five(self) -> None:
+        with patch(
+            "src.tools.fetch_latest_posts",
+            new=AsyncMock(return_value=_SAMPLE_LATEST_POSTS),
+        ) as mock_fetch:
+            await list_latest_news()
+
+        mock_fetch.assert_awaited_once_with(5)
+
+    async def test_limit_capped_at_twenty(self) -> None:
+        with patch(
+            "src.tools.fetch_latest_posts",
+            new=AsyncMock(return_value=_SAMPLE_LATEST_POSTS),
+        ) as mock_fetch:
+            await list_latest_news(limit=1000)
+
+        # Should be capped to 20
+        mock_fetch.assert_awaited_once_with(20)
+
+    async def test_result_fields_are_standardised(self) -> None:
+        with patch(
+            "src.tools.fetch_latest_posts",
+            new=AsyncMock(return_value=_SAMPLE_LATEST_POSTS),
+        ):
+            results = await list_latest_news()
+
+        required_keys = {"id", "title", "excerpt", "date", "link", "source"}
+        for result in results:
+            assert required_keys.issubset(result.keys())
+
+    async def test_http_error_raises_tool_error(self) -> None:
+        with patch(
+            "src.tools.fetch_latest_posts",
+            new=AsyncMock(
+                side_effect=httpx.HTTPStatusError(
+                    "HTTP 503", request=MagicMock(), response=MagicMock()
+                )
+            ),
+        ):
+            with pytest.raises(ToolError, match="WordPress"):
+                await list_latest_news()
+
+    async def test_request_error_raises_tool_error(self) -> None:
+        with patch(
+            "src.tools.fetch_latest_posts",
+            new=AsyncMock(side_effect=httpx.RequestError("connection refused")),
+        ):
+            with pytest.raises(ToolError):
+                await list_latest_news()
+
+    async def test_empty_results_raises_tool_error(self) -> None:
+        with patch(
+            "src.tools.fetch_latest_posts",
+            new=AsyncMock(return_value=[]),
+        ):
+            with pytest.raises(ToolError, match="Nenhuma matéria"):
+                await list_latest_news()
+
+    async def test_respects_valid_limit(self) -> None:
+        with patch(
+            "src.tools.fetch_latest_posts",
+            new=AsyncMock(return_value=_SAMPLE_LATEST_POSTS),
+        ) as mock_fetch:
+            await list_latest_news(limit=10)
+
+        mock_fetch.assert_awaited_once_with(10)
+
+    async def test_limit_at_boundary_twenty(self) -> None:
+        with patch(
+            "src.tools.fetch_latest_posts",
+            new=AsyncMock(return_value=_SAMPLE_LATEST_POSTS),
+        ) as mock_fetch:
+            await list_latest_news(limit=20)
+
+        mock_fetch.assert_awaited_once_with(20)

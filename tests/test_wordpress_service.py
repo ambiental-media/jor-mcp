@@ -14,6 +14,7 @@ from src.services.wordpress import (
     _fetch_post_by_slug,
     _strip_html,
     fetch_full_article,
+    fetch_latest_posts,
 )
 
 # ---------------------------------------------------------------------------
@@ -362,3 +363,92 @@ class TestFetchFullArticle:
         assert ">" not in result["content"]
         assert "Texto" in result["content"]
         assert "importante" in result["content"]
+
+
+# ---------------------------------------------------------------------------
+# fetch_latest_posts
+# ---------------------------------------------------------------------------
+
+_SAMPLE_WP_SUMMARY_POST: dict[str, object] = {
+    "id": 10,
+    "title": {"rendered": "Amazônia em Chamas"},
+    "excerpt": {"rendered": "<p>Resumo sobre a Amazônia.</p>"},
+    "date": "2024-08-01T12:00:00",
+    "link": "https://ambiental.media/amazonia-em-chamas/",
+}
+
+
+class TestFetchLatestPosts:
+    async def test_returns_formatted_list(self, mock_client: AsyncMock) -> None:
+        mock_client.get.return_value = _make_response(200, [_SAMPLE_WP_SUMMARY_POST])
+
+        results = await fetch_latest_posts(5)
+
+        assert len(results) == 1
+        post = results[0]
+        assert post["id"] == "10"
+        assert post["title"] == "Amazônia em Chamas"
+        assert post["date"] == "2024-08-01"
+        assert post["link"] == "https://ambiental.media/amazonia-em-chamas/"
+        assert post["source"] == "wordpress"
+        assert "<p>" not in post["excerpt"]
+        assert "Resumo" in post["excerpt"]
+
+    async def test_result_keys_are_complete(self, mock_client: AsyncMock) -> None:
+        mock_client.get.return_value = _make_response(200, [_SAMPLE_WP_SUMMARY_POST])
+
+        results = await fetch_latest_posts(1)
+
+        required_keys = {"id", "title", "excerpt", "date", "link", "source"}
+        assert required_keys.issubset(results[0].keys())
+
+    async def test_sends_correct_query_params(self, mock_client: AsyncMock) -> None:
+        mock_client.get.return_value = _make_response(200, [])
+
+        await fetch_latest_posts(7)
+
+        params = mock_client.get.call_args.kwargs["params"]
+        assert params["orderby"] == "date"
+        assert params["order"] == "desc"
+        assert params["per_page"] == "7"
+        assert "_fields" in params
+
+    async def test_uses_correct_endpoint(self, mock_client: AsyncMock) -> None:
+        from src.config import WP_API_BASE_URL
+
+        mock_client.get.return_value = _make_response(200, [])
+        await fetch_latest_posts(5)
+
+        url_called = mock_client.get.call_args.args[0]
+        assert url_called == f"{WP_API_BASE_URL}/wp/v2/posts"
+
+    async def test_empty_response_returns_empty_list(self, mock_client: AsyncMock) -> None:
+        mock_client.get.return_value = _make_response(200, [])
+
+        results = await fetch_latest_posts(5)
+
+        assert results == []
+
+    async def test_multiple_posts_returned(self, mock_client: AsyncMock) -> None:
+        second_post = {**_SAMPLE_WP_SUMMARY_POST, "id": 11, "title": {"rendered": "Pantanal"}}
+        mock_client.get.return_value = _make_response(200, [_SAMPLE_WP_SUMMARY_POST, second_post])
+
+        results = await fetch_latest_posts(2)
+
+        assert len(results) == 2
+        assert results[1]["id"] == "11"
+        assert results[1]["title"] == "Pantanal"
+
+    async def test_http_error_raises(self, mock_client: AsyncMock) -> None:
+        mock_client.get.return_value = _make_response(500)
+
+        with pytest.raises(httpx.HTTPStatusError):
+            await fetch_latest_posts(5)
+
+    async def test_date_truncated_to_date_only(self, mock_client: AsyncMock) -> None:
+        mock_client.get.return_value = _make_response(200, [_SAMPLE_WP_SUMMARY_POST])
+
+        results = await fetch_latest_posts(1)
+
+        assert results[0]["date"] == "2024-08-01"
+        assert "T" not in results[0]["date"]
