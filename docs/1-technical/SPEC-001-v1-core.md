@@ -55,7 +55,7 @@ The FastMCP server will be initialized with explicit instructions to guide the L
 ### 4.2 MCP Tools
 To minimize the tool count and cognitive load on the LLM, we will expose only three robust tools:
 
-1.  **`search_ambiental(query: str, source: str = "all")`**
+1.  **`search_content(query: str, source: str = "all")`**
     *   *Description:* Unified search across all Ambiental Media properties (main WordPress site, WordPress microsites, and Next.js GitHub repositories).
     *   *Behavior:* Concurrently queries WP REST API (`?search=query`) and GitHub REST API (parsing `messages/pt.json` and `messages/en.json`).
 2.  **`get_full_article(url_or_id: str)`**
@@ -78,7 +78,7 @@ The development is divided into four milestones. Each milestone must pass the `m
 - [ ] Implement `httpx.AsyncClient` singleton with connection pooling and retry logic.
 - [ ] Develop the WordPress data fetcher and advanced HTML text cleaner for `get_full_article`.
 - [ ] Develop the GitHub API fetcher to decode and parse base64 Next.js JSON files.
-- [ ] Implement the `search_ambiental` tool using `asyncio.gather` for concurrent, unified search.
+- [ ] Implement the `search_content` tool using `asyncio.gather` for concurrent, unified search.
 
 ### Milestone 3: LLM Optimization & Low Tool Count
 - [ ] Finalize the implementation of the 3 core tools in `src/tools.py`.

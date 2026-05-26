@@ -48,6 +48,6 @@ Two options were evaluated for accessing the private GitHub repositories:
 
 The tools are defined by their semantic operation, unifying the underlying data sources.
 
-*   **`search_ambiental`**: Unified search across Next.js JSONs and WordPress REST APIs.
+*   **`search_content`**: Unified search across Next.js JSONs and WordPress REST APIs.
 *   **`get_full_article`**: Retrieves complete, cleaned text from a WordPress post/page.
 *   **`list_latest_news`**: Retrieves recent publications for temporal context.

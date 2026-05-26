@@ -258,7 +258,7 @@ async def _safe_search_github(
         "com o 'link' retornado para obter o texto completo de uma matéria."
     )
 )
-async def search_ambiental(query: str) -> list[dict[str, Any]]:
+async def search_content(query: str) -> list[dict[str, Any]]:
     """Perform a unified search across WordPress and GitHub content sources.
 
     Args:

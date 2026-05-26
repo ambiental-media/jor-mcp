@@ -14,7 +14,7 @@ from src.tools import (
     _safe_search_wp,
     _search_github,
     _search_wp,
-    search_ambiental,
+    search_content,
 )
 
 # ---------------------------------------------------------------------------
@@ -344,7 +344,7 @@ class TestSafeSearchGithub:
 
 
 # ---------------------------------------------------------------------------
-# search_ambiental (the MCP tool)
+# search_content (the MCP tool)
 # ---------------------------------------------------------------------------
 
 
@@ -359,7 +359,7 @@ class TestSearchAmbiental:
                 new=AsyncMock(return_value=[_SAMPLE_GITHUB_FILE]),
             ),
         ):
-            results = await search_ambiental("amazonia")
+            results = await search_content("amazonia")
 
         sources = {r["source"] for r in results}
         assert "wordpress" in sources
@@ -373,7 +373,7 @@ class TestSearchAmbiental:
             new=AsyncMock(side_effect=RuntimeError("boom")),
         ):
             with pytest.raises(ToolError):
-                await search_ambiental("amazonia")
+                await search_content("amazonia")
 
     async def test_succeeds_when_only_wp_fails(self, mock_wp_client: AsyncMock) -> None:
         """Partial failure (WP down) still returns GitHub results."""
@@ -385,7 +385,7 @@ class TestSearchAmbiental:
                 new=AsyncMock(return_value=[_SAMPLE_GITHUB_FILE]),
             ),
         ):
-            results = await search_ambiental("amazonia")
+            results = await search_content("amazonia")
 
         assert len(results) >= 1
         assert all(r["source"].startswith("github:") for r in results)
@@ -397,7 +397,7 @@ class TestSearchAmbiental:
             "src.tools.fetch_github_i18n_content",
             new=AsyncMock(side_effect=RuntimeError("gh down")),
         ):
-            results = await search_ambiental("amazonia")
+            results = await search_content("amazonia")
 
         assert len(results) >= 1
         assert all(r["source"] == "wordpress" for r in results)
@@ -410,7 +410,7 @@ class TestSearchAmbiental:
             new=AsyncMock(return_value=[]),
         ):
             with pytest.raises(ToolError, match="Nenhum resultado"):
-                await search_ambiental("termo-inexistente")
+                await search_content("termo-inexistente")
 
     async def test_result_fields_are_standardised(self, mock_wp_client: AsyncMock) -> None:
         """Every result dict contains the required keys."""
@@ -419,7 +419,7 @@ class TestSearchAmbiental:
             "src.tools.fetch_github_i18n_content",
             new=AsyncMock(return_value=[_SAMPLE_GITHUB_FILE]),
         ):
-            results = await search_ambiental("amazonia")
+            results = await search_content("amazonia")
 
         required_keys = {"id", "title", "excerpt", "date", "link", "source"}
         for result in results:
@@ -433,4 +433,4 @@ class TestSearchAmbiental:
             new=AsyncMock(side_effect=RuntimeError("boom")),
         ):
             with pytest.raises(ToolError, match="WordPress"):
-                await search_ambiental("amazonia")
+                await search_content("amazonia")
