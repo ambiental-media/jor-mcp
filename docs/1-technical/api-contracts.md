@@ -6,7 +6,7 @@ This document defines the strict interfaces for the tools exposed by the Jor-MCP
 
 ---
 
-## 1. `search_ambiental`
+## 1. `search_content`
 
 **Purpose:** Unified full-text search across all Ambiental Media properties (WordPress sites and Next.js microsites).
 
@@ -64,7 +64,7 @@ This document defines the strict interfaces for the tools exposed by the Jor-MCP
 | `limit` | `integer`| No | `5` | Number of recent articles to return (Max: 20). |
 
 ### Response Schema (Array of Objects)
-*(Follows the exact same schema as `search_ambiental` without the `source` field, as it only queries the main WordPress publication).*
+*(Follows the exact same schema as `search_content` without the `source` field, as it only queries the main WordPress publication).*
 ```json
 [
   {

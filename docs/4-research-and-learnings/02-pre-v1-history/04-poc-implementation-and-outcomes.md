@@ -14,7 +14,7 @@ The POC successfully implemented a full data flow from ingestion to HTTP exposur
 ## 3. Implemented Tools (POC Scope)
 Three core tools were built and tested:
 
-1.  **`search_ambiental(query: str)`**: Executed parallel queries (`asyncio.gather`) against the WP REST API and GitHub (downloading and regex-searching `pt.json` and `en.json`).
+1.  **`search_content(query: str)`**: Executed parallel queries (`asyncio.gather`) against the WP REST API and GitHub (downloading and regex-searching `pt.json` and `en.json`).
 2.  **`get_full_article(url_or_id: str)`**: Fetched WP content and applied basic HTML stripping.
 3.  **`list_latest_news(limit: int)`**: Queried the WP API for recent posts to provide temporal context.
 
@@ -23,7 +23,7 @@ Three core tools were built and tested:
 The POC was evaluated against Claude Desktop and OpenAI (Developer Mode).
 
 *   **Connection:** The clients successfully authenticated and listed the tools over SSE.
-*   **Search Flow:** The `search_ambiental` tool successfully aggregated JSON results from both WordPress and Next.js properties.
+*   **Search Flow:** The `search_content` tool successfully aggregated JSON results from both WordPress and Next.js properties.
 *   **Synthesis Flow:** The agents successfully consumed the cleaned text from `get_full_article` to generate summaries without hallucination.
 *   **Error Handling:** The server successfully returned `isError: true` with semantic hints when given invalid IDs, prompting the agent to retry or inform the user.
 *   **Rate Limiting:** The in-memory sliding window successfully returned HTTP 429 when thresholds were exceeded.
