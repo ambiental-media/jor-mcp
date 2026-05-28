@@ -490,7 +490,7 @@ class TestGetFullArticle:
             "src.tools.fetch_full_article",
             new=AsyncMock(side_effect=WordPressPostNotFoundError("Post not found")),
         ):
-            with pytest.raises(ToolError, match="search_ambiental"):
+            with pytest.raises(ToolError, match="search_content"):
                 await get_full_article("slug-inexistente")
 
     async def test_not_found_error_mentions_identifier(self) -> None:
