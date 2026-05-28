@@ -334,15 +334,19 @@ class TestSafeSearchGithub:
         assert err is None
         assert len(results) == 1
 
-    async def test_captures_unexpected_exception(self) -> None:
+    async def test_propagates_programming_error(self) -> None:
+        """RuntimeError from fetch_github_i18n_content propagates rather than being swallowed.
+
+        fetch_github_i18n_content handles all network/parsing errors internally
+        and never raises in normal operation.  A RuntimeError here would indicate
+        a programming bug (e.g. uninitialized HTTP client) that must not be silenced.
+        """
         with patch(
             "src.tools.fetch_github_i18n_content",
             new=AsyncMock(side_effect=RuntimeError("unexpected")),
         ):
-            results, err = await _safe_search_github("amazonia")
-
-        assert results == []
-        assert isinstance(err, RuntimeError)
+            with pytest.raises(RuntimeError):
+                await _safe_search_github("amazonia")
 
 
 # ---------------------------------------------------------------------------

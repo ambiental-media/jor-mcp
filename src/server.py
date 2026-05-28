@@ -93,11 +93,13 @@ async def server_lifespan(app: Starlette) -> AsyncGenerator[None, None]:
             yield
     finally:
         if _http_client_mod._http_client is not None:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(OSError, RuntimeError):
                 await _http_client_mod._http_client.aclose()
         _http_client_mod._http_client = None
         if _redis_client is not None:
-            with contextlib.suppress(Exception):
+            from redis.exceptions import RedisError
+
+            with contextlib.suppress(RedisError):
                 await _redis_client.aclose()
         _redis_client = None
 

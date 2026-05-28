@@ -219,22 +219,19 @@ async def _safe_search_wp(
 async def _safe_search_github(
     query: str,
 ) -> tuple[list[dict[str, Any]], Exception | None]:
-    """Run :func:`_search_github` and capture any raised exception.
+    """Run :func:`_search_github` and return its results.
+
+    :func:`fetch_github_i18n_content` handles all network and parsing errors
+    internally (returning empty results on any failure), so this wrapper never
+    raises and always returns ``None`` as the error value.
 
     Args:
         query: The search query string.
 
     Returns:
-        A 2-tuple ``(results, error)``; ``error`` is ``None`` on success.
+        A 2-tuple ``(results, None)``.
     """
-    try:
-        return await _search_github(query), None
-    except Exception as exc:  # noqa: BLE001
-        logger.warning(
-            "GitHub search failed",
-            extra={"query": query, "error": str(exc)},
-        )
-        return [], exc
+    return await _search_github(query), None
 
 
 # ---------------------------------------------------------------------------
