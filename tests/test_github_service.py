@@ -126,7 +126,6 @@ def test_decode_base64_content_invalid_raises() -> None:
 # ---------------------------------------------------------------------------
 
 
-
 @pytest.mark.asyncio
 async def test_fetch_file_success(mock_client: AsyncMock) -> None:
     mock_client.get.return_value = _make_response(200, _content_response())
@@ -137,13 +136,11 @@ async def test_fetch_file_success(mock_client: AsyncMock) -> None:
     assert result.data == _SAMPLE_DATA
 
 
-
 @pytest.mark.asyncio
 async def test_fetch_file_404_returns_none(mock_client: AsyncMock) -> None:
     mock_client.get.return_value = _make_response(404)
     result = await _fetch_file(mock_client, _REPO, _PATH)
     assert result is None
-
 
 
 @pytest.mark.asyncio
@@ -153,7 +150,6 @@ async def test_fetch_file_http_error_returns_none(mock_client: AsyncMock) -> Non
     assert result is None
 
 
-
 @pytest.mark.asyncio
 async def test_fetch_file_network_error_returns_none(mock_client: AsyncMock) -> None:
     mock_client.get.side_effect = httpx.RequestError("connection refused")
@@ -161,13 +157,11 @@ async def test_fetch_file_network_error_returns_none(mock_client: AsyncMock) -> 
     assert result is None
 
 
-
 @pytest.mark.asyncio
 async def test_fetch_file_bad_schema_returns_none(mock_client: AsyncMock) -> None:
     mock_client.get.return_value = _make_response(200, {"unexpected": "schema"})
     result = await _fetch_file(mock_client, _REPO, _PATH)
     assert result is None
-
 
 
 @pytest.mark.asyncio
@@ -179,7 +173,6 @@ async def test_fetch_file_unsupported_encoding_returns_none(
     mock_client.get.return_value = _make_response(200, payload)
     result = await _fetch_file(mock_client, _REPO, _PATH)
     assert result is None
-
 
 
 @pytest.mark.asyncio
@@ -200,7 +193,6 @@ async def test_fetch_file_invalid_json_returns_none(mock_client: AsyncMock) -> N
 # ---------------------------------------------------------------------------
 
 
-
 @pytest.mark.asyncio
 async def test_discover_i18n_paths_returns_matching_files(mock_client: AsyncMock) -> None:
     """Only files named pt.json or en.json are returned, at any depth."""
@@ -219,13 +211,11 @@ async def test_discover_i18n_paths_returns_matching_files(mock_client: AsyncMock
     assert set(paths) == {"messages/pt.json", "messages/en.json"}
 
 
-
 @pytest.mark.asyncio
 async def test_discover_i18n_paths_http_error_returns_empty(mock_client: AsyncMock) -> None:
     mock_client.get.return_value = _make_response(403)
     paths = await _discover_i18n_paths(mock_client, _REPO)
     assert paths == []
-
 
 
 @pytest.mark.asyncio
@@ -235,13 +225,11 @@ async def test_discover_i18n_paths_network_error_returns_empty(mock_client: Asyn
     assert paths == []
 
 
-
 @pytest.mark.asyncio
 async def test_discover_i18n_paths_bad_schema_returns_empty(mock_client: AsyncMock) -> None:
     mock_client.get.return_value = _make_response(200, {"unexpected": "schema"})
     paths = await _discover_i18n_paths(mock_client, _REPO)
     assert paths == []
-
 
 
 @pytest.mark.asyncio
@@ -258,7 +246,6 @@ async def test_discover_i18n_paths_truncated_logs_warning(
     assert any("truncated" in r.message for r in caplog.records)
 
 
-
 @pytest.mark.asyncio
 async def test_discover_i18n_paths_no_matches_returns_empty(mock_client: AsyncMock) -> None:
     mock_client.get.return_value = _make_response(
@@ -273,7 +260,6 @@ async def test_discover_i18n_paths_no_matches_returns_empty(mock_client: AsyncMo
 # ---------------------------------------------------------------------------
 
 
-
 @pytest.mark.asyncio
 async def test_fetch_repo_files_returns_found_files(mock_client: AsyncMock) -> None:
     """Files discovered via the tree are fetched and returned."""
@@ -286,7 +272,6 @@ async def test_fetch_repo_files_returns_found_files(mock_client: AsyncMock) -> N
     assert len(results) == 1
     assert results[0].path == _PATH
     assert results[0].repo == _REPO
-
 
 
 @pytest.mark.asyncio
@@ -305,13 +290,11 @@ async def test_fetch_repo_files_all_missing_returns_empty(mock_client: AsyncMock
 # ---------------------------------------------------------------------------
 
 
-
 @pytest.mark.asyncio
 async def test_fetch_github_i18n_content_empty_repos(mock_client: AsyncMock) -> None:
     with patch("src.services.github.GITHUB_REPOS", ""):
         result = await fetch_github_i18n_content()
     assert result == []
-
 
 
 @pytest.mark.asyncio
@@ -330,7 +313,6 @@ async def test_fetch_github_i18n_content_success(mock_client: AsyncMock) -> None
     assert isinstance(result, list)
     assert any(item["repo"] == _REPO for item in result)
     assert all("data" in item for item in result)
-
 
 
 @pytest.mark.asyncio
@@ -364,7 +346,6 @@ async def test_fetch_github_i18n_content_graceful_degradation(
     assert any("repo-good" in item["repo"] for item in result)
 
 
-
 @pytest.mark.asyncio
 async def test_fetch_github_i18n_content_whitespace_repos(
     mock_client: AsyncMock,
@@ -374,4 +355,3 @@ async def test_fetch_github_i18n_content_whitespace_repos(
     with patch("src.services.github.GITHUB_REPOS", "  ,  "):
         result = await fetch_github_i18n_content()
     assert result == []
-
