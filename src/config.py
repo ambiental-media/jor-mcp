@@ -26,3 +26,16 @@ RATE_LIMIT_BASIC: int = int(os.environ.get("RATE_LIMIT_BASIC_REQUESTS", "500"))
 
 RATE_LIMIT_PRO: int = int(os.environ.get("RATE_LIMIT_PRO_REQUESTS", "2000"))
 """Monthly request quota for 'pro' tier users."""
+
+# ---------------------------------------------------------------------------
+# HTTP Client
+# ---------------------------------------------------------------------------
+
+HTTP_TIMEOUT: float = float(os.environ.get("HTTP_TIMEOUT", "10.0"))
+"""Default timeout in seconds applied to all outbound HTTP requests."""
+
+HTTP_MAX_KEEPALIVE_CONNECTIONS: int = int(os.environ.get("HTTP_MAX_KEEPALIVE_CONNECTIONS", "50"))
+"""Maximum number of idle keep-alive connections retained in the pool."""
+
+HTTP_MAX_CONNECTIONS: int = int(os.environ.get("HTTP_MAX_CONNECTIONS", "100"))
+"""Maximum total concurrent connections allowed in the pool."""

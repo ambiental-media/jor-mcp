@@ -30,7 +30,20 @@ def test_health_endpoint() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_server_lifespan_initializes_firebase_when_not_present() -> None:
+@patch("firebase_admin.get_app", side_effect=ValueError("No app"))
+@patch("firebase_admin.initialize_app")
+@patch("src.server._mcp_http_app")
+@patch("redis.asyncio.ConnectionPool.from_url")
+@patch("redis.asyncio.Redis")
+@patch("httpx.AsyncClient")
+async def test_server_lifespan_initializes_firebase_when_not_present(
+    mock_http_client_cls: MagicMock,
+    mock_redis_cls: MagicMock,
+    _mock_pool: MagicMock,
+    mock_mcp_app: MagicMock,
+    mock_init: MagicMock,
+    _mock_get_app: MagicMock,
+) -> None:
     """server_lifespan calls initialize_app() when no Firebase app exists yet."""
     from src.server import server_lifespan
 
@@ -39,21 +52,33 @@ async def test_server_lifespan_initializes_firebase_when_not_present() -> None:
         yield
 
     fake_redis = _make_fake_redis()
-    with (
-        patch("firebase_admin.get_app", side_effect=ValueError("No app")),
-        patch("firebase_admin.initialize_app") as mock_init,
-        patch("src.server._mcp_http_app") as mock_mcp_app,
-        patch("redis.asyncio.ConnectionPool.from_url", return_value=MagicMock()),
-        patch("redis.asyncio.Redis", return_value=fake_redis),
-    ):
-        mock_mcp_app.lifespan = fake_mcp_lifespan
-        async with server_lifespan(MagicMock()):
-            pass
+    fake_http_client = AsyncMock()
+    mock_redis_cls.return_value = fake_redis
+    mock_http_client_cls.return_value = fake_http_client
+    mock_mcp_app.lifespan = fake_mcp_lifespan
+
+    async with server_lifespan(MagicMock()):
+        pass
 
     mock_init.assert_called_once()
+    fake_http_client.aclose.assert_awaited_once()
+    fake_redis.aclose.assert_awaited_once()
 
 
-async def test_server_lifespan_skips_init_when_firebase_already_present() -> None:
+@patch("firebase_admin.get_app")
+@patch("firebase_admin.initialize_app")
+@patch("src.server._mcp_http_app")
+@patch("redis.asyncio.ConnectionPool.from_url")
+@patch("redis.asyncio.Redis")
+@patch("httpx.AsyncClient")
+async def test_server_lifespan_skips_init_when_firebase_already_present(
+    mock_http_client_cls: MagicMock,
+    mock_redis_cls: MagicMock,
+    _mock_pool: MagicMock,
+    mock_mcp_app: MagicMock,
+    mock_init: MagicMock,
+    _mock_get_app: MagicMock,
+) -> None:
     """server_lifespan does NOT call initialize_app() when Firebase is already initialized."""
     from src.server import server_lifespan
 
@@ -62,15 +87,14 @@ async def test_server_lifespan_skips_init_when_firebase_already_present() -> Non
         yield
 
     fake_redis = _make_fake_redis()
-    with (
-        patch("firebase_admin.get_app", return_value=MagicMock()),
-        patch("firebase_admin.initialize_app") as mock_init,
-        patch("src.server._mcp_http_app") as mock_mcp_app,
-        patch("redis.asyncio.ConnectionPool.from_url", return_value=MagicMock()),
-        patch("redis.asyncio.Redis", return_value=fake_redis),
-    ):
-        mock_mcp_app.lifespan = fake_mcp_lifespan
-        async with server_lifespan(MagicMock()):
-            pass
+    fake_http_client = AsyncMock()
+    mock_redis_cls.return_value = fake_redis
+    mock_http_client_cls.return_value = fake_http_client
+    mock_mcp_app.lifespan = fake_mcp_lifespan
+
+    async with server_lifespan(MagicMock()):
+        pass
 
     mock_init.assert_not_called()
+    fake_http_client.aclose.assert_awaited_once()
+    fake_redis.aclose.assert_awaited_once()
