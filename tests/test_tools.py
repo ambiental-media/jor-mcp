@@ -335,12 +335,12 @@ class TestSafeSearchGithub:
     async def test_captures_unexpected_exception(self) -> None:
         with patch(
             "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(side_effect=RuntimeError("unexpected")),
+            new=AsyncMock(side_effect=KeyError("missing_key")),
         ):
             results, err = await _safe_search_github("amazonia")
 
         assert results == []
-        assert isinstance(err, RuntimeError)
+        assert isinstance(err, KeyError)
 
 
 # ---------------------------------------------------------------------------
