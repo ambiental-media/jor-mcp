@@ -224,8 +224,8 @@ async def _safe_search_github(
     """
     try:
         return await _search_github(query), None
-    except Exception as exc:  # noqa: BLE001
-        logger.warning(
+    except (KeyError, TypeError, AttributeError) as exc:
+        logger.exception(
             "GitHub search failed",
             extra={"query": query, "error": str(exc)},
         )
