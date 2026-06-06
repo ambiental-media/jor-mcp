@@ -343,7 +343,7 @@ class TestSafeSearchGithub:
         """
         with patch(
             "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(side_effect=RuntimeError("unexpected")),
+            new=AsyncMock(side_effect=KeyError("missing_key")),
         ):
             with pytest.raises(RuntimeError):
                 await _safe_search_github("amazonia")

@@ -231,7 +231,14 @@ async def _safe_search_github(
     Returns:
         A 2-tuple ``(results, None)``.
     """
-    return await _search_github(query), None
+    try:
+        return await _search_github(query), None
+    except (KeyError, TypeError, AttributeError) as exc:
+        logger.exception(
+            "GitHub search failed",
+            extra={"query": query, "error": str(exc)},
+        )
+        return [], exc
 
 
 # ---------------------------------------------------------------------------
