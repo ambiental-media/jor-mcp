@@ -146,10 +146,11 @@ async def _fetch_file(
         return None
 
     try:
-        payload = _GitHubContentResponse.model_validate(response.json())
-    except ValidationError as exc:
+        response_data = response.json()
+        payload = _GitHubContentResponse.model_validate(response_data)
+    except (ValueError, ValidationError) as exc:
         logger.warning(
-            "Unexpected GitHub API response schema",
+            "Unexpected or invalid GitHub API response",
             extra={"repo": repo, "path": path, "error": str(exc)},
         )
         return None
@@ -172,7 +173,14 @@ async def _fetch_file(
         )
         return None
 
-    return GitHubFileResult(repo=repo, path=path, data=data)
+    try:
+        return GitHubFileResult(repo=repo, path=path, data=data)
+    except ValidationError as exc:
+        logger.warning(
+            "Decoded GitHub file content does not match expected schema (expected dict)",
+            extra={"repo": repo, "path": path, "error": str(exc)},
+        )
+        return None
 
 
 async def _discover_i18n_paths(
@@ -219,10 +227,11 @@ async def _discover_i18n_paths(
         return []
 
     try:
-        payload = _GitHubTreeResponse.model_validate(response.json())
-    except ValidationError as exc:
+        response_data = response.json()
+        payload = _GitHubTreeResponse.model_validate(response_data)
+    except (ValueError, ValidationError) as exc:
         logger.warning(
-            "Unexpected tree API response schema",
+            "Unexpected or invalid GitHub API response",
             extra={"repo": repo, "error": str(exc)},
         )
         return []
