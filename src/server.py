@@ -66,11 +66,15 @@ async def server_lifespan(app: Starlette) -> AsyncGenerator[None, None]:
             decode_responses=False,
         )
         _redis_client = aioredis.Redis(connection_pool=pool)
-        _http_client_mod._http_client = httpx.AsyncClient(
+        transport = httpx.AsyncHTTPTransport(
+            retries=3,
             limits=httpx.Limits(
                 max_keepalive_connections=HTTP_MAX_KEEPALIVE_CONNECTIONS,
                 max_connections=HTTP_MAX_CONNECTIONS,
             ),
+        )
+        _http_client_mod._http_client = httpx.AsyncClient(
+            transport=transport,
             timeout=HTTP_TIMEOUT,
         )
         async with _mcp_http_app.lifespan(app):
