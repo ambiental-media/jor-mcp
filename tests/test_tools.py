@@ -135,11 +135,18 @@ class TestCollectStrings:
         result = _collect_strings(data, "amazonia", limit=3)
         assert len(result) <= 3
 
-    def test_trims_long_string_to_excerpt_max(self) -> None:
-        long_string = "amazonia " + ("x" * 400)
+    def test_excerpt_is_context_window_around_match(self) -> None:
+        """Excerpt is extracted around the match position, not from the start."""
+        prefix = "x" * 200
+        suffix = "x" * 200
+        long_string = prefix + "amazonia" + suffix
         result = _collect_strings(long_string, "amazonia")
         assert len(result) == 1
-        assert len(result[0]) == 300  # _EXCERPT_MAX_LENGTH
+        excerpt = result[0]
+        assert "amazonia" in excerpt
+        # excerpt should start and end with ellipsis since match is in the middle
+        assert excerpt.startswith("…")
+        assert excerpt.endswith("…")
 
     def test_non_string_scalars_ignored(self) -> None:
         data = {"count": 42, "flag": True, "value": None}
@@ -306,9 +313,7 @@ class TestSafeSearchWp:
 
         results, err = await _safe_search_wp("amazonia")
 
-        assert len(results) == 1
-        assert "error" in results[0]
-        assert results[0]["source"] == "wordpress"
+        assert results == []
         assert isinstance(err, httpx.HTTPStatusError)
 
     async def test_captures_request_error(self, mock_wp_client: AsyncMock) -> None:
@@ -316,9 +321,7 @@ class TestSafeSearchWp:
 
         results, err = await _safe_search_wp("amazonia")
 
-        assert len(results) == 1
-        assert "error" in results[0]
-        assert results[0]["source"] == "wordpress"
+        assert results == []
         assert isinstance(err, httpx.RequestError)
 
 
@@ -338,19 +341,20 @@ class TestSafeSearchGithub:
         assert err is None
         assert len(results) == 1
 
-    async def test_propagates_programming_error(self) -> None:
-        """RuntimeError from fetch_github_i18n_content propagates rather than being swallowed.
+    async def test_captures_programming_error(self) -> None:
+        """RuntimeError from fetch_github_i18n_content is captured, not propagated.
 
-        fetch_github_i18n_content handles all network/parsing errors internally
-        and never raises in normal operation.  A RuntimeError here would indicate
-        a programming bug (e.g. uninitialized HTTP client) that must not be silenced.
+        The safe wrapper must never let any exception escape to the TaskGroup,
+        so even unexpected programming errors are caught and returned as ([], exc).
         """
         with patch(
             "src.tools.fetch_github_i18n_content",
             new=AsyncMock(side_effect=RuntimeError("unexpected")),
         ):
-            with pytest.raises(RuntimeError):
-                await _safe_search_github("amazonia")
+            results, err = await _safe_search_github("amazonia")
+
+        assert results == []
+        assert isinstance(err, RuntimeError)
 
 
 # ---------------------------------------------------------------------------
@@ -400,18 +404,28 @@ class TestSearchAmbiental:
         assert len(results) >= 1
         sources = {r["source"] for r in results}
         assert any(s.startswith("github:") for s in sources)
+        error_dicts = [r for r in results if "error" in r]
+        assert len(error_dicts) == 1
+        assert error_dicts[0]["source"] == "wordpress"
 
     async def test_succeeds_when_only_github_fails(self, mock_wp_client: AsyncMock) -> None:
-        """Partial failure (GitHub down) still returns WP results."""
+        """Partial failure (GitHub network error) still returns WP results plus an error dict."""
         mock_wp_client.get.return_value = _make_response(200, [_SAMPLE_WP_POST])
-        with patch(
-            "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(side_effect=RuntimeError("gh down")),
+        with (
+            patch("src.tools.GITHUB_REPOS", "ambiental-media/microsite-amazonia"),
+            patch(
+                "src.tools.fetch_github_i18n_content",
+                new=AsyncMock(side_effect=RuntimeError("gh down")),
+            ),
         ):
             results = await search_content("amazonia")
 
         assert len(results) >= 1
-        assert all(r["source"] == "wordpress" for r in results)
+        sources = {r["source"] for r in results}
+        assert "wordpress" in sources
+        error_dicts = [r for r in results if "error" in r]
+        assert len(error_dicts) == 1
+        assert error_dicts[0]["source"] == "github"
 
     async def test_raises_tool_error_on_empty_results(self, mock_wp_client: AsyncMock) -> None:
         """ToolError with guidance is raised when both sources return empty."""

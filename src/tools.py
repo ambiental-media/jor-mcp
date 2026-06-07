@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 _WP_SEARCH_FIELDS: str = "id,title,excerpt,date,link"
 _WP_SEARCH_PER_PAGE: int = 10
 _EXCERPT_MAX_LENGTH: int = 300
+_EXCERPT_CONTEXT_WINDOW: int = 150
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +90,16 @@ def _collect_strings(data: Any, normalized_query: str, *, limit: int = 5) -> lis
     matches: list[str] = []
     if isinstance(data, str):
         if normalized_query in _normalize(data):
-            matches.append(data[:_EXCERPT_MAX_LENGTH])
+            normalized_data = _normalize(data)
+            match_idx = normalized_data.find(normalized_query)
+            window_start = max(0, match_idx - _EXCERPT_CONTEXT_WINDOW)
+            window_end = min(len(data), match_idx + len(normalized_query) + _EXCERPT_CONTEXT_WINDOW)
+            excerpt = data[window_start:window_end]
+            if window_start > 0:
+                excerpt = "…" + excerpt
+            if window_end < len(data):
+                excerpt = excerpt + "…"
+            matches.append(excerpt)
     elif isinstance(data, dict):
         for value in data.values():
             if len(matches) >= limit:
@@ -213,32 +223,27 @@ async def _safe_search_wp(
             "WordPress search failed",
             extra={"query": query, "error": str(exc)},
         )
-        return [
-            {
-                "error": "Não foi possível buscar resultados no WordPress no momento.",
-                "source": "wordpress",
-            }
-        ], exc
+        return [], exc
 
 
 async def _safe_search_github(
     query: str,
 ) -> tuple[list[dict[str, Any]], Exception | None]:
-    """Run :func:`_search_github` and return its results.
+    """Run :func:`_search_github` and capture any exception.
 
-    :func:`fetch_github_i18n_content` handles all network and parsing errors
-    internally (returning empty results on any failure), so this wrapper never
-    raises and always returns ``None`` as the error value.
+    Wraps all exceptions so that a GitHub failure never causes the
+    ``asyncio.TaskGroup`` in :func:`search_content` to panic and cancel
+    the WordPress task.
 
     Args:
         query: The search query string.
 
     Returns:
-        A 2-tuple ``(results, None)``.
+        A 2-tuple ``(results, error)``; ``error`` is ``None`` on success.
     """
     try:
         return await _search_github(query), None
-    except (KeyError, TypeError, AttributeError) as exc:
+    except Exception as exc:
         logger.exception(
             "GitHub search failed",
             extra={"query": query, "error": str(exc)},
@@ -321,6 +326,11 @@ async def search_content(query: str) -> list[dict[str, Any]]:
         )
 
     results: list[dict[str, Any]] = wp_results + gh_results
+
+    if wp_err:
+        results.append({"error": f"WordPress search failed: {str(wp_err)}", "source": "wordpress"})
+    if gh_err:
+        results.append({"error": f"GitHub search failed: {str(gh_err)}", "source": "github"})
 
     if not results:
         raise ToolError(
