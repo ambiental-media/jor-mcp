@@ -21,6 +21,8 @@ dependencies = [
     "redis[hiredis]>=5.0.0",
     "urllib3>=2.7.0",
     "beautifulsoup4>=4.14.3",
+    "opentelemetry-instrumentation-starlette>=0.46b0",
+    "opentelemetry-instrumentation-redis>=0.46b0",
 ]
 
 [dependency-groups]

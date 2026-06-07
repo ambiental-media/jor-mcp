@@ -73,3 +73,17 @@ GITHUB_API_BASE_URL: str = os.environ.get("GITHUB_API_BASE_URL", "https://api.gi
     "/"
 )
 """Base URL for the GitHub REST API (no trailing slash)."""
+
+# ---------------------------------------------------------------------------
+# OpenTelemetry
+# ---------------------------------------------------------------------------
+
+OTEL_EXPORTER_OTLP_ENDPOINT: str | None = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+"""OTLP/HTTP collector endpoint for exporting traces (e.g. http://localhost:4318).
+
+When absent the SDK falls back to :class:`ConsoleSpanExporter` which writes
+spans to stdout – useful for local development.
+"""
+
+OTEL_SERVICE_NAME: str = os.environ.get("OTEL_SERVICE_NAME", "jor-mcp")
+"""Logical service name embedded in every exported span's resource attributes."""
