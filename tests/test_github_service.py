@@ -188,6 +188,32 @@ async def test_fetch_file_invalid_json_returns_none(mock_client: AsyncMock) -> N
     assert result is None
 
 
+@pytest.mark.asyncio
+async def test_fetch_file_json_array_content_returns_none(mock_client: AsyncMock) -> None:
+    """A Base64-encoded JSON array must be gracefully rejected (not raise ValidationError)."""
+    array_payload = {
+        "name": "pt.json",
+        "path": _PATH,
+        "encoding": "base64",
+        "content": base64.b64encode(json.dumps([1, 2, 3]).encode("utf-8")).decode("ascii"),
+    }
+    mock_client.get.return_value = _make_response(200, array_payload)
+    result = await _fetch_file(mock_client, _REPO, _PATH)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_file_response_json_decode_error_returns_none(
+    mock_client: AsyncMock,
+) -> None:
+    """A JSONDecodeError from response.json() must be trapped and return None."""
+    mock_response = _make_response(200)
+    mock_response.json.side_effect = json.JSONDecodeError("Expecting value", "", 0)
+    mock_client.get.return_value = mock_response
+    result = await _fetch_file(mock_client, _REPO, _PATH)
+    assert result is None
+
+
 # ---------------------------------------------------------------------------
 # _discover_i18n_paths
 # ---------------------------------------------------------------------------
