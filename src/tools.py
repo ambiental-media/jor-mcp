@@ -231,7 +231,14 @@ async def _safe_search_github(
     Returns:
         A 2-tuple ``(results, None)``.
     """
-    return await _search_github(query), None
+    try:
+        return await _search_github(query), None
+    except (KeyError, TypeError, AttributeError) as exc:
+        logger.exception(
+            "GitHub search failed",
+            extra={"query": query, "error": str(exc)},
+        )
+        return [], exc
 
 
 # ---------------------------------------------------------------------------
@@ -372,7 +379,7 @@ async def list_latest_news(limit: int = _LATEST_NEWS_DEFAULT_LIMIT) -> list[dict
     Raises:
         ToolError: If the WordPress API is unreachable or returns no posts.
     """
-    safe_limit = min(limit, _LATEST_NEWS_MAX_LIMIT)
+    safe_limit = max(1, min(limit, _LATEST_NEWS_MAX_LIMIT))
 
     try:
         results = await fetch_latest_posts(safe_limit)
