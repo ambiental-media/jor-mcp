@@ -21,7 +21,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6.2.0
         with:
-          python-version: "3.12"
+          python-version: "3.13"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v8.1.0
@@ -104,9 +104,7 @@ jobs:
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:test
           format: table
-          # Skiping 'os' now to unlock development, once docker official python
-          # image vulns are fixed, this must be turned back on.
-          # vuln-type: 'os,library'
+          # TO-DO: include 'os,library' once official debian based python image is patched in Docker hub
           vuln-type: 'library'
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
