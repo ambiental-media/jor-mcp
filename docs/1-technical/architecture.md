@@ -4,7 +4,7 @@ This document provides a high-level overview of the Jor-MCP system architecture,
 
 ## 1. System Context Diagram (C4 Level 1)
 
-This diagram illustrates the Jor-MCP server in its environment. It acts as an orchestrator, receiving requests from an AI Agent (Client), validating authentication via Firebase, applying rate limits via Redis, and fetching data from WordPress and GitHub.
+This diagram illustrates the Jor-MCP server in its environment. It acts as an orchestrator, receiving requests from an AI Agent (Client), validating authentication via Firebase, applying rate limits via Firestore, and fetching data from WordPress and GitHub.
 
 ```mermaid
 %%{init: {'theme': 'dark'}}%%
@@ -16,7 +16,7 @@ graph TD
     subgraph GCP Environment
         LB[Global Application Load Balancer]
         JorMCP[Jor-MCP Server \n FastMCP / Cloud Run \n Internal Ingress Only]
-        Redis[(GCP Memorystore \n Redis)]
+        Firestore[(Google Cloud Firestore \n NoSQL)]
     end
     
     %% External Services
@@ -28,14 +28,14 @@ graph TD
     Client -- "1. HTTP SSE + Bearer Token" --> LB
     LB -- "2. Route to Serverless NEG" --> JorMCP
     JorMCP -. "3. Validate JWKS" .-> FirebaseAuth
-    JorMCP -- "4. Check/Update Quota" --> Redis
+    JorMCP -- "4. Check/Update Quota" --> Firestore
     JorMCP -- "5. Fetch Posts/Pages" --> WP
     JorMCP -- "6. Fetch JSON Content" --> GH
     
     class Client,FirebaseAuth,WP,GH external;
     class JorMCP internal;
     class LB gateway;
-    class Redis db;
+    class Firestore db;
 ```
 
 ## 2. Request Lifecycle (Sequence Diagram)
@@ -48,7 +48,7 @@ sequenceDiagram
     participant C as LLM Client
     participant Auth as Auth Middleware
     participant RL as Rate Limit Middleware
-    participant Redis as GCP Memorystore
+    participant Firestore as Google Cloud Firestore
     participant MCP as FastMCP Engine
     participant Ext as External APIs (WP/GH)
 
@@ -62,8 +62,8 @@ sequenceDiagram
     end
 
     Note over RL: Fixed Window (Monthly) Check
-    RL->>Redis: GET / SET user requests
-    Redis-->>RL: Current Count
+    RL->>Firestore: Get / Increment document
+    Firestore-->>RL: Current Count
     
     alt Quota Exceeded
         RL-->>C: 429 Too Many Requests
@@ -83,5 +83,5 @@ sequenceDiagram
 
 - **Framework:** `fastmcp` (ASGI server powered by `uvicorn`).
 - **HTTP Client:** `httpx` (Asynchronous connection pooling).
-- **Security:** `firebase-admin` (JWT validation) and `redis.asyncio` (Rate limiting).
+- **Security:** `firebase-admin` (JWT validation) and `google-cloud-firestore` (Rate limiting).
 - **Telemetry:** OpenTelemetry (`opentelemetry-sdk`, `opentelemetry-instrumentation-fastapi`).

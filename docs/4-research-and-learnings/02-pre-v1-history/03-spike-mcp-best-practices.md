@@ -8,7 +8,7 @@ To establish best practices for building an MCP server, focusing on observabilit
 A robust monitoring infrastructure is critical to ensure the health and performance of the MCP server.
 
 *   **Approach:** We will utilize **OpenTelemetry (OTel)**.
-*   **Instrumentation:** To minimize code changes, we will rely on **Automatic Instrumentation** (e.g., `opentelemetry-instrumentation-fastapi`, `httpx`, `redis`). Manual instrumentation will be used only for highly specific domain metrics (e.g., tracking token usage if necessary).
+*   **Instrumentation:** To minimize code changes, we will rely on **Automatic Instrumentation** (e.g., `opentelemetry-instrumentation-fastapi`, `httpx`, `google-cloud-firestore` defaults). Manual instrumentation will be used only for highly specific domain metrics (e.g., tracking token usage if necessary).
 *   **Exporting:** To simplify deployment on Cloud Run and avoid managing a sidecar container (OTel Collector), we will use direct **SDK Exporters** (`opentelemetry-exporter-gcp-monitoring` and `opentelemetry-exporter-gcp-trace`).
 *   **Key Metrics:**
     *   *Latency:* Tracked via Histograms (p50, p95, p99).

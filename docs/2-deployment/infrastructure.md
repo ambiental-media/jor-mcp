@@ -8,7 +8,7 @@ The system is designed to be fully serverless, highly available, and stateless a
 
 - **Entrypoint:** Global External Application Load Balancer (Handles custom domains, SSL, and SSE streaming).
 - **Compute:** Google Cloud Run (Containerized, auto-scaling). Locked down to "Internal and Cloud Load Balancing traffic only."
-- **Cache/State:** Google Cloud Memorystore for Redis (Handles distributed rate-limiting).
+- **Database/State:** Google Cloud Firestore (Handles distributed rate-limiting via atomic increments).
 - **Identity:** Google Cloud Identity Platform / Firebase Auth (Validates JWTs).
 - **Observability:** Google Cloud Operations Suite (Cloud Logging and Cloud Trace via OpenTelemetry).
 
@@ -20,12 +20,13 @@ The server relies strictly on environment variables for configuration. No secret
 | :--- | :--- | :--- |
 | `PORT` | The port the ASGI server binds to. | `8080` |
 | `LOG_LEVEL` | Python logging level (`INFO`, `DEBUG`, `WARNING`). | `INFO` |
-| `REDIS_URL` | Connection string for GCP Memorystore (e.g., `redis://10.0.0.3:6379`). | *(Required)* |
 | `FIREBASE_PROJECT_ID` | The GCP Project ID associated with Firebase Auth. | *(Required)* |
 | `WORDPRESS_API_URL` | Base URL for the main WordPress REST API. | `https://ambiental.media/wp-json/wp/v2` |
 | `GITHUB_TOKEN` | Personal Access Token to read private Next.js repos. | *(Required)* |
 | `GITHUB_REPOS` | Comma-separated list of Next.js repos (e.g., `mata-nativa,rio60`). | *(Required)* |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`| OTLP endpoint for tracing. Empty means console export. | `""` |
+
+> **Note on Rate Limiting (Firestore):** The application relies on Google Cloud Firestore for its state. It automatically utilizes Google Application Default Credentials (ADC) bound to the Cloud Run service account. No explicit connection string or secret is required, but the service account *must* be granted the `roles/datastore.user` IAM role.
 
 ## 3. Dockerization Strategy
 
@@ -47,7 +48,7 @@ Deployment should be automated via GitHub Actions:
 
 The Cloud Run service is managed declaratively via a `service.yaml` file located at the root of the repository. This file is the single source of truth for the service configuration, including container resources, auto-scaling, ingress, and environment variables.
 
-Sensitive variables (`GITHUB_TOKEN`, `REDIS_URL`, `JWT_SECRET`) are never hardcoded in the YAML. They are stored in GCP Secret Manager and injected directly into the container at runtime via `valueFrom: secretKeyRef`.
+Sensitive variables (`GITHUB_TOKEN`, `JWT_SECRET`) are never hardcoded in the YAML. They are stored in GCP Secret Manager and injected directly into the container at runtime via `valueFrom: secretKeyRef`.
 
 ### Applying the manifest locally
 
