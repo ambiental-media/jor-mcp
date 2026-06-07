@@ -243,7 +243,15 @@ async def _safe_search_github(
     """
     try:
         return await _search_github(query), None
-    except Exception as exc:
+    except (
+        httpx.RequestError,
+        httpx.HTTPStatusError,
+        ValueError,
+        TypeError,
+        KeyError,
+        AttributeError,
+        RuntimeError,
+    ) as exc:
         logger.exception(
             "GitHub search failed",
             extra={"query": query, "error": str(exc)},
