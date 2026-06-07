@@ -44,12 +44,16 @@ HTTP_MAX_CONNECTIONS: int = int(os.environ.get("HTTP_MAX_CONNECTIONS", "100"))
 # WordPress REST API
 # ---------------------------------------------------------------------------
 
-WP_API_BASE_URL: str = os.environ.get(
-    "WORDPRESS_API_URL", "https://ambiental.media/wp-json"
-).rstrip("/")
-"""Base URL for the WordPress REST API (no trailing slash).
+WP_API_BASE_URL: str = (
+    os.environ.get("WORDPRESS_API_URL", "https://ambiental.media/wp-json")
+    .rstrip("/")
+    .removesuffix("/wp/v2")
+)
+"""Base URL for the WordPress REST API (no trailing slash, without /wp/v2).
 
-Example: https://ambiental.media/wp-json
+Accepts both ``https://ambiental.media/wp-json`` and
+``https://ambiental.media/wp-json/wp/v2`` — the ``/wp/v2`` suffix is
+normalised away so service code can safely append ``/wp/v2/<resource>``.
 """
 
 # ---------------------------------------------------------------------------

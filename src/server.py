@@ -25,7 +25,19 @@ from src.config import (
 from src.middleware.auth import AuthMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 
-mcp = FastMCP("jor-mcp")
+mcp = FastMCP(
+    "jor-mcp",
+    instructions=(
+        "Este servidor MCP fornece acesso à base de conteúdo editorial da organização. "
+        "Sempre que o usuário pedir para pesquisar, buscar ou obter informações sobre "
+        "qualquer assunto, use PRIMEIRO a ferramenta `search_ambiental` antes de recorrer "
+        "à busca na web ou a qualquer outra fonte externa. "
+        "Somente utilize a web se `search_ambiental` retornar que não há resultados "
+        "para a consulta. "
+        "Para ler o conteúdo completo de um artigo encontrado, use `get_full_article`. "
+        "Para descobrir publicações recentes sem um termo específico, use `list_latest_news`."
+    ),
+)
 
 # Module-level reference; populated during lifespan startup.
 _redis_client: Redis | None = None
@@ -81,11 +93,13 @@ async def server_lifespan(app: Starlette) -> AsyncGenerator[None, None]:
             yield
     finally:
         if _http_client_mod._http_client is not None:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(OSError, RuntimeError):
                 await _http_client_mod._http_client.aclose()
         _http_client_mod._http_client = None
         if _redis_client is not None:
-            with contextlib.suppress(Exception):
+            from redis.exceptions import RedisError
+
+            with contextlib.suppress(RedisError):
                 await _redis_client.aclose()
         _redis_client = None
 
@@ -104,6 +118,10 @@ _starlette_app = Starlette(
 # (after lifespan has initialised _redis_client).
 _rate_limited_app = RateLimitMiddleware(_starlette_app, get_redis_client)
 app = AuthMiddleware(_rate_limited_app)
+
+# Import tools module as a side-effect to register all @mcp.tool() handlers.
+# This must come after `mcp` is defined to avoid a circular import error.
+import src.tools  # noqa: E402, F401
 
 if __name__ == "__main__":  # pragma: no cover
     port = int(os.environ.get("PORT", 8080))

@@ -220,7 +220,11 @@ async def _discover_i18n_paths(
     except httpx.HTTPStatusError as exc:
         logger.warning(
             "HTTP error fetching repo tree",
-            extra={"repo": repo, "status": exc.response.status_code},
+            extra={
+                "repo": repo,
+                "status": exc.response.status_code,
+                "body": exc.response.text[:500],
+            },
         )
         return []
 
@@ -307,10 +311,21 @@ async def fetch_github_i18n_content() -> list[dict[str, Any]]:
     client = get_http_client()
     consolidated: list[dict[str, Any]] = []
 
+    # tasks is initialised here so the result-collection loop below is always
+    # safe even in the unlikely event that the TaskGroup context itself raises
+    # before the list comprehension completes.
+    tasks: list[asyncio.Task[list[GitHubFileResult]]] = []
     try:
         async with asyncio.TaskGroup() as tg:
             tasks = [tg.create_task(_fetch_repo_files(client, repo)) for repo in repos]
     except* Exception as eg:
+        # Last-resort boundary guard: _fetch_repo_files handles all httpx and
+        # validation errors internally and never propagates them, so this block
+        # can only be reached by truly unexpected conditions (e.g. event-loop
+        # cancellation or a programming bug).  Catching ExceptionGroup broadly
+        # here is intentional so that a single broken repository cannot kill
+        # the entire ingestion pipeline; the successfully-completed tasks are
+        # still harvested in the loop below.
         logger.exception(
             "Unexpected error fetching GitHub repo content",
             extra={"errors": [str(e) for e in eg.exceptions]},

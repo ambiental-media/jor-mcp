@@ -19,7 +19,7 @@ A robust monitoring infrastructure is critical to ensure the health and performa
 Standard HTTP error codes are insufficient for AI agents, as the agent needs semantic understanding of *why* an operation failed to adjust its behavior.
 
 *   **Practice:** When an internal tool fails (e.g., a WordPress article is not found, or a GitHub repo is inaccessible), the server must raise a `ToolError` (specific to the FastMCP framework).
-*   **Semantic Hints:** The error message must contain clear, human-readable instructions in Portuguese guiding the LLM on how to recover. For example: *"Artigo não encontrado com este ID. Tente utilizar a ferramenta search_ambiental para buscar por palavras-chave."*
+*   **Semantic Hints:** The error message must contain clear, human-readable instructions in Portuguese guiding the LLM on how to recover. For example: *"Artigo não encontrado com este ID. Tente utilizar a ferramenta search_content para buscar por palavras-chave."*
 
 ## 4. Context Management (Token Sustainability)
 
