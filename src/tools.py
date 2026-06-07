@@ -213,7 +213,12 @@ async def _safe_search_wp(
             "WordPress search failed",
             extra={"query": query, "error": str(exc)},
         )
-        return [], exc
+        return [
+            {
+                "error": "Não foi possível buscar resultados no WordPress no momento.",
+                "source": "wordpress",
+            }
+        ], exc
 
 
 async def _safe_search_github(
