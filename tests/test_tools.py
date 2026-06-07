@@ -306,7 +306,9 @@ class TestSafeSearchWp:
 
         results, err = await _safe_search_wp("amazonia")
 
-        assert results == []
+        assert len(results) == 1
+        assert "error" in results[0]
+        assert results[0]["source"] == "wordpress"
         assert isinstance(err, httpx.HTTPStatusError)
 
     async def test_captures_request_error(self, mock_wp_client: AsyncMock) -> None:
@@ -314,7 +316,9 @@ class TestSafeSearchWp:
 
         results, err = await _safe_search_wp("amazonia")
 
-        assert results == []
+        assert len(results) == 1
+        assert "error" in results[0]
+        assert results[0]["source"] == "wordpress"
         assert isinstance(err, httpx.RequestError)
 
 
@@ -382,7 +386,7 @@ class TestSearchAmbiental:
                 await search_content("amazonia")
 
     async def test_succeeds_when_only_wp_fails(self, mock_wp_client: AsyncMock) -> None:
-        """Partial failure (WP down) still returns GitHub results."""
+        """Partial failure (WP down) still returns GitHub results plus an error dict."""
         mock_wp_client.get.return_value = _make_response(500)
         with (
             patch("src.tools.GITHUB_REPOS", "ambiental-media/microsite-amazonia"),
@@ -394,7 +398,8 @@ class TestSearchAmbiental:
             results = await search_content("amazonia")
 
         assert len(results) >= 1
-        assert all(r["source"].startswith("github:") for r in results)
+        sources = {r["source"] for r in results}
+        assert any(s.startswith("github:") for s in sources)
 
     async def test_succeeds_when_only_github_fails(self, mock_wp_client: AsyncMock) -> None:
         """Partial failure (GitHub down) still returns WP results."""
@@ -490,7 +495,7 @@ class TestGetFullArticle:
             "src.tools.fetch_full_article",
             new=AsyncMock(side_effect=WordPressPostNotFoundError("Post not found")),
         ):
-            with pytest.raises(ToolError, match="search_ambiental"):
+            with pytest.raises(ToolError, match="search_content"):
                 await get_full_article("slug-inexistente")
 
     async def test_not_found_error_mentions_identifier(self) -> None:
