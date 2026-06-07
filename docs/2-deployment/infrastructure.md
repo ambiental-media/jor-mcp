@@ -42,3 +42,28 @@ Deployment should be automated via GitHub Actions:
 3. Builds the Docker image.
 4. Pushes the image to Google Artifact Registry.
 5. Deploys the new revision to Cloud Run using the existing service account.
+
+## 5. Declarative Service Manifest
+
+The Cloud Run service is managed declaratively via a `service.yaml` file located at the root of the repository. This file is the single source of truth for the service configuration, including container resources, auto-scaling, ingress, and environment variables.
+
+Sensitive variables (`GITHUB_TOKEN`, `REDIS_URL`, `JWT_SECRET`) are never hardcoded in the YAML. They are stored in GCP Secret Manager and injected directly into the container at runtime via `valueFrom: secretKeyRef`.
+
+### Applying the manifest locally
+
+Export the required environment variables and use `envsubst` to replace the placeholders before applying:
+
+```bash
+export IMAGE_URL="us-central1-docker.pkg.dev/jor-mcp/jor-mcp/jor-mcp-server:SHA"
+export GCP_PROJECT_NUMBER="959918358302"
+export FIREBASE_PROJECT_ID="..."
+export WORDPRESS_API_URL="..."
+export GITHUB_REPOS="..."
+export OTEL_EXPORTER_OTLP_ENDPOINT="..."
+
+envsubst < service.yaml | gcloud run services replace - --region us-central1
+```
+
+### In the CD pipeline (GitHub Actions)
+
+The variables above are injected automatically as repository secrets and variables. The `envsubst` command is executed by the pipeline before calling `gcloud run services replace`, so no manual substitution is needed.
