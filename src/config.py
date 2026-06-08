@@ -63,7 +63,7 @@ normalised away so service code can safely append ``/wp/v2/<resource>``.
 GITHUB_TOKEN: str | None = os.environ.get("GITHUB_TOKEN")
 """Personal Access Token for the GitHub API. Optional for public repos."""
 
-GITHUB_REPOS: str = os.environ.get("GITHUB_REPOS", "")
+GITHUB_REPOS: str = os.environ.get("GH_REPOS", "")
 """Comma-separated list of GitHub repositories (owner/repo format) to index.
 
 Example: ambiental-media/microsite-amazonia,ambiental-media/microsite-pantanal

@@ -21,10 +21,10 @@ spec:
         autoscaling.knative.dev/maxScale: "5"
 
         # ── Secret Manager — lookup names → resource IDs ──────────────────────
-        run.googleapis.com/secrets: "redis-url:projects/${GCP_PROJECT_NUMBER}/secrets/REDIS_URL,github-token:projects/${GCP_PROJECT_NUMBER}/secrets/GITHUB_TOKEN,jwt-secret:projects/${GCP_PROJECT_NUMBER}/secrets/JWT_SECRET"
+        run.googleapis.com/secrets: "github-token:projects/${GCP_PROJECT_NUMBER}/secrets/GITHUB_TOKEN,jwt-secret:projects/${GCP_PROJECT_NUMBER}/secrets/JWT_SECRET"
     spec:
       # ← Service account configured with the actual GCP value
-      serviceAccountName: 959918358302-compute@developer.gserviceaccount.com
+      serviceAccountName: github-actions-ci@jor-mcp.iam.gserviceaccount.com
 
       containers:
         - image: ${IMAGE_URL}
@@ -46,17 +46,12 @@ spec:
               value: "${FIREBASE_PROJECT_ID}"
             - name: WORDPRESS_API_URL
               value: "${WORDPRESS_API_URL}"
-            - name: GITHUB_REPOS
-              value: "${GITHUB_REPOS}"
+            - name: GH_REPOS
+              value: "${GH_REPOS}"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "${OTEL_EXPORTER_OTLP_ENDPOINT}"
 
             # ── Secrets via Secret Manager ───────────────────────────────────
-            - name: REDIS_URL
-              valueFrom:
-                secretKeyRef:
-                  name: redis-url
-                  key: latest
             - name: GITHUB_TOKEN
               valueFrom:
                 secretKeyRef:
