@@ -75,6 +75,8 @@ jobs:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
     needs: check
+    env:
+      IMAGE_TAG: pr-${{ github.event.pull_request.number }}
 
     steps:
       - name: Checkout code
@@ -97,12 +99,12 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:test .
+          docker build -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ env.IMAGE_TAG }} .
 
       - name: Security scan (Trivy)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:test
+          image-ref: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ env.IMAGE_TAG }}
           format: table
           # TO-DO: include 'os,library' once official debian based python image is patched in Docker hub
           vuln-type: 'library'
@@ -111,4 +113,4 @@ jobs:
 
       - name: Push Docker image
         run: |
-          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:test
+          docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ env.IMAGE_TAG }}
