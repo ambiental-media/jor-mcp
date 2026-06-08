@@ -59,8 +59,7 @@ jobs:
           TAG_EXISTS=$(gcloud artifacts docker tags list \
             "${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}" \
             --project "${{ env.PROJECT_ID }}" \
-            --filter="tag=${{ inputs.image_tag }}" \
-            --format="value(tag)")
+            --format="value(tag)" | grep -x "${{ inputs.image_tag }}")
           if [ -z "$TAG_EXISTS" ]; then
             echo "::error::Image not found: ${{ steps.image.outputs.url }} — check the image_tag input."
             exit 1
