@@ -32,5 +32,5 @@ The POC was evaluated against Claude Desktop and OpenAI (Developer Mode).
 The POC highlighted several areas requiring improvement for the v1 production release:
 
 *   **HTML Parsing:** The basic HTML stripper left residual artifacts (Elementor shortcodes, excessive whitespace) that confused the LLM. A more advanced parser is needed.
-*   **Rate Limiting Limitations:** The in-memory rate limiter proved insufficient for Cloud Run, as it resets per instance when scaling horizontally. A distributed store (Redis) is necessary.
+*   **Rate Limiting Limitations:** The in-memory rate limiter proved insufficient for Cloud Run, as it resets per instance when scaling horizontally. A distributed store (Firestore) is necessary to track global monthly quotas.
 *   **Security:** The symmetric JWT secret approach used in the POC needs to be upgraded to a robust OAuth 2.0 implementation.

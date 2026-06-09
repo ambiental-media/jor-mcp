@@ -1,0 +1,88 @@
+# =============================================================================
+# Jor-MCP — Continuous Deployment
+# Manual deploy: pick an image tag and roll it out to Cloud Run.
+# =============================================================================
+ 
+name: CD
+ 
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (e.g. pr-12)"
+        required: true
+        type: string
+ 
+env:
+  REGISTRY: us-central1-docker.pkg.dev
+  PROJECT_ID: jor-mcp
+  REPOSITORY: jor-mcp
+  IMAGE: jor-mcp-server
+  REGION: us-central1
+ 
+# Queue overlapping deploys instead of cancelling an in-flight rollout.
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+ 
+permissions:
+  contents: read
+ 
+jobs:
+  deploy:
+    name: Deploy to Cloud Run
+    runs-on: ubuntu-latest
+ 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
+ 
+      - name: Decode credentials
+        id: decode_si
+        run: |
+          DECODED_CREDENTIALS="$(echo -n ${{ secrets.GCP_SA_KEY }} | base64 --decode)"
+          echo "::add-mask::$DECODED_CREDENTIALS"
+          echo "creds=$DECODED_CREDENTIALS" >> "$GITHUB_OUTPUT"
+ 
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: '${{ steps.decode_si.outputs.creds }}'
+ 
+      - name: Build image URL
+        id: image
+        run: |
+          echo "url=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+ 
+      - name: Verify image exists in Artifact Registry
+        run: |
+          TAG_EXISTS=$(gcloud artifacts docker tags list \
+            "${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}" \
+            --project "${{ env.PROJECT_ID }}" \
+            --format="value(tag)" | grep -x "${{ inputs.image_tag }}")
+          if [ -z "$TAG_EXISTS" ]; then
+            echo "::error::Image not found: ${{ steps.image.outputs.url }} — check the image_tag input."
+            exit 1
+          fi
+ 
+      - name: Render service manifest (envsubst)
+        env:
+          IMAGE_URL: ${{ steps.image.outputs.url }}
+          GCP_PROJECT_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          WORDPRESS_API_URL: ${{ vars.WORDPRESS_API_URL }}
+          GH_REPOS: ${{ vars.GH_REPOS }}
+          OTEL_EXPORTER_OTLP_ENDPOINT: ${{ vars.OTEL_EXPORTER_OTLP_ENDPOINT }}
+        run: |
+          # Allowlist form: only these variables are substituted, leaving any
+          # other "$" in the manifest untouched.
+          envsubst '${IMAGE_URL} ${GCP_PROJECT_NUMBER} ${FIREBASE_PROJECT_ID} ${WORDPRESS_API_URL} ${GH_REPOS} ${OTEL_EXPORTER_OTLP_ENDPOINT}' \
+            < service.yaml > service.rendered.yaml
+          echo "----- Rendered manifest -----"
+          cat service.rendered.yaml
+ 
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run services replace service.rendered.yaml \
+            --project "${{ env.PROJECT_ID }}" \
+            --region "${{ env.REGION }}"

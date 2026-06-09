@@ -66,6 +66,30 @@ def mock_wp_client() -> Generator[AsyncMock, None, None]:
         yield client
 
 
+@pytest.fixture
+def mock_fetch_github_i18n_content() -> Generator[AsyncMock, None, None]:
+    """Inject a mock for fetch_github_i18n_content."""
+    mock = AsyncMock(return_value=[_SAMPLE_GITHUB_FILE])
+    with patch("src.tools.fetch_github_i18n_content", new=mock):
+        yield mock
+
+
+@pytest.fixture
+def mock_fetch_full_article() -> Generator[AsyncMock, None, None]:
+    """Inject a mock for fetch_full_article."""
+    mock = AsyncMock(return_value=_SAMPLE_FULL_ARTICLE)
+    with patch("src.tools.fetch_full_article", new=mock):
+        yield mock
+
+
+@pytest.fixture
+def mock_fetch_latest_posts() -> Generator[AsyncMock, None, None]:
+    """Inject a mock for fetch_latest_posts."""
+    mock = AsyncMock(return_value=_SAMPLE_LATEST_POSTS)
+    with patch("src.tools.fetch_latest_posts", new=mock):
+        yield mock
+
+
 # ---------------------------------------------------------------------------
 # _normalize
 # ---------------------------------------------------------------------------
@@ -135,11 +159,18 @@ class TestCollectStrings:
         result = _collect_strings(data, "amazonia", limit=3)
         assert len(result) <= 3
 
-    def test_trims_long_string_to_excerpt_max(self) -> None:
-        long_string = "amazonia " + ("x" * 400)
+    def test_excerpt_is_context_window_around_match(self) -> None:
+        """Excerpt is extracted around the match position, not from the start."""
+        prefix = "x" * 200
+        suffix = "x" * 200
+        long_string = prefix + "amazonia" + suffix
         result = _collect_strings(long_string, "amazonia")
         assert len(result) == 1
-        assert len(result[0]) == 300  # _EXCERPT_MAX_LENGTH
+        excerpt = result[0]
+        assert "amazonia" in excerpt
+        # excerpt should start and end with ellipsis since match is in the middle
+        assert excerpt.startswith("…")
+        assert excerpt.endswith("…")
 
     def test_non_string_scalars_ignored(self) -> None:
         data = {"count": 42, "flag": True, "value": None}
@@ -218,12 +249,8 @@ class TestSearchWp:
 
 
 class TestSearchGithub:
-    async def test_returns_matching_file(self) -> None:
-        with patch(
-            "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(return_value=[_SAMPLE_GITHUB_FILE]),
-        ):
-            results = await _search_github("amazonia")
+    async def test_returns_matching_file(self, mock_fetch_github_i18n_content: AsyncMock) -> None:
+        results = await _search_github("amazonia")
 
         assert len(results) == 1
         result = results[0]
@@ -233,56 +260,46 @@ class TestSearchGithub:
         assert "github.com" in result["link"]
         assert result["id"] == "ambiental-media/microsite-amazonia/messages/pt.json"
 
-    async def test_accent_insensitive_match(self) -> None:
+    async def test_accent_insensitive_match(
+        self, mock_fetch_github_i18n_content: AsyncMock
+    ) -> None:
         # Query 'historico' (no accent) should match 'históricos' in the data
-        with patch(
-            "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(return_value=[_SAMPLE_GITHUB_FILE]),
-        ):
-            results = await _search_github("historico")
+        results = await _search_github("historico")
 
         assert len(results) == 1
 
-    async def test_no_match_returns_empty(self) -> None:
-        with patch(
-            "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(return_value=[_SAMPLE_GITHUB_FILE]),
-        ):
-            results = await _search_github("termo-que-nao-existe")
+    async def test_no_match_returns_empty(self, mock_fetch_github_i18n_content: AsyncMock) -> None:
+        results = await _search_github("termo-que-nao-existe")
 
         assert results == []
 
-    async def test_empty_files_returns_empty(self) -> None:
-        with patch(
-            "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(return_value=[]),
-        ):
-            results = await _search_github("amazonia")
+    async def test_empty_files_returns_empty(
+        self, mock_fetch_github_i18n_content: AsyncMock
+    ) -> None:
+        mock_fetch_github_i18n_content.return_value = []
+        results = await _search_github("amazonia")
 
         assert results == []
 
-    async def test_multiple_files_multiple_matches(self) -> None:
+    async def test_multiple_files_multiple_matches(
+        self, mock_fetch_github_i18n_content: AsyncMock
+    ) -> None:
         second_file = {
             "repo": "ambiental-media/microsite-pantanal",
             "path": "messages/pt.json",
             "data": {"body": "Queimadas no Pantanal"},
         }
-        with patch(
-            "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(return_value=[_SAMPLE_GITHUB_FILE, second_file]),
-        ):
-            results = await _search_github("amazonia")
+        mock_fetch_github_i18n_content.return_value = [_SAMPLE_GITHUB_FILE, second_file]
+        results = await _search_github("amazonia")
 
         # Only the first file matches "amazonia"
         assert len(results) == 1
         assert "microsite-amazonia" in results[0]["source"]
 
-    async def test_date_field_is_empty_string(self) -> None:
-        with patch(
-            "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(return_value=[_SAMPLE_GITHUB_FILE]),
-        ):
-            results = await _search_github("amazonia")
+    async def test_date_field_is_empty_string(
+        self, mock_fetch_github_i18n_content: AsyncMock
+    ) -> None:
+        results = await _search_github("amazonia")
 
         assert results[0]["date"] == ""
 
@@ -306,9 +323,7 @@ class TestSafeSearchWp:
 
         results, err = await _safe_search_wp("amazonia")
 
-        assert len(results) == 1
-        assert "error" in results[0]
-        assert results[0]["source"] == "wordpress"
+        assert results == []
         assert isinstance(err, httpx.HTTPStatusError)
 
     async def test_captures_request_error(self, mock_wp_client: AsyncMock) -> None:
@@ -316,9 +331,7 @@ class TestSafeSearchWp:
 
         results, err = await _safe_search_wp("amazonia")
 
-        assert len(results) == 1
-        assert "error" in results[0]
-        assert results[0]["source"] == "wordpress"
+        assert results == []
         assert isinstance(err, httpx.RequestError)
 
 
@@ -328,29 +341,27 @@ class TestSafeSearchWp:
 
 
 class TestSafeSearchGithub:
-    async def test_returns_results_on_success(self) -> None:
-        with patch(
-            "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(return_value=[_SAMPLE_GITHUB_FILE]),
-        ):
-            results, err = await _safe_search_github("amazonia")
+    async def test_returns_results_on_success(
+        self, mock_fetch_github_i18n_content: AsyncMock
+    ) -> None:
+        results, err = await _safe_search_github("amazonia")
 
         assert err is None
         assert len(results) == 1
 
-    async def test_propagates_programming_error(self) -> None:
-        """RuntimeError from fetch_github_i18n_content propagates rather than being swallowed.
+    async def test_captures_programming_error(
+        self, mock_fetch_github_i18n_content: AsyncMock
+    ) -> None:
+        """RuntimeError from fetch_github_i18n_content is captured, not propagated.
 
-        fetch_github_i18n_content handles all network/parsing errors internally
-        and never raises in normal operation.  A RuntimeError here would indicate
-        a programming bug (e.g. uninitialized HTTP client) that must not be silenced.
+        The safe wrapper must never let any exception escape to the TaskGroup,
+        so even unexpected programming errors are caught and returned as ([], exc).
         """
-        with patch(
-            "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(side_effect=RuntimeError("unexpected")),
-        ):
-            with pytest.raises(RuntimeError):
-                await _safe_search_github("amazonia")
+        mock_fetch_github_i18n_content.side_effect = RuntimeError("unexpected")
+        results, err = await _safe_search_github("amazonia")
+
+        assert results == []
+        assert isinstance(err, RuntimeError)
 
 
 # ---------------------------------------------------------------------------
@@ -359,92 +370,86 @@ class TestSafeSearchGithub:
 
 
 class TestSearchAmbiental:
-    async def test_returns_aggregated_results(self, mock_wp_client: AsyncMock) -> None:
+    async def test_returns_aggregated_results(
+        self, mock_wp_client: AsyncMock, mock_fetch_github_i18n_content: AsyncMock
+    ) -> None:
         """Results from both WP and GitHub are merged into a single list."""
         mock_wp_client.get.return_value = _make_response(200, [_SAMPLE_WP_POST])
-        with (
-            patch("src.tools.GITHUB_REPOS", "ambiental-media/microsite-amazonia"),
-            patch(
-                "src.tools.fetch_github_i18n_content",
-                new=AsyncMock(return_value=[_SAMPLE_GITHUB_FILE]),
-            ),
-        ):
+        with patch("src.tools.GITHUB_REPOS", "ambiental-media/microsite-amazonia"):
             results = await search_content("amazonia")
 
         sources = {r["source"] for r in results}
         assert "wordpress" in sources
         assert any(s.startswith("github:") for s in sources)
 
-    async def test_raises_tool_error_when_both_fail(self, mock_wp_client: AsyncMock) -> None:
+    async def test_raises_tool_error_when_both_fail(
+        self, mock_wp_client: AsyncMock, mock_fetch_github_i18n_content: AsyncMock
+    ) -> None:
         """ToolError is raised when both WP and GitHub queries fail."""
         mock_wp_client.get.return_value = _make_response(503)
-        with patch(
-            "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(side_effect=RuntimeError("boom")),
-        ):
-            with pytest.raises(ToolError):
-                await search_content("amazonia")
+        mock_fetch_github_i18n_content.side_effect = RuntimeError("boom")
+        with pytest.raises(ToolError):
+            await search_content("amazonia")
 
-    async def test_succeeds_when_only_wp_fails(self, mock_wp_client: AsyncMock) -> None:
+    async def test_succeeds_when_only_wp_fails(
+        self, mock_wp_client: AsyncMock, mock_fetch_github_i18n_content: AsyncMock
+    ) -> None:
         """Partial failure (WP down) still returns GitHub results plus an error dict."""
         mock_wp_client.get.return_value = _make_response(500)
-        with (
-            patch("src.tools.GITHUB_REPOS", "ambiental-media/microsite-amazonia"),
-            patch(
-                "src.tools.fetch_github_i18n_content",
-                new=AsyncMock(return_value=[_SAMPLE_GITHUB_FILE]),
-            ),
-        ):
+        with patch("src.tools.GITHUB_REPOS", "ambiental-media/microsite-amazonia"):
             results = await search_content("amazonia")
 
         assert len(results) >= 1
         sources = {r["source"] for r in results}
         assert any(s.startswith("github:") for s in sources)
+        error_dicts = [r for r in results if "error" in r]
+        assert len(error_dicts) == 1
+        assert error_dicts[0]["source"] == "wordpress"
 
-    async def test_succeeds_when_only_github_fails(self, mock_wp_client: AsyncMock) -> None:
-        """Partial failure (GitHub down) still returns WP results."""
+    async def test_succeeds_when_only_github_fails(
+        self, mock_wp_client: AsyncMock, mock_fetch_github_i18n_content: AsyncMock
+    ) -> None:
+        """Partial failure (GitHub network error) still returns WP results plus an error dict."""
         mock_wp_client.get.return_value = _make_response(200, [_SAMPLE_WP_POST])
-        with patch(
-            "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(side_effect=RuntimeError("gh down")),
-        ):
+        mock_fetch_github_i18n_content.side_effect = RuntimeError("gh down")
+        with patch("src.tools.GITHUB_REPOS", "ambiental-media/microsite-amazonia"):
             results = await search_content("amazonia")
 
         assert len(results) >= 1
-        assert all(r["source"] == "wordpress" for r in results)
+        sources = {r["source"] for r in results}
+        assert "wordpress" in sources
+        error_dicts = [r for r in results if "error" in r]
+        assert len(error_dicts) == 1
+        assert error_dicts[0]["source"] == "github"
 
-    async def test_raises_tool_error_on_empty_results(self, mock_wp_client: AsyncMock) -> None:
+    async def test_raises_tool_error_on_empty_results(
+        self, mock_wp_client: AsyncMock, mock_fetch_github_i18n_content: AsyncMock
+    ) -> None:
         """ToolError with guidance is raised when both sources return empty."""
         mock_wp_client.get.return_value = _make_response(200, [])
-        with patch(
-            "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(return_value=[]),
-        ):
-            with pytest.raises(ToolError, match="Nenhum resultado"):
-                await search_content("termo-inexistente")
+        mock_fetch_github_i18n_content.return_value = []
+        with pytest.raises(ToolError, match="Nenhum resultado"):
+            await search_content("termo-inexistente")
 
-    async def test_result_fields_are_standardised(self, mock_wp_client: AsyncMock) -> None:
+    async def test_result_fields_are_standardised(
+        self, mock_wp_client: AsyncMock, mock_fetch_github_i18n_content: AsyncMock
+    ) -> None:
         """Every result dict contains the required keys."""
         mock_wp_client.get.return_value = _make_response(200, [_SAMPLE_WP_POST])
-        with patch(
-            "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(return_value=[_SAMPLE_GITHUB_FILE]),
-        ):
-            results = await search_content("amazonia")
+        results = await search_content("amazonia")
 
         required_keys = {"id", "title", "excerpt", "date", "link", "source"}
         for result in results:
             assert required_keys.issubset(result.keys()), f"Missing keys in: {result}"
 
-    async def test_tool_error_message_when_both_fail(self, mock_wp_client: AsyncMock) -> None:
+    async def test_tool_error_message_when_both_fail(
+        self, mock_wp_client: AsyncMock, mock_fetch_github_i18n_content: AsyncMock
+    ) -> None:
         """ToolError message mentions both WordPress and GitHub."""
         mock_wp_client.get.side_effect = httpx.RequestError("timeout")
-        with patch(
-            "src.tools.fetch_github_i18n_content",
-            new=AsyncMock(side_effect=RuntimeError("boom")),
-        ):
-            with pytest.raises(ToolError, match="WordPress"):
-                await search_content("amazonia")
+        mock_fetch_github_i18n_content.side_effect = RuntimeError("boom")
+        with pytest.raises(ToolError, match="WordPress"):
+            await search_content("amazonia")
 
 
 # ---------------------------------------------------------------------------
@@ -460,73 +465,53 @@ _SAMPLE_FULL_ARTICLE: dict[str, str] = {
 
 
 class TestGetFullArticle:
-    async def test_returns_article_by_id(self) -> None:
-        with patch(
-            "src.tools.fetch_full_article",
-            new=AsyncMock(return_value=_SAMPLE_FULL_ARTICLE),
-        ):
-            result = await get_full_article("42")
+    async def test_returns_article_by_id(self, mock_fetch_full_article: AsyncMock) -> None:
+        result = await get_full_article("42")
 
         assert result["title"] == "Amazônia em Chamas"
         assert result["content"] == "Conteúdo completo do artigo sobre a Amazônia."
 
-    async def test_returns_article_by_url(self) -> None:
-        with patch(
-            "src.tools.fetch_full_article",
-            new=AsyncMock(return_value=_SAMPLE_FULL_ARTICLE),
-        ):
-            result = await get_full_article("https://ambiental.media/amazonia-em-chamas/")
+    async def test_returns_article_by_url(self, mock_fetch_full_article: AsyncMock) -> None:
+        result = await get_full_article("https://ambiental.media/amazonia-em-chamas/")
 
         assert result["link"] == "https://ambiental.media/amazonia-em-chamas/"
 
-    async def test_returns_article_by_slug(self) -> None:
-        with patch(
-            "src.tools.fetch_full_article",
-            new=AsyncMock(return_value=_SAMPLE_FULL_ARTICLE),
-        ):
-            result = await get_full_article("amazonia-em-chamas")
+    async def test_returns_article_by_slug(self, mock_fetch_full_article: AsyncMock) -> None:
+        result = await get_full_article("amazonia-em-chamas")
 
         assert set(result.keys()) == {"title", "date", "link", "content"}
 
-    async def test_not_found_raises_tool_error_with_search_hint(self) -> None:
+    async def test_not_found_raises_tool_error_with_search_hint(
+        self, mock_fetch_full_article: AsyncMock
+    ) -> None:
         from src.services.wordpress import WordPressPostNotFoundError
 
-        with patch(
-            "src.tools.fetch_full_article",
-            new=AsyncMock(side_effect=WordPressPostNotFoundError("Post not found")),
-        ):
-            with pytest.raises(ToolError, match="search_content"):
-                await get_full_article("slug-inexistente")
+        mock_fetch_full_article.side_effect = WordPressPostNotFoundError("Post not found")
+        with pytest.raises(ToolError, match="search_content"):
+            await get_full_article("slug-inexistente")
 
-    async def test_not_found_error_mentions_identifier(self) -> None:
+    async def test_not_found_error_mentions_identifier(
+        self, mock_fetch_full_article: AsyncMock
+    ) -> None:
         from src.services.wordpress import WordPressPostNotFoundError
 
-        with patch(
-            "src.tools.fetch_full_article",
-            new=AsyncMock(side_effect=WordPressPostNotFoundError("Post not found")),
-        ):
-            with pytest.raises(ToolError, match="slug-inexistente"):
-                await get_full_article("slug-inexistente")
+        mock_fetch_full_article.side_effect = WordPressPostNotFoundError("Post not found")
+        with pytest.raises(ToolError, match="slug-inexistente"):
+            await get_full_article("slug-inexistente")
 
-    async def test_http_error_raises_tool_error(self) -> None:
-        with patch(
-            "src.tools.fetch_full_article",
-            new=AsyncMock(
-                side_effect=httpx.HTTPStatusError(
-                    "HTTP 500", request=MagicMock(), response=MagicMock()
-                )
-            ),
-        ):
-            with pytest.raises(ToolError, match="WordPress"):
-                await get_full_article("42")
+    async def test_http_error_raises_tool_error(self, mock_fetch_full_article: AsyncMock) -> None:
+        mock_fetch_full_article.side_effect = httpx.HTTPStatusError(
+            "HTTP 500", request=MagicMock(), response=MagicMock()
+        )
+        with pytest.raises(ToolError, match="WordPress"):
+            await get_full_article("42")
 
-    async def test_request_error_raises_tool_error(self) -> None:
-        with patch(
-            "src.tools.fetch_full_article",
-            new=AsyncMock(side_effect=httpx.RequestError("timeout")),
-        ):
-            with pytest.raises(ToolError):
-                await get_full_article("42")
+    async def test_request_error_raises_tool_error(
+        self, mock_fetch_full_article: AsyncMock
+    ) -> None:
+        mock_fetch_full_article.side_effect = httpx.RequestError("timeout")
+        with pytest.raises(ToolError):
+            await get_full_article("42")
 
 
 # ---------------------------------------------------------------------------
@@ -554,89 +539,58 @@ _SAMPLE_LATEST_POSTS: list[dict[str, str]] = [
 
 
 class TestListLatestNews:
-    async def test_returns_latest_posts(self) -> None:
-        with patch(
-            "src.tools.fetch_latest_posts",
-            new=AsyncMock(return_value=_SAMPLE_LATEST_POSTS),
-        ):
-            results = await list_latest_news(limit=2)
+    async def test_returns_latest_posts(self, mock_fetch_latest_posts: AsyncMock) -> None:
+        results = await list_latest_news(limit=2)
 
         assert len(results) == 2
         assert results[0]["title"] == "Amazônia em Chamas"
         assert results[0]["source"] == "wordpress"
 
-    async def test_default_limit_is_five(self) -> None:
-        with patch(
-            "src.tools.fetch_latest_posts",
-            new=AsyncMock(return_value=_SAMPLE_LATEST_POSTS),
-        ) as mock_fetch:
-            await list_latest_news()
+    async def test_default_limit_is_five(self, mock_fetch_latest_posts: AsyncMock) -> None:
+        await list_latest_news()
 
-        mock_fetch.assert_awaited_once_with(5)
+        mock_fetch_latest_posts.assert_awaited_once_with(5)
 
-    async def test_limit_capped_at_twenty(self) -> None:
-        with patch(
-            "src.tools.fetch_latest_posts",
-            new=AsyncMock(return_value=_SAMPLE_LATEST_POSTS),
-        ) as mock_fetch:
-            await list_latest_news(limit=1000)
+    async def test_limit_capped_at_twenty(self, mock_fetch_latest_posts: AsyncMock) -> None:
+        await list_latest_news(limit=1000)
 
         # Should be capped to 20
-        mock_fetch.assert_awaited_once_with(20)
+        mock_fetch_latest_posts.assert_awaited_once_with(20)
 
-    async def test_result_fields_are_standardised(self) -> None:
-        with patch(
-            "src.tools.fetch_latest_posts",
-            new=AsyncMock(return_value=_SAMPLE_LATEST_POSTS),
-        ):
-            results = await list_latest_news()
+    async def test_result_fields_are_standardised(self, mock_fetch_latest_posts: AsyncMock) -> None:
+        results = await list_latest_news()
 
         required_keys = {"id", "title", "excerpt", "date", "link", "source"}
         for result in results:
             assert required_keys.issubset(result.keys())
 
-    async def test_http_error_raises_tool_error(self) -> None:
-        with patch(
-            "src.tools.fetch_latest_posts",
-            new=AsyncMock(
-                side_effect=httpx.HTTPStatusError(
-                    "HTTP 503", request=MagicMock(), response=MagicMock()
-                )
-            ),
-        ):
-            with pytest.raises(ToolError, match="WordPress"):
-                await list_latest_news()
+    async def test_http_error_raises_tool_error(self, mock_fetch_latest_posts: AsyncMock) -> None:
+        mock_fetch_latest_posts.side_effect = httpx.HTTPStatusError(
+            "HTTP 503", request=MagicMock(), response=MagicMock()
+        )
+        with pytest.raises(ToolError, match="WordPress"):
+            await list_latest_news()
 
-    async def test_request_error_raises_tool_error(self) -> None:
-        with patch(
-            "src.tools.fetch_latest_posts",
-            new=AsyncMock(side_effect=httpx.RequestError("connection refused")),
-        ):
-            with pytest.raises(ToolError):
-                await list_latest_news()
+    async def test_request_error_raises_tool_error(
+        self, mock_fetch_latest_posts: AsyncMock
+    ) -> None:
+        mock_fetch_latest_posts.side_effect = httpx.RequestError("connection refused")
+        with pytest.raises(ToolError):
+            await list_latest_news()
 
-    async def test_empty_results_raises_tool_error(self) -> None:
-        with patch(
-            "src.tools.fetch_latest_posts",
-            new=AsyncMock(return_value=[]),
-        ):
-            with pytest.raises(ToolError, match="Nenhuma matéria"):
-                await list_latest_news()
+    async def test_empty_results_raises_tool_error(
+        self, mock_fetch_latest_posts: AsyncMock
+    ) -> None:
+        mock_fetch_latest_posts.return_value = []
+        with pytest.raises(ToolError, match="Nenhuma matéria"):
+            await list_latest_news()
 
-    async def test_respects_valid_limit(self) -> None:
-        with patch(
-            "src.tools.fetch_latest_posts",
-            new=AsyncMock(return_value=_SAMPLE_LATEST_POSTS),
-        ) as mock_fetch:
-            await list_latest_news(limit=10)
+    async def test_respects_valid_limit(self, mock_fetch_latest_posts: AsyncMock) -> None:
+        await list_latest_news(limit=10)
 
-        mock_fetch.assert_awaited_once_with(10)
+        mock_fetch_latest_posts.assert_awaited_once_with(10)
 
-    async def test_limit_at_boundary_twenty(self) -> None:
-        with patch(
-            "src.tools.fetch_latest_posts",
-            new=AsyncMock(return_value=_SAMPLE_LATEST_POSTS),
-        ) as mock_fetch:
-            await list_latest_news(limit=20)
+    async def test_limit_at_boundary_twenty(self, mock_fetch_latest_posts: AsyncMock) -> None:
+        await list_latest_news(limit=20)
 
-        mock_fetch.assert_awaited_once_with(20)
+        mock_fetch_latest_posts.assert_awaited_once_with(20)
