@@ -87,3 +87,10 @@ spans to stdout – useful for local development.
 
 OTEL_SERVICE_NAME: str = os.environ.get("OTEL_SERVICE_NAME", "jor-mcp")
 """Logical service name embedded in every exported span's resource attributes."""
+
+GCP_PROJECT_ID: str = os.environ.get("GCP_PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+"""Google Cloud project ID used to build Cloud Logging trace correlation fields.
+
+When set, log records include ``logging.googleapis.com/trace`` in the
+``projects/<project-id>/traces/<trace-id>`` format required by Cloud Logging.
+"""

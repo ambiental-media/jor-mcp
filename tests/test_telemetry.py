@@ -71,14 +71,43 @@ class TestJsonFormatter:
         record.__dict__["trace_id"] = "abc123"
         record.__dict__["span_id"] = "def456"
 
-        output = telemetry_mod._JsonFormatter().format(record)
-        parsed = json.loads(output)
+        with patch("src.telemetry.GCP_PROJECT_ID", ""):
+            output = telemetry_mod._JsonFormatter().format(record)
+            parsed = json.loads(output)
 
         assert parsed["message"] == "hello world"
         assert parsed["severity"] == "INFO"
         assert parsed["logger"] == "mylogger"
         assert parsed["trace_id"] == "abc123"
         assert parsed["span_id"] == "def456"
+
+    def test_gcp_trace_fields_are_present_when_project_is_configured(self) -> None:
+        import json
+
+        record = logging.LogRecord("mylogger", logging.INFO, "", 0, "hello world", (), None)
+        record.__dict__["trace_id"] = "abc123"
+        record.__dict__["span_id"] = "def456"
+
+        with patch("src.telemetry.GCP_PROJECT_ID", "jor-prod"):
+            output = telemetry_mod._JsonFormatter().format(record)
+            parsed = json.loads(output)
+
+        assert parsed["logging.googleapis.com/trace"] == "projects/jor-prod/traces/abc123"
+        assert parsed["logging.googleapis.com/spanId"] == "def456"
+
+    def test_gcp_trace_fields_are_not_present_without_project_id(self) -> None:
+        import json
+
+        record = logging.LogRecord("mylogger", logging.INFO, "", 0, "hello world", (), None)
+        record.__dict__["trace_id"] = "abc123"
+        record.__dict__["span_id"] = "def456"
+
+        with patch("src.telemetry.GCP_PROJECT_ID", ""):
+            output = telemetry_mod._JsonFormatter().format(record)
+            parsed = json.loads(output)
+
+        assert "logging.googleapis.com/trace" not in parsed
+        assert "logging.googleapis.com/spanId" not in parsed
 
     def test_extra_fields_appear_under_extra_key(self) -> None:
         import json
@@ -256,18 +285,23 @@ class TestConfigureLogging:
     def test_adds_filter_and_formatter_to_existing_stream_handler(self) -> None:
         root = logging.getLogger()
         original_handlers = root.handlers[:]
+        original_level = root.level
         handler = logging.StreamHandler()
         root.handlers = [handler]  # Isolate so _configure_logging finds only our handler
         try:
+            root.setLevel(logging.WARNING)
             telemetry_mod._configure_logging()
             assert any(isinstance(f, telemetry_mod._TraceContextFilter) for f in handler.filters)
             assert isinstance(handler.formatter, telemetry_mod._JsonFormatter)
+            assert root.level == logging.INFO
         finally:
             root.handlers = original_handlers
+            root.setLevel(original_level)
 
     def test_creates_new_handler_when_root_has_no_stream_handler(self) -> None:
         root = logging.getLogger()
         original_handlers = root.handlers[:]
+        original_level = root.level
         root.handlers = []
         try:
             telemetry_mod._configure_logging()
@@ -278,8 +312,10 @@ class TestConfigureLogging:
                 isinstance(f, telemetry_mod._TraceContextFilter) for f in new_handler.filters
             )
             assert isinstance(new_handler.formatter, telemetry_mod._JsonFormatter)
+            assert root.level == logging.INFO
         finally:
             root.handlers = original_handlers
+            root.setLevel(original_level)
 
 
 # ---------------------------------------------------------------------------

@@ -22,6 +22,7 @@ The server relies strictly on environment variables for configuration. No secret
 | `LOG_LEVEL` | Python logging level (`INFO`, `DEBUG`, `WARNING`). | `INFO` |
 | `REDIS_URL` | Connection string for GCP Memorystore (e.g., `redis://10.0.0.3:6379`). | *(Required)* |
 | `FIREBASE_PROJECT_ID` | The GCP Project ID associated with Firebase Auth. | *(Required)* |
+| `GCP_PROJECT_ID` | GCP project ID used to emit `logging.googleapis.com/trace` in Cloud Logging format. Falls back to `GOOGLE_CLOUD_PROJECT` when omitted. | *(Optional in Cloud Run, recommended elsewhere)* |
 | `WORDPRESS_API_URL` | Base URL for the main WordPress REST API. | `https://ambiental.media/wp-json/wp/v2` |
 | `GITHUB_TOKEN` | Personal Access Token to read private Next.js repos. | *(Required)* |
 | `GITHUB_REPOS` | Comma-separated list of Next.js repos (e.g., `mata-nativa,rio60`). | *(Required)* |
@@ -56,6 +57,7 @@ Export the required environment variables and use `envsubst` to replace the plac
 ```bash
 export IMAGE_URL="us-central1-docker.pkg.dev/jor-mcp/jor-mcp/jor-mcp-server:SHA"
 export GCP_PROJECT_NUMBER="959918358302"
+export GCP_PROJECT_ID="jor-mcp"
 export FIREBASE_PROJECT_ID="..."
 export WORDPRESS_API_URL="..."
 export GITHUB_REPOS="..."

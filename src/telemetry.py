@@ -28,7 +28,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 from starlette.applications import Starlette
 
-from src.config import OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_SERVICE_NAME
+from src.config import GCP_PROJECT_ID, OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_SERVICE_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -102,14 +102,19 @@ class _JsonFormatter(logging.Formatter):
     )
 
     def format(self, record: logging.LogRecord) -> str:
+        trace_id = getattr(record, "trace_id", "")
+        span_id = getattr(record, "span_id", "")
         payload: dict[str, Any] = {
             "time": self.formatTime(record),
             "severity": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
-            "trace_id": getattr(record, "trace_id", ""),
-            "span_id": getattr(record, "span_id", ""),
+            "trace_id": trace_id,
+            "span_id": span_id,
         }
+        if trace_id and GCP_PROJECT_ID:
+            payload["logging.googleapis.com/trace"] = f"projects/{GCP_PROJECT_ID}/traces/{trace_id}"
+            payload["logging.googleapis.com/spanId"] = span_id
         extra = {k: v for k, v in record.__dict__.items() if k not in self._STD_ATTRS}
         if extra:
             payload["extra"] = extra
@@ -126,6 +131,7 @@ def _configure_logging() -> None:
     This prevents duplicate handlers when the function is called more than once.
     """
     root = logging.getLogger()
+    root.setLevel(logging.INFO)
     for handler in root.handlers:
         if isinstance(handler, logging.StreamHandler):
             handler.addFilter(_TraceContextFilter())
@@ -135,7 +141,6 @@ def _configure_logging() -> None:
     handler.addFilter(_TraceContextFilter())
     handler.setFormatter(_JsonFormatter())
     root.addHandler(handler)
-    root.setLevel(logging.INFO)
 
 
 # ---------------------------------------------------------------------------
