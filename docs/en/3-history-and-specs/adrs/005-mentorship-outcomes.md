@@ -27,4 +27,4 @@ Following the POC, the team engaged in a technical mentorship session to review 
 *   *Outcome:* While valuable, the team decided to **defer** Vector DB integration from the v1 architecture to prioritize real-time ingestion (stateless REST calls) and minimize infrastructure complexity in the initial release.
 
 ## 3. Impact on v1 Specification
-These mentorship outcomes directly informed `SPEC-001-v1-core.md`, leading to the adoption of Firebase Auth (OAuth), GCP Memorystore (for stateless rate limiting), the strict 3-tool limit, and the inclusion of explicit server instructions.
+These mentorship outcomes directly informed [SPEC-001-v1-core](../specs/SPEC-001-v1-core.md), leading to the adoption of Firebase Auth (OAuth), Google Cloud Firestore (for stateless rate limiting), the strict 3-tool limit, and the inclusion of explicit server instructions.
