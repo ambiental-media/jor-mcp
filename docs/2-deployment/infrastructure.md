@@ -24,8 +24,8 @@ The server relies strictly on environment variables for configuration. No secret
 | `FIREBASE_PROJECT_ID` | The GCP Project ID associated with Firebase Auth. | *(Required)* |
 | `GCP_PROJECT_ID` | GCP project ID used to emit `logging.googleapis.com/trace` in Cloud Logging format. Falls back to `GOOGLE_CLOUD_PROJECT` when omitted. | *(Optional in Cloud Run, recommended elsewhere)* |
 | `WORDPRESS_API_URL` | Base URL for the main WordPress REST API. | `https://ambiental.media/wp-json/wp/v2` |
-| `GITHUB_TOKEN` | Personal Access Token to read private Next.js repos. | *(Required)* |
-| `GITHUB_REPOS` | Comma-separated list of Next.js repos (e.g., `mata-nativa,rio60`). | *(Required)* |
+| `MCP_GITHUB_TOKEN` | Personal Access Token to read private Next.js repos. | *(Required)* |
+| `MCP_GITHUB_REPOS` | Comma-separated list of Next.js repos (e.g., `mata-nativa,rio60`). | *(Required)* |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`| OTLP endpoint for tracing. Empty means console export. | `""` |
 
 ## 3. Dockerization Strategy
@@ -48,7 +48,7 @@ Deployment should be automated via GitHub Actions:
 
 The Cloud Run service is managed declaratively via a `service.yaml` file located at the root of the repository. This file is the single source of truth for the service configuration, including container resources, auto-scaling, ingress, and environment variables.
 
-Sensitive variables (`GITHUB_TOKEN`, `REDIS_URL`, `JWT_SECRET`) are never hardcoded in the YAML. They are stored in GCP Secret Manager and injected directly into the container at runtime via `valueFrom: secretKeyRef`.
+Sensitive variables (`MCP_GITHUB_TOKEN`, `REDIS_URL`, `JWT_SECRET`) are never hardcoded in the YAML. They are stored in GCP Secret Manager and injected directly into the container at runtime via `valueFrom: secretKeyRef`.
 
 ### Applying the manifest locally
 
@@ -60,7 +60,7 @@ export GCP_PROJECT_NUMBER="959918358302"
 export GCP_PROJECT_ID="jor-mcp"
 export FIREBASE_PROJECT_ID="..."
 export WORDPRESS_API_URL="..."
-export GITHUB_REPOS="..."
+export MCP_GITHUB_REPOS="..."
 export OTEL_EXPORTER_OTLP_ENDPOINT="..."
 
 envsubst < service.yaml | gcloud run services replace - --region us-central1

@@ -60,19 +60,27 @@ normalised away so service code can safely append ``/wp/v2/<resource>``.
 # GitHub API
 # ---------------------------------------------------------------------------
 
-GITHUB_TOKEN: str | None = os.environ.get("GITHUB_TOKEN")
-"""Personal Access Token for the GitHub API. Optional for public repos."""
+GITHUB_TOKEN: str | None = os.environ.get("MCP_GITHUB_TOKEN")
+"""Personal Access Token for the GitHub API. Optional for public repos.
 
-GITHUB_REPOS: str = os.environ.get("GITHUB_REPOS", "")
+Environment variable: ``MCP_GITHUB_TOKEN``.
+"""
+
+GITHUB_REPOS: str = os.environ.get("MCP_GITHUB_REPOS", "")
 """Comma-separated list of GitHub repositories (owner/repo format) to index.
 
 Example: ambiental-media/microsite-amazonia,ambiental-media/microsite-pantanal
+
+Environment variable: ``MCP_GITHUB_REPOS``.
 """
 
-GITHUB_API_BASE_URL: str = os.environ.get("GITHUB_API_BASE_URL", "https://api.github.com").rstrip(
-    "/"
-)
-"""Base URL for the GitHub REST API (no trailing slash)."""
+GITHUB_API_BASE_URL: str = os.environ.get(
+    "MCP_GITHUB_API_BASE_URL", "https://api.github.com"
+).rstrip("/")
+"""Base URL for the GitHub REST API (no trailing slash).
+
+Environment variable: ``MCP_GITHUB_API_BASE_URL``.
+"""
 
 # ---------------------------------------------------------------------------
 # OpenTelemetry
