@@ -179,13 +179,15 @@ Runs all code quality and security validations. This job mirrors the local `make
 
 ### Job: `build-and-push`
 
-Only runs if the `check` job completes successfully. Builds the Docker image, scans it for critical vulnerabilities with Trivy, and pushes it to the Artifact Registry with the tag `:test`.
+Only runs if the `check` job completes successfully. Builds the Docker image, scans it for critical vulnerabilities with Trivy, and pushes it to the Artifact Registry tagged with the originating Pull Request number (`:pr-<number>`).
+
+This per-PR tag replaces the previous static `:test` tag, which created a race condition when multiple Pull Requests ran the CI simultaneously — one PR's image could overwrite another's. Tagging each image with its PR number keeps every artifact isolated and traceable.
 
 | Step | Detail |
 |---|---|
 | Build | Docker image built from the project `Dockerfile` |
 | Security scan | Trivy scans the image — fails if `CRITICAL` vulnerabilities are found |
-| Push | Image pushed to Artifact Registry with tag `:test` |
+| Push | Image pushed to Artifact Registry with tag `:pr-<number>` |
 
 ### Required GitHub Secrets
 
@@ -204,6 +206,12 @@ For the `build-and-push` job to authenticate with Google Cloud, the following se
 *   **Container scan failure:** A critical vulnerability was found in the Docker image. Review the Trivy report in the CI logs and update the affected dependency or base image.
 
 ---
+
+## Continuous Deployment (CD)
+
+Deployment is handled by a separate workflow, `.github/workflows/cd.yml`, and is **triggered manually** via `workflow_dispatch`. There is no automatic deploy on merge — an operator chooses when to deploy and which image to ship.
+
+To deploy, go to **Actions → CD → Run workflow** and provide the image tag (e.g. `pr-34`). The workflow then verifies the tag exists in Artifact Registry, renders `service.yaml` with `envsubst`, and applies it declaratively via `gcloud run services replace`. No image is rebuilt — the exact artifact validated in CI is the one promoted to Cloud Run.
 
 ## Security Scanning
 
