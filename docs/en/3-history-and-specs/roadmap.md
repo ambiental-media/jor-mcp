@@ -7,7 +7,8 @@ This document outlines the high-level goals and upcoming features for the Jor-MC
 *   **Next.js Portal Development:** Building the `jor-mcp-site` to handle user consent, authentication, and the B2B admin dashboard.
 
 ## Next Up (Near Term) ⏳
-(To be defined)
+*   **Token-Based Rate Limiting & Weekly Quotas:** Migrate from request-based limits to token-consumption-based limits, moving from monthly to weekly reset cycles for tighter control and more precise billing metrics.
+*   **Firebase Authentication Expansion:** Exploring Firebase configuration to enable additional authentication methods such as Google, OpenID Connect (OIDC), SAML, Microsoft, and Apple.
 
 ## Future Vision (Long Term) 🚀
 (To be defined)

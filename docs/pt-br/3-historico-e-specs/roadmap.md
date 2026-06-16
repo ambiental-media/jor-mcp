@@ -7,7 +7,8 @@ Este documento descreve os objetivos de alto nível e as próximas funcionalidad
 *   **Desenvolvimento do Portal Next.js:** Construção do `jor-mcp-site` para lidar com consentimento do usuário, autenticação e o painel administrativo B2B.
 
 ## Próximos Passos (Curto Prazo) ⏳
-(A definir)
+*   **Rate Limiting Baseado em Tokens e Quotas Semanais:** Migrar de limites baseados em requisições para limites baseados no consumo de tokens, alterando o ciclo de reset de mensal para semanal para um controle mais preciso e métricas de faturamento ajustadas.
+*   **Expansão da Autenticação Firebase:** Explorar a configuração do Firebase para habilitar métodos de autenticação adicionais, como Google, OpenID Connect (OIDC), SAML, Microsoft e Apple.
 
 ## Visão de Futuro (Longo Prazo) 🚀
 (A definir)
