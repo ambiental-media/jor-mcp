@@ -129,7 +129,8 @@ async def test_request_within_limit_is_allowed() -> None:
         called["app"] = True
 
     middleware = RateLimitMiddleware(inner_app, lambda: firestore_client)
-    await middleware(_make_scope(tier="basic"), _noop_receive, AsyncMock())
+    with patch.dict("src.middleware.rate_limit._TIER_QUOTAS", {"basic": 500}):
+        await middleware(_make_scope(tier="basic"), _noop_receive, AsyncMock())
 
     assert called["app"] is True
 
