@@ -60,16 +60,45 @@ normalised away so service code can safely append ``/wp/v2/<resource>``.
 # GitHub API
 # ---------------------------------------------------------------------------
 
-GITHUB_TOKEN: str | None = os.environ.get("GITHUB_TOKEN")
-"""Personal Access Token for the GitHub API. Optional for public repos."""
+GITHUB_TOKEN: str | None = os.environ.get("MCP_GITHUB_TOKEN")
+"""Personal Access Token for the GitHub API. Optional for public repos.
 
-GITHUB_REPOS: str = os.environ.get("GH_REPOS", "")
+Environment variable: ``MCP_GITHUB_TOKEN``.
+"""
+
+GITHUB_REPOS: str = os.environ.get("MCP_GITHUB_REPOS", "")
 """Comma-separated list of GitHub repositories (owner/repo format) to index.
 
 Example: ambiental-media/microsite-amazonia,ambiental-media/microsite-pantanal
+
+Environment variable: ``MCP_GITHUB_REPOS``.
 """
 
-GITHUB_API_BASE_URL: str = os.environ.get("GITHUB_API_BASE_URL", "https://api.github.com").rstrip(
-    "/"
-)
-"""Base URL for the GitHub REST API (no trailing slash)."""
+GITHUB_API_BASE_URL: str = os.environ.get(
+    "MCP_GITHUB_API_BASE_URL", "https://api.github.com"
+).rstrip("/")
+"""Base URL for the GitHub REST API (no trailing slash).
+
+Environment variable: ``MCP_GITHUB_API_BASE_URL``.
+"""
+
+# ---------------------------------------------------------------------------
+# OpenTelemetry
+# ---------------------------------------------------------------------------
+
+OTEL_EXPORTER_OTLP_ENDPOINT: str | None = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+"""OTLP/HTTP collector endpoint for exporting traces (e.g. http://localhost:4318).
+
+When absent the SDK falls back to :class:`ConsoleSpanExporter` which writes
+spans to stdout – useful for local development.
+"""
+
+OTEL_SERVICE_NAME: str = os.environ.get("OTEL_SERVICE_NAME", "jor-mcp")
+"""Logical service name embedded in every exported span's resource attributes."""
+
+GCP_PROJECT_ID: str = os.environ.get("GCP_PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+"""Google Cloud project ID used to build Cloud Logging trace correlation fields.
+
+When set, log records include ``logging.googleapis.com/trace`` in the
+``projects/<project-id>/traces/<trace-id>`` format required by Cloud Logging.
+"""

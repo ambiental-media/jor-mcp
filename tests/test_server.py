@@ -16,7 +16,8 @@ def _make_fake_redis() -> MagicMock:
     return fake_redis
 
 
-def test_health_endpoint() -> None:
+@patch("src.server.setup_telemetry")
+def test_health_endpoint(_mock_setup: MagicMock) -> None:
     from src.server import app
 
     client = TestClient(app)
@@ -30,6 +31,7 @@ def test_health_endpoint() -> None:
 # ---------------------------------------------------------------------------
 
 
+@patch("src.server.setup_telemetry")
 @patch("firebase_admin.get_app", side_effect=ValueError("No app"))
 @patch("firebase_admin.initialize_app")
 @patch("src.server._mcp_http_app")
@@ -43,6 +45,7 @@ async def test_server_lifespan_initializes_firebase_when_not_present(
     mock_mcp_app: MagicMock,
     mock_init: MagicMock,
     _mock_get_app: MagicMock,
+    _mock_setup: MagicMock,
 ) -> None:
     """server_lifespan calls initialize_app() when no Firebase app exists yet."""
     from src.server import server_lifespan
@@ -63,8 +66,10 @@ async def test_server_lifespan_initializes_firebase_when_not_present(
     mock_init.assert_called_once()
     fake_http_client.aclose.assert_awaited_once()
     fake_redis.aclose.assert_awaited_once()
+    _mock_setup.assert_called_once()
 
 
+@patch("src.server.setup_telemetry")
 @patch("firebase_admin.get_app")
 @patch("firebase_admin.initialize_app")
 @patch("src.server._mcp_http_app")
@@ -78,6 +83,7 @@ async def test_server_lifespan_skips_init_when_firebase_already_present(
     mock_mcp_app: MagicMock,
     mock_init: MagicMock,
     _mock_get_app: MagicMock,
+    _mock_setup: MagicMock,
 ) -> None:
     """server_lifespan does NOT call initialize_app() when Firebase is already initialized."""
     from src.server import server_lifespan
@@ -98,3 +104,4 @@ async def test_server_lifespan_skips_init_when_firebase_already_present(
     mock_init.assert_not_called()
     fake_http_client.aclose.assert_awaited_once()
     fake_redis.aclose.assert_awaited_once()
+    _mock_setup.assert_called_once()

@@ -43,7 +43,7 @@ The easiest way to get `jor-mcp` running is via Docker.
     Create a `.env` file to configure your newsroom's specific access points:
     ```env
     WORDPRESS_API_URL=https://yoursite.com/wp-json/wp/v2
-    GITHUB_TOKEN=your_github_personal_access_token
+    MCP_GITHUB_TOKEN=your_github_personal_access_token
     JWT_SECRET=your_secure_random_string_for_auth
     PORT=8080
     ```

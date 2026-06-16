@@ -21,9 +21,10 @@ The server relies strictly on environment variables for configuration. No secret
 | `PORT` | The port the ASGI server binds to. | `8080` |
 | `LOG_LEVEL` | Python logging level (`INFO`, `DEBUG`, `WARNING`). | `INFO` |
 | `FIREBASE_PROJECT_ID` | The GCP Project ID associated with Firebase Auth. | *(Required)* |
+| `GCP_PROJECT_ID` | GCP project ID used to emit `logging.googleapis.com/trace` in Cloud Logging format. Falls back to `GOOGLE_CLOUD_PROJECT` when omitted. | *(Optional in Cloud Run, recommended elsewhere)* |
 | `WORDPRESS_API_URL` | Base URL for the main WordPress REST API. | `https://ambiental.media/wp-json/wp/v2` |
-| `GITHUB_TOKEN` | Personal Access Token to read private Next.js repos. | *(Required)* |
-| `GITHUB_REPOS` | Comma-separated list of Next.js repos (e.g., `mata-nativa,rio60`). | *(Required)* |
+| `MCP_GITHUB_TOKEN` | Personal Access Token to read private Next.js repos. | *(Required)* |
+| `MCP_GITHUB_REPOS` | Comma-separated list of Next.js repos (e.g., `mata-nativa,rio60`). | *(Required)* |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`| OTLP endpoint for tracing. Empty means console export. | `""` |
 
 > **Note on Rate Limiting (Firestore):** The application relies on Google Cloud Firestore for its state. It automatically utilizes Google Application Default Credentials (ADC) bound to the Cloud Run service account. No explicit connection string or secret is required, but the service account *must* be granted the `roles/datastore.user` IAM role.
@@ -48,7 +49,7 @@ Deployment should be automated via GitHub Actions:
 
 The Cloud Run service is managed declaratively via a `service.yaml` file located at the root of the repository. This file is the single source of truth for the service configuration, including container resources, auto-scaling, ingress, and environment variables.
 
-Sensitive variables (`GITHUB_TOKEN`, `JWT_SECRET`) are never hardcoded in the YAML. They are stored in GCP Secret Manager and injected directly into the container at runtime via `valueFrom: secretKeyRef`.
+Sensitive variables (`MCP_GITHUB_TOKEN`, `REDIS_URL`, `JWT_SECRET`) are never hardcoded in the YAML. They are stored in GCP Secret Manager and injected directly into the container at runtime via `valueFrom: secretKeyRef`.
 
 ### Applying the manifest locally
 
@@ -57,9 +58,10 @@ Export the required environment variables and use `envsubst` to replace the plac
 ```bash
 export IMAGE_URL="us-central1-docker.pkg.dev/jor-mcp/jor-mcp/jor-mcp-server:SHA"
 export GCP_PROJECT_NUMBER="959918358302"
+export GCP_PROJECT_ID="jor-mcp"
 export FIREBASE_PROJECT_ID="..."
 export WORDPRESS_API_URL="..."
-export GITHUB_REPOS="..."
+export MCP_GITHUB_REPOS="..."
 export OTEL_EXPORTER_OTLP_ENDPOINT="..."
 
 envsubst < service.yaml | gcloud run services replace - --region us-central1
