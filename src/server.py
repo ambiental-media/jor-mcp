@@ -1,4 +1,5 @@
 import contextlib
+import logging
 import os
 from collections.abc import AsyncGenerator
 
@@ -8,7 +9,9 @@ import redis.asyncio as aioredis
 import uvicorn
 from fastmcp import FastMCP
 from redis.asyncio import Redis
+from redis.exceptions import RedisError
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
@@ -24,6 +27,9 @@ from src.config import (
 )
 from src.middleware.auth import AuthMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
+from src.telemetry import instrument_asgi_app, setup_telemetry
+
+logger = logging.getLogger(__name__)
 
 mcp = FastMCP(
     "jor-mcp",
@@ -79,6 +85,8 @@ _mcp_http_app = mcp.http_app()
 async def server_lifespan(app: Starlette) -> AsyncGenerator[None, None]:
     global _redis_client
 
+    setup_telemetry()
+
     try:
         firebase_admin.get_app()
     except ValueError:
@@ -111,8 +119,6 @@ async def server_lifespan(app: Starlette) -> AsyncGenerator[None, None]:
                 await _http_client_mod._http_client.aclose()
         _http_client_mod._http_client = None
         if _redis_client is not None:
-            from redis.exceptions import RedisError
-
             with contextlib.suppress(RedisError):
                 await _redis_client.aclose()
         _redis_client = None
@@ -120,18 +126,24 @@ async def server_lifespan(app: Starlette) -> AsyncGenerator[None, None]:
 
 _starlette_app = Starlette(
     lifespan=server_lifespan,
+    middleware=[
+        Middleware(AuthMiddleware),
+        Middleware(RateLimitMiddleware, redis_factory=get_redis_client),
+    ],
     routes=[
         Route("/health", health_check),
         Mount("/", app=_mcp_http_app),
     ],
 )
 
-# Middleware stack (outermost → innermost):
-#   request → AuthMiddleware → RateLimitMiddleware → Starlette app
-# get_redis_client is passed as a factory so it resolves the client lazily
-# (after lifespan has initialised _redis_client).
-_rate_limited_app = RateLimitMiddleware(_starlette_app, get_redis_client)
-app = AuthMiddleware(_rate_limited_app)
+# instrument_asgi_app() must be called before the application starts: Starlette
+# forbids add_middleware() after startup.  OTel's ProxyTracer mechanism ensures
+# that spans are correlated with the real TracerProvider configured later inside
+# server_lifespan.  Final middleware order (outermost first):
+#   OTel → AuthMiddleware → RateLimitMiddleware → routes
+instrument_asgi_app(_starlette_app)
+
+app = _starlette_app
 
 # Import tools module as a side-effect to register all @mcp.tool() handlers.
 # This must come after `mcp` is defined to avoid a circular import error.
