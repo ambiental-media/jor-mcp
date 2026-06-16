@@ -159,7 +159,6 @@ class TestSetupTelemetry:
             patch("src.telemetry.TracerProvider"),
             patch("src.telemetry.trace.set_tracer_provider"),
             patch("src.telemetry.HTTPXClientInstrumentor"),
-            patch("src.telemetry.RedisInstrumentor"),
             patch("src.telemetry._configure_logging"),
         )
 
@@ -174,7 +173,6 @@ class TestSetupTelemetry:
             patch("src.telemetry.TracerProvider"),
             patch("src.telemetry.trace.set_tracer_provider"),
             patch("src.telemetry.HTTPXClientInstrumentor"),
-            patch("src.telemetry.RedisInstrumentor"),
             patch("src.telemetry._configure_logging"),
         ):
             telemetry_mod.setup_telemetry()
@@ -194,7 +192,6 @@ class TestSetupTelemetry:
             patch("src.telemetry.TracerProvider"),
             patch("src.telemetry.trace.set_tracer_provider"),
             patch("src.telemetry.HTTPXClientInstrumentor"),
-            patch("src.telemetry.RedisInstrumentor"),
             patch("src.telemetry._configure_logging"),
         ):
             telemetry_mod.setup_telemetry()
@@ -212,7 +209,6 @@ class TestSetupTelemetry:
             patch("src.telemetry.TracerProvider"),
             patch("src.telemetry.trace.set_tracer_provider"),
             patch("src.telemetry.HTTPXClientInstrumentor"),
-            patch("src.telemetry.RedisInstrumentor"),
             patch("src.telemetry._configure_logging"),
         ):
             telemetry_mod.setup_telemetry()
@@ -220,11 +216,10 @@ class TestSetupTelemetry:
 
         mock_console.assert_called_once()
 
-    def test_instruments_httpx_and_redis(self) -> None:
+    def test_instruments_httpx(self) -> None:
         telemetry_mod._TELEMETRY_CONFIGURED = False
 
         mock_httpx = MagicMock()
-        mock_redis = MagicMock()
 
         with (
             patch("src.telemetry.OTEL_EXPORTER_OTLP_ENDPOINT", None),
@@ -233,13 +228,11 @@ class TestSetupTelemetry:
             patch("src.telemetry.TracerProvider"),
             patch("src.telemetry.trace.set_tracer_provider"),
             patch("src.telemetry.HTTPXClientInstrumentor", return_value=mock_httpx),
-            patch("src.telemetry.RedisInstrumentor", return_value=mock_redis),
             patch("src.telemetry._configure_logging"),
         ):
             telemetry_mod.setup_telemetry()
 
         mock_httpx.instrument.assert_called_once()
-        mock_redis.instrument.assert_called_once()
 
     def test_sets_telemetry_configured_flag(self) -> None:
         telemetry_mod._TELEMETRY_CONFIGURED = False
@@ -251,7 +244,6 @@ class TestSetupTelemetry:
             patch("src.telemetry.TracerProvider"),
             patch("src.telemetry.trace.set_tracer_provider"),
             patch("src.telemetry.HTTPXClientInstrumentor"),
-            patch("src.telemetry.RedisInstrumentor"),
             patch("src.telemetry._configure_logging"),
         ):
             telemetry_mod.setup_telemetry()
@@ -268,7 +260,6 @@ class TestSetupTelemetry:
             patch("src.telemetry.TracerProvider"),
             patch("src.telemetry.trace.set_tracer_provider"),
             patch("src.telemetry.HTTPXClientInstrumentor"),
-            patch("src.telemetry.RedisInstrumentor"),
             patch("src.telemetry._configure_logging") as mock_configure,
         ):
             telemetry_mod.setup_telemetry()

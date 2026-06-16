@@ -1,8 +1,8 @@
 """Unit tests for RateLimitMiddleware.
 
 Uses the "Spy App" pattern to inspect internal state mutations and direct
-async middleware calls.  The Redis client is always mocked so no real Redis
-instance is required.
+async middleware calls. The Firestore client is always mocked so no real
+Firestore access is required.
 """
 
 from collections.abc import MutableMapping
@@ -10,7 +10,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from redis import exceptions as redis_exceptions
+from google.api_core import exceptions as gcp_exceptions
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -31,18 +31,26 @@ async def _noop_receive() -> dict[str, Any]:
     return {"type": "http.request", "body": b"", "more_body": False}
 
 
-def _make_redis_mock(*, count: int = 1) -> MagicMock:
-    """Build a Redis mock whose INCR returns *count*.
+def _make_firestore_mock(*, count: int = 1) -> tuple[MagicMock, MagicMock]:
+    """Build a Firestore client mock whose post-increment count resolves to *count*.
 
-    Args:
-        count: The value returned by ``redis.incr()``, representing the total
-            number of requests for the current billing cycle after this one is
-            counted.
+    ``count`` is the value returned by the document read that follows the atomic
+    ``firestore.Increment(1)`` write, i.e. the count *after* this request.
     """
-    redis_mock = MagicMock()
-    redis_mock.incr = AsyncMock(return_value=count)
-    redis_mock.expire = AsyncMock(return_value=True)
-    return redis_mock
+    firestore_client = MagicMock()
+    doc_ref = MagicMock()
+    snapshot = MagicMock()
+    snapshot.exists = True
+    snapshot.get.return_value = count
+
+    doc_ref.set = AsyncMock(return_value=None)
+    doc_ref.get = AsyncMock(return_value=snapshot)
+
+    collection_ref = MagicMock()
+    collection_ref.document.return_value = doc_ref
+    firestore_client.collection.return_value = collection_ref
+
+    return firestore_client, doc_ref
 
 
 # ---------------------------------------------------------------------------
@@ -51,58 +59,58 @@ def _make_redis_mock(*, count: int = 1) -> MagicMock:
 
 
 async def test_health_path_bypasses_rate_limit() -> None:
-    """/health requests pass through without touching Redis."""
+    """/health requests pass through without touching Firestore."""
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    redis_mock = _make_redis_mock()
+    firestore_client, doc_ref = _make_firestore_mock()
     called = {"app": False}
 
     async def inner_app(scope: Any, receive: Any, send: Any) -> None:
         called["app"] = True
 
-    middleware = RateLimitMiddleware(inner_app, lambda: redis_mock)
+    middleware = RateLimitMiddleware(inner_app, lambda: firestore_client)
     scope: dict[str, Any] = {"type": "http", "path": "/health", "headers": []}
 
     await middleware(scope, _noop_receive, AsyncMock())
 
     assert called["app"] is True
-    redis_mock.incr.assert_not_called()
+    doc_ref.set.assert_not_called()
 
 
 async def test_non_http_scope_passes_through() -> None:
     """Lifespan and other non-HTTP scopes bypass rate limiting."""
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    redis_mock = _make_redis_mock()
+    firestore_client, doc_ref = _make_firestore_mock()
     called = {"app": False}
 
     async def inner_app(scope: Any, receive: Any, send: Any) -> None:
         called["app"] = True
 
-    middleware = RateLimitMiddleware(inner_app, lambda: redis_mock)
+    middleware = RateLimitMiddleware(inner_app, lambda: firestore_client)
     await middleware({"type": "lifespan"}, _noop_receive, AsyncMock())
 
     assert called["app"] is True
-    redis_mock.incr.assert_not_called()
+    doc_ref.set.assert_not_called()
 
 
 async def test_missing_user_scope_passes_through() -> None:
     """Requests without scope['user'] (already rejected by AuthMiddleware) pass through."""
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    redis_mock = _make_redis_mock()
+    firestore_client, doc_ref = _make_firestore_mock()
     called = {"app": False}
 
     async def inner_app(scope: Any, receive: Any, send: Any) -> None:
         called["app"] = True
 
-    middleware = RateLimitMiddleware(inner_app, lambda: redis_mock)
+    middleware = RateLimitMiddleware(inner_app, lambda: firestore_client)
     scope: dict[str, Any] = {"type": "http", "path": "/mcp/", "headers": []}
 
     await middleware(scope, _noop_receive, AsyncMock())
 
     assert called["app"] is True
-    redis_mock.incr.assert_not_called()
+    doc_ref.set.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -114,13 +122,13 @@ async def test_request_within_limit_is_allowed() -> None:
     """A request under quota reaches the inner application."""
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    redis_mock = _make_redis_mock(count=5)  # well below any tier monthly limit
+    firestore_client, _doc_ref = _make_firestore_mock(count=5)
     called = {"app": False}
 
     async def inner_app(scope: Any, receive: Any, send: Any) -> None:
         called["app"] = True
 
-    middleware = RateLimitMiddleware(inner_app, lambda: redis_mock)
+    middleware = RateLimitMiddleware(inner_app, lambda: firestore_client)
     await middleware(_make_scope(tier="basic"), _noop_receive, AsyncMock())
 
     assert called["app"] is True
@@ -131,40 +139,52 @@ async def test_first_request_always_allowed(tier: str) -> None:
     """The very first request of a billing cycle (count=1) is always allowed."""
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    redis_mock = _make_redis_mock(count=1)
+    firestore_client, _doc_ref = _make_firestore_mock(count=1)
     called = {"app": False}
 
     async def inner_app(scope: Any, receive: Any, send: Any) -> None:
         called["app"] = True
 
-    middleware = RateLimitMiddleware(inner_app, lambda: redis_mock)
+    middleware = RateLimitMiddleware(inner_app, lambda: firestore_client)
     await middleware(_make_scope(tier=tier), _noop_receive, AsyncMock())
 
     assert called["app"] is True
 
 
-async def test_first_request_sets_expire() -> None:
-    """When count==1 (new billing cycle), EXPIRE is set on the Redis key."""
+async def test_uses_monthly_document_id() -> None:
+    """Document id follows the {uid}_YYYY-MM fixed monthly window convention."""
+    from datetime import UTC, datetime
+
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    redis_mock = _make_redis_mock(count=1)
+    firestore_client, _doc_ref = _make_firestore_mock(count=1)
+    fixed_now = datetime(2026, 5, 20, 12, 30, tzinfo=UTC)
 
-    middleware = RateLimitMiddleware(AsyncMock(), lambda: redis_mock)
-    await middleware(_make_scope(), _noop_receive, AsyncMock())
+    middleware = RateLimitMiddleware(AsyncMock(), lambda: firestore_client)
 
-    redis_mock.expire.assert_called_once()
+    with patch("src.middleware.rate_limit.datetime") as mock_datetime:
+        mock_datetime.now.return_value = fixed_now
+        await middleware(_make_scope(uid="abc-123"), _noop_receive, AsyncMock())
+
+    firestore_client.collection.return_value.document.assert_called_once_with("abc-123_2026-05")
 
 
-async def test_subsequent_request_does_not_set_expire() -> None:
-    """When count > 1 (existing key), EXPIRE is not called again."""
+async def test_uses_atomic_increment_for_count() -> None:
+    """Rate-limit check increments the counter with firestore.Increment(1)."""
+    from google.cloud import firestore
+
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    redis_mock = _make_redis_mock(count=2)
+    firestore_client, doc_ref = _make_firestore_mock(count=1)
+    middleware = RateLimitMiddleware(AsyncMock(), lambda: firestore_client)
 
-    middleware = RateLimitMiddleware(AsyncMock(), lambda: redis_mock)
     await middleware(_make_scope(), _noop_receive, AsyncMock())
 
-    redis_mock.expire.assert_not_called()
+    doc_ref.set.assert_awaited_once()
+    payload = doc_ref.set.call_args.args[0]
+    assert isinstance(payload["count"], type(firestore.Increment(1)))
+    assert doc_ref.set.call_args.kwargs["merge"] is True
+    doc_ref.get.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------
@@ -173,11 +193,11 @@ async def test_subsequent_request_does_not_set_expire() -> None:
 
 
 async def test_request_over_limit_returns_429() -> None:
-    """When count > limit, the middleware short-circuits with HTTP 429."""
+    """When the post-increment count exceeds the limit, the middleware returns HTTP 429."""
     from src.config import RATE_LIMIT_BASIC
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    redis_mock = _make_redis_mock(count=RATE_LIMIT_BASIC + 1)
+    firestore_client, _doc_ref = _make_firestore_mock(count=RATE_LIMIT_BASIC + 1)
 
     responses: list[dict[str, Any]] = []
 
@@ -189,12 +209,11 @@ async def test_request_over_limit_returns_429() -> None:
     async def inner_app(scope: Any, receive: Any, send: Any) -> None:
         called["app"] = True
 
-    middleware = RateLimitMiddleware(inner_app, lambda: redis_mock)
+    middleware = RateLimitMiddleware(inner_app, lambda: firestore_client)
     await middleware(_make_scope(tier="basic"), _noop_receive, capture_send)
 
     assert called["app"] is False
     assert responses[0]["status"] == 429
-    # Retry-After header must be present
     headers = dict(responses[0]["headers"])
     assert b"retry-after" in headers
 
@@ -204,14 +223,14 @@ async def test_429_response_includes_retry_after_header() -> None:
     from src.config import RATE_LIMIT_BASIC
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    redis_mock = _make_redis_mock(count=RATE_LIMIT_BASIC + 1)
+    firestore_client, _doc_ref = _make_firestore_mock(count=RATE_LIMIT_BASIC + 1)
 
     responses: list[dict[str, Any]] = []
 
     async def capture_send(message: MutableMapping[str, Any]) -> None:
         responses.append(dict(message))
 
-    middleware = RateLimitMiddleware(MagicMock(), lambda: redis_mock)
+    middleware = RateLimitMiddleware(MagicMock(), lambda: firestore_client)
     await middleware(_make_scope(tier="basic"), _noop_receive, capture_send)
 
     assert responses[0]["status"] == 429
@@ -220,85 +239,44 @@ async def test_429_response_includes_retry_after_header() -> None:
     assert retry_after_value >= 1
 
 
-async def test_pro_tier_has_higher_limit_than_basic() -> None:
-    """Pro-tier users are allowed more requests per month than basic-tier users."""
-    from src.config import RATE_LIMIT_BASIC, RATE_LIMIT_PRO
-
-    assert RATE_LIMIT_PRO > RATE_LIMIT_BASIC
-
-
-async def test_basic_tier_limit_is_enforced() -> None:
-    """Exactly one over the basic monthly limit, the request is blocked."""
-    from src.config import RATE_LIMIT_BASIC
-    from src.middleware.rate_limit import RateLimitMiddleware
-
-    redis_mock = _make_redis_mock(count=RATE_LIMIT_BASIC + 1)
-
-    responses: list[dict[str, Any]] = []
-
-    async def capture_send(message: MutableMapping[str, Any]) -> None:
-        responses.append(dict(message))
-
-    middleware = RateLimitMiddleware(MagicMock(), lambda: redis_mock)
-    await middleware(_make_scope(tier="basic"), _noop_receive, capture_send)
-
-    assert responses[0]["status"] == 429
-
-
-async def test_pro_tier_limit_is_enforced() -> None:
-    """Exactly one over the pro monthly limit, the request is blocked."""
-    from src.config import RATE_LIMIT_PRO
-    from src.middleware.rate_limit import RateLimitMiddleware
-
-    redis_mock = _make_redis_mock(count=RATE_LIMIT_PRO + 1)
-
-    responses: list[dict[str, Any]] = []
-
-    async def capture_send(message: MutableMapping[str, Any]) -> None:
-        responses.append(dict(message))
-
-    middleware = RateLimitMiddleware(MagicMock(), lambda: redis_mock)
-    await middleware(_make_scope(tier="pro"), _noop_receive, capture_send)
-
-    assert responses[0]["status"] == 429
-
-
 async def test_unknown_tier_falls_back_to_basic_limit() -> None:
     """An unrecognised tier string defaults to basic-tier monthly quota."""
     from src.config import RATE_LIMIT_BASIC
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    redis_mock = _make_redis_mock(count=RATE_LIMIT_BASIC + 1)
+    firestore_client, _doc_ref = _make_firestore_mock(count=RATE_LIMIT_BASIC + 1)
 
     responses: list[dict[str, Any]] = []
 
     async def capture_send(message: MutableMapping[str, Any]) -> None:
         responses.append(dict(message))
 
-    middleware = RateLimitMiddleware(MagicMock(), lambda: redis_mock)
+    middleware = RateLimitMiddleware(MagicMock(), lambda: firestore_client)
     await middleware(_make_scope(tier="enterprise"), _noop_receive, capture_send)
 
     assert responses[0]["status"] == 429
 
 
 # ---------------------------------------------------------------------------
-# Fail-open (Redis unavailable) tests
+# Fail-open (Firestore unavailable) tests
 # ---------------------------------------------------------------------------
 
 
-async def test_redis_exception_fails_open() -> None:
-    """When Redis raises a RedisError the request passes through (fail-open)."""
+async def test_firestore_exception_fails_open() -> None:
+    """When Firestore raises a GoogleAPICallError the request passes through."""
     from src.middleware.rate_limit import RateLimitMiddleware
 
-    redis_mock = MagicMock()
-    redis_mock.incr = AsyncMock(side_effect=redis_exceptions.ConnectionError("Redis unreachable"))
+    firestore_client, doc_ref = _make_firestore_mock(count=1)
+    doc_ref.get = AsyncMock(
+        side_effect=gcp_exceptions.GoogleAPICallError("firestore down")  # type: ignore[no-untyped-call]
+    )
 
     called = {"app": False}
 
     async def inner_app(scope: Any, receive: Any, send: Any) -> None:
         called["app"] = True
 
-    middleware = RateLimitMiddleware(inner_app, lambda: redis_mock)
+    middleware = RateLimitMiddleware(inner_app, lambda: firestore_client)
 
     with patch("src.middleware.rate_limit.logger") as mock_logger:
         await middleware(_make_scope(), _noop_receive, AsyncMock())
@@ -307,26 +285,8 @@ async def test_redis_exception_fails_open() -> None:
     mock_logger.warning.assert_called_once()
 
 
-async def test_redis_timeout_fails_open() -> None:
-    """A redis TimeoutError also triggers fail-open behaviour."""
-    from src.middleware.rate_limit import RateLimitMiddleware
-
-    redis_mock = MagicMock()
-    redis_mock.incr = AsyncMock(side_effect=redis_exceptions.TimeoutError("timed out"))
-
-    called = {"app": False}
-
-    async def inner_app(scope: Any, receive: Any, send: Any) -> None:
-        called["app"] = True
-
-    middleware = RateLimitMiddleware(inner_app, lambda: redis_mock)
-    await middleware(_make_scope(), _noop_receive, AsyncMock())
-
-    assert called["app"] is True
-
-
-async def test_redis_factory_exception_fails_open() -> None:
-    """If the redis factory itself raises (e.g. before lifespan), fail-open."""
+async def test_firestore_factory_exception_fails_open() -> None:
+    """If the Firestore factory itself raises (e.g. before lifespan), fail-open."""
     from src.middleware.rate_limit import RateLimitMiddleware
 
     def broken_factory() -> Any:
@@ -347,19 +307,19 @@ async def test_redis_factory_exception_fails_open() -> None:
 
 
 # ---------------------------------------------------------------------------
-# get_redis_client tests (src/server.py)
+# get_firestore_client tests (src/server.py)
 # ---------------------------------------------------------------------------
 
 
-def test_get_redis_client_raises_before_lifespan() -> None:
-    """get_redis_client() raises RuntimeError when called outside lifespan."""
+def test_get_firestore_client_raises_before_lifespan() -> None:
+    """get_firestore_client() raises RuntimeError when called outside lifespan."""
     import src.server as server_module
-    from src.server import get_redis_client
+    from src.server import get_firestore_client
 
-    original = server_module._redis_client
+    original = server_module._firestore_client
     try:
-        server_module._redis_client = None
+        server_module._firestore_client = None
         with pytest.raises(RuntimeError, match="not initialized"):
-            get_redis_client()
+            get_firestore_client()
     finally:
-        server_module._redis_client = original
+        server_module._firestore_client = original

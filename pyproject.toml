@@ -18,11 +18,10 @@ dependencies = [
     "opentelemetry-instrumentation-httpx>=0.46b0",
     "firebase-admin>=7.4.0",
     "pydantic>=2.8.0",
-    "redis[hiredis]>=5.0.0",
+    "google-cloud-firestore>=2.21.0",
     "urllib3>=2.7.0",
     "beautifulsoup4>=4.14.3",
     "opentelemetry-instrumentation-starlette>=0.46b0",
-    "opentelemetry-instrumentation-redis>=0.46b0",
 ]
 
 [dependency-groups]

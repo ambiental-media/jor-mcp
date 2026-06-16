@@ -4,16 +4,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from starlette.testclient import TestClient
 
 
-def _make_fake_redis() -> MagicMock:
-    """Return a MagicMock that satisfies the Redis async interface."""
-    fake_redis = MagicMock()
-    pipeline_rv = fake_redis.pipeline.return_value
-    pipeline_rv.__aenter__ = AsyncMock(return_value=pipeline_rv)
-    pipeline_rv.__aexit__ = AsyncMock(return_value=False)
-    pipeline_rv.execute = AsyncMock(return_value=[0, 0, 1, True])
-    fake_redis.zrange = AsyncMock(return_value=[])
-    fake_redis.aclose = AsyncMock()
-    return fake_redis
+def _make_fake_firestore() -> MagicMock:
+    """Return a MagicMock that satisfies the Firestore async interface."""
+    fake_firestore = MagicMock()
+    fake_firestore.close = AsyncMock()
+    return fake_firestore
 
 
 @patch("src.server.setup_telemetry")
@@ -35,13 +30,11 @@ def test_health_endpoint(_mock_setup: MagicMock) -> None:
 @patch("firebase_admin.get_app", side_effect=ValueError("No app"))
 @patch("firebase_admin.initialize_app")
 @patch("src.server._mcp_http_app")
-@patch("redis.asyncio.ConnectionPool.from_url")
-@patch("redis.asyncio.Redis")
+@patch("src.server.FirestoreAsyncClient")
 @patch("httpx.AsyncClient")
 async def test_server_lifespan_initializes_firebase_when_not_present(
     mock_http_client_cls: MagicMock,
-    mock_redis_cls: MagicMock,
-    _mock_pool: MagicMock,
+    mock_firestore_cls: MagicMock,
     mock_mcp_app: MagicMock,
     mock_init: MagicMock,
     _mock_get_app: MagicMock,
@@ -54,9 +47,9 @@ async def test_server_lifespan_initializes_firebase_when_not_present(
     async def fake_mcp_lifespan(app):  # type: ignore[no-untyped-def]
         yield
 
-    fake_redis = _make_fake_redis()
+    fake_firestore = _make_fake_firestore()
     fake_http_client = AsyncMock()
-    mock_redis_cls.return_value = fake_redis
+    mock_firestore_cls.return_value = fake_firestore
     mock_http_client_cls.return_value = fake_http_client
     mock_mcp_app.lifespan = fake_mcp_lifespan
 
@@ -65,7 +58,7 @@ async def test_server_lifespan_initializes_firebase_when_not_present(
 
     mock_init.assert_called_once()
     fake_http_client.aclose.assert_awaited_once()
-    fake_redis.aclose.assert_awaited_once()
+    fake_firestore.close.assert_awaited_once()
     _mock_setup.assert_called_once()
 
 
@@ -73,13 +66,11 @@ async def test_server_lifespan_initializes_firebase_when_not_present(
 @patch("firebase_admin.get_app")
 @patch("firebase_admin.initialize_app")
 @patch("src.server._mcp_http_app")
-@patch("redis.asyncio.ConnectionPool.from_url")
-@patch("redis.asyncio.Redis")
+@patch("src.server.FirestoreAsyncClient")
 @patch("httpx.AsyncClient")
 async def test_server_lifespan_skips_init_when_firebase_already_present(
     mock_http_client_cls: MagicMock,
-    mock_redis_cls: MagicMock,
-    _mock_pool: MagicMock,
+    mock_firestore_cls: MagicMock,
     mock_mcp_app: MagicMock,
     mock_init: MagicMock,
     _mock_get_app: MagicMock,
@@ -92,9 +83,9 @@ async def test_server_lifespan_skips_init_when_firebase_already_present(
     async def fake_mcp_lifespan(app):  # type: ignore[no-untyped-def]
         yield
 
-    fake_redis = _make_fake_redis()
+    fake_firestore = _make_fake_firestore()
     fake_http_client = AsyncMock()
-    mock_redis_cls.return_value = fake_redis
+    mock_firestore_cls.return_value = fake_firestore
     mock_http_client_cls.return_value = fake_http_client
     mock_mcp_app.lifespan = fake_mcp_lifespan
 
@@ -103,5 +94,5 @@ async def test_server_lifespan_skips_init_when_firebase_already_present(
 
     mock_init.assert_not_called()
     fake_http_client.aclose.assert_awaited_once()
-    fake_redis.aclose.assert_awaited_once()
+    fake_firestore.close.assert_awaited_once()
     _mock_setup.assert_called_once()
