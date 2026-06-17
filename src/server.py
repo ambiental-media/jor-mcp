@@ -5,11 +5,9 @@ from collections.abc import AsyncGenerator
 
 import firebase_admin
 import httpx
-import redis.asyncio as aioredis
 import uvicorn
 from fastmcp import FastMCP
-from redis.asyncio import Redis
-from redis.exceptions import RedisError
+from google.cloud.firestore_v1 import AsyncClient as FirestoreAsyncClient
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.requests import Request
@@ -18,12 +16,10 @@ from starlette.routing import Mount, Route
 
 import src.http_client as _http_client_mod
 from src.config import (
+    FIRESTORE_DATABASE_ID,
     HTTP_MAX_CONNECTIONS,
     HTTP_MAX_KEEPALIVE_CONNECTIONS,
     HTTP_TIMEOUT,
-    REDIS_CONNECT_TIMEOUT,
-    REDIS_SOCKET_TIMEOUT,
-    REDIS_URL,
 )
 from src.middleware.auth import AuthMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
@@ -60,30 +56,35 @@ mcp = FastMCP(
 )
 
 # Module-level reference; populated during lifespan startup.
-_redis_client: Redis | None = None
+_firestore_client: FirestoreAsyncClient | None = None
 
 
-def get_redis_client() -> Redis:
-    """Return the active Redis client.
+def get_firestore_client() -> FirestoreAsyncClient:
+    """Return the active Firestore client.
 
     Raises:
         RuntimeError: If called before the ASGI lifespan has started.
     """
-    if _redis_client is None:
-        raise RuntimeError("Redis client is not initialized")
-    return _redis_client
+    if _firestore_client is None:
+        raise RuntimeError("Firestore client is not initialized")
+    return _firestore_client
 
 
 async def health_check(request: Request) -> JSONResponse:
     return JSONResponse({"status": "ok", "service": "jor-mcp"})
 
 
+# Register all @mcp.tool() handlers BEFORE building the HTTP app: http_app()
+# snapshots the tool registry at call time, so importing tools afterwards would
+# expose zero tools. Safe here because src.tools only imports `mcp` (defined above).
+import src.tools  # noqa: E402, F401
+
 _mcp_http_app = mcp.http_app()
 
 
 @contextlib.asynccontextmanager
 async def server_lifespan(app: Starlette) -> AsyncGenerator[None, None]:
-    global _redis_client
+    global _firestore_client
 
     setup_telemetry()
 
@@ -93,13 +94,7 @@ async def server_lifespan(app: Starlette) -> AsyncGenerator[None, None]:
         firebase_admin.initialize_app()
 
     try:
-        pool = aioredis.ConnectionPool.from_url(
-            REDIS_URL,
-            socket_timeout=REDIS_SOCKET_TIMEOUT,
-            socket_connect_timeout=REDIS_CONNECT_TIMEOUT,
-            decode_responses=False,
-        )
-        _redis_client = aioredis.Redis(connection_pool=pool)
+        _firestore_client = FirestoreAsyncClient(database=FIRESTORE_DATABASE_ID)
         transport = httpx.AsyncHTTPTransport(
             retries=3,
             limits=httpx.Limits(
@@ -118,17 +113,17 @@ async def server_lifespan(app: Starlette) -> AsyncGenerator[None, None]:
             with contextlib.suppress(OSError, RuntimeError):
                 await _http_client_mod._http_client.aclose()
         _http_client_mod._http_client = None
-        if _redis_client is not None:
-            with contextlib.suppress(RedisError):
-                await _redis_client.aclose()
-        _redis_client = None
+        if _firestore_client is not None:
+            with contextlib.suppress(RuntimeError):
+                await _firestore_client.close()  # type: ignore[no-untyped-call]
+        _firestore_client = None
 
 
 _starlette_app = Starlette(
     lifespan=server_lifespan,
     middleware=[
         Middleware(AuthMiddleware),
-        Middleware(RateLimitMiddleware, redis_factory=get_redis_client),
+        Middleware(RateLimitMiddleware, firestore_factory=get_firestore_client),
     ],
     routes=[
         Route("/health", health_check),
@@ -145,10 +140,11 @@ instrument_asgi_app(_starlette_app)
 
 app = _starlette_app
 
-# Import tools module as a side-effect to register all @mcp.tool() handlers.
-# This must come after `mcp` is defined to avoid a circular import error.
-import src.tools  # noqa: E402, F401
-
 if __name__ == "__main__":  # pragma: no cover
     port = int(os.environ.get("PORT", 8080))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # Pass the import string (not the `app` object) so uvicorn imports this
+    # module as `src.server` once. Passing `app` while running via
+    # `python -m src.server` makes tools.py's `from src.server import mcp`
+    # re-import the module, creating a second `mcp` whose tools never reach the
+    # served `http_app()`.
+    uvicorn.run("src.server:app", host="0.0.0.0", port=port)

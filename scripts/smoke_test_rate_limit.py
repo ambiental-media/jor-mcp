@@ -1,4 +1,4 @@
-"""Smoke test for RateLimitMiddleware with a real Redis instance.
+"""Smoke test for RateLimitMiddleware with Firestore-backed counters.
 
 By default patches Firebase (no credentials needed). To test with real
 Firebase, set GOOGLE_APPLICATION_CREDENTIALS, FIREBASE_API_KEY,
@@ -16,6 +16,7 @@ Usage (real Firebase — set vars in .env):
 """
 
 import os
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 _API_KEY = os.environ.get("FIREBASE_API_KEY", "")
@@ -48,9 +49,7 @@ def _fetch_firebase_token(api_key: str, email: str, password: str) -> str:
     return str(resp.json()["idToken"])
 
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 LIMIT = int(os.environ.get("RATE_LIMIT_BASIC_REQUESTS", "20"))
-WINDOW = int(os.environ.get("RATE_LIMIT_BASIC_WINDOW", "60"))
 
 GREEN = "\033[92m"
 RED = "\033[91m"
@@ -65,8 +64,8 @@ def colored(text: str, color: str) -> str:
 def main() -> None:
     mode = "Real Firebase" if _USE_REAL_FIREBASE else "Mocked Firebase"
     print(f"\nMode: {mode}")
-    print(f"Redis: {REDIS_URL}")
-    print(f"Tier: basic | Limit: {LIMIT} req / {WINDOW}s")
+    print("Rate limit backend: Firestore")
+    print(f"Tier: basic | Monthly limit: {LIMIT} req")
     print(f"Firing {LIMIT + 2} requests...\n")
 
     if _USE_REAL_FIREBASE:
@@ -78,7 +77,7 @@ def main() -> None:
 
     headers = {"Authorization": f"Bearer {token}"}
 
-    # Use TestClient as context manager so server_lifespan runs (initialises Redis pool)
+    # Use TestClient as context manager so server_lifespan runs.
     with TestClient(app, raise_server_exceptions=False) as client:
         for i in range(1, LIMIT + 3):
             resp = client.get("/mcp/", headers=headers, follow_redirects=False)
@@ -93,47 +92,39 @@ def main() -> None:
                 # FastMCP returns 406 for non-MCP requests — that's expected.
                 print(colored(f"  [{i:02d}] {status} passed through rate limiter", GREEN))
 
-        print("\n--- Checking Redis ---")
-        from typing import cast
-
-        import redis
-
-        r = redis.Redis.from_url(REDIS_URL, decode_responses=True)
-        all_keys = cast(list[str], r.keys("rl:*"))
-        if not all_keys:
-            print("No rl:* keys found in Redis.")
-        for key in all_keys:
-            count = r.zcard(key)
-            entries = cast(list[tuple[str, float]], r.zrange(key, 0, -1, withscores=True))
-            print(f"Redis key : {key}")
-            print(f"Entries   : {count}")
-            for member, score in entries:
-                print(f"  {member} -> {int(score)} ms")
-
         print("\n--- Fail-open test ---")
-        print("Pointing to non-existent Redis (port 9999)...")
+        print("Injecting a broken Firestore client...")
 
-        import redis.asyncio as aioredis  # noqa: E402
+        from google.api_core import exceptions as gcp_exceptions  # noqa: E402
 
         import src.server as server_module  # noqa: E402
 
-        broken_pool = aioredis.ConnectionPool.from_url(
-            "redis://localhost:9999/0",
-            socket_timeout=0.5,
-            socket_connect_timeout=0.5,
-        )
-        original_client = server_module._redis_client
-        server_module._redis_client = aioredis.Redis(connection_pool=broken_pool)
+        class _BrokenDocument:
+            async def set(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+                raise gcp_exceptions.GoogleAPICallError("Firestore unavailable")  # type: ignore[no-untyped-call]
+
+        class _BrokenCollection:
+            def document(self, _doc_id: str) -> _BrokenDocument:
+                return _BrokenDocument()
+
+        class _BrokenFirestore:
+            def collection(self, _name: str) -> _BrokenCollection:
+                return _BrokenCollection()
+
+        original_client = server_module._firestore_client
+        server_module._firestore_client = cast(Any, _BrokenFirestore())
 
         resp = client.get("/mcp/", headers=headers, follow_redirects=False)
         if resp.status_code != 429:
-            msg = f"  Fail-open OK — response: {resp.status_code} (passed through without Redis)"
+            msg = (
+                f"  Fail-open OK — response: {resp.status_code} (passed through without Firestore)"
+            )
             print(colored(msg, GREEN))
         else:
             msg = f"  FAILED — returned {resp.status_code} instead of passing through"
             print(colored(msg, RED))
 
-        server_module._redis_client = original_client
+        server_module._firestore_client = original_client
 
     print(colored("\nSmoke test complete.", GREEN))
 

@@ -21,7 +21,6 @@ from typing import Any, ClassVar
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from opentelemetry.instrumentation.redis import RedisInstrumentor
 from opentelemetry.instrumentation.starlette import StarletteInstrumentor
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -153,7 +152,7 @@ def setup_telemetry() -> None:
 
     This function is idempotent: subsequent calls are no-ops.  It must be
     invoked once during the ASGI lifespan startup **before** the HTTP client
-    and Redis client are created so their spans are correctly captured.
+    is created so its spans are correctly captured.
 
     Exporter selection:
 
@@ -166,8 +165,6 @@ def setup_telemetry() -> None:
 
     - :class:`~opentelemetry.instrumentation.httpx.HTTPXClientInstrumentor` –
       traces every outbound HTTP request made via ``httpx.AsyncClient``.
-    - :class:`~opentelemetry.instrumentation.redis.RedisInstrumentor` –
-      traces every Redis command.
 
     Call :func:`instrument_asgi_app` separately to add ASGI-level spans.
     """
@@ -188,7 +185,6 @@ def setup_telemetry() -> None:
     trace.set_tracer_provider(provider)
 
     HTTPXClientInstrumentor().instrument()
-    RedisInstrumentor().instrument()
     _configure_logging()
 
     _TELEMETRY_CONFIGURED = True

@@ -49,7 +49,7 @@ Deployment should be automated via GitHub Actions:
 
 The Cloud Run service is managed declaratively via a `service.yaml` file located at the root of the repository. This file is the single source of truth for the service configuration, including container resources, auto-scaling, ingress, and environment variables.
 
-Sensitive variables (`MCP_GITHUB_TOKEN`, `REDIS_URL`, `JWT_SECRET`) are never hardcoded in the YAML. They are stored in GCP Secret Manager and injected directly into the container at runtime via `valueFrom: secretKeyRef`.
+Sensitive variables (for example `MCP_GITHUB_TOKEN`) are never hardcoded in the YAML. They are stored in GCP Secret Manager and injected directly into the container at runtime via `valueFrom: secretKeyRef`.
 
 ### Applying the manifest locally
 
