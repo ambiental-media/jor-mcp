@@ -1,16 +1,19 @@
-"""Rate-limiting ASGI middleware using Redis Fixed Window algorithm.
+"""Rate-limiting ASGI middleware using Firestore Fixed Window algorithm.
 
 This middleware must be placed after AuthMiddleware in the middleware
-stack.  It reads ``scope["user"]["uid"]`` and ``scope["user"]["tier"]``
+stack. It reads ``scope["user"]["uid"]`` and ``scope["user"]["tier"]``
 injected by AuthMiddleware, then enforces per-tier monthly quotas stored
-in Redis.
+in Firestore.
 
-The Fixed Window algorithm uses a simple INCR counter per user per billing
-month (key: ``rl:{uid}:YYYY-MM``).  When a new key is created (INCR returns
-1), an EXPIRE is set to the exact start of the next calendar month so the
-counter resets cleanly on the billing date without accumulating stale data.
+The Fixed Window algorithm uses one document per user per month in the
+``rate_limits`` collection (document id: ``{uid}_YYYY-MM``). Each request
+atomically increments the document's ``count`` field with
+``firestore.Increment(1)`` and reads the new value back; the request is
+rejected once that value exceeds the tier quota. The server-side Increment
+is atomic, so concurrent Cloud Run replicas processing the same uid never
+lose updates.
 
-Fail-open policy: if Redis is unreachable or times out, the request is
+Fail-open policy: if Firestore is unreachable or times out, the request is
 allowed through and the failure is logged for observability.
 """
 
@@ -18,11 +21,12 @@ import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from redis.asyncio import Redis
-from redis.exceptions import RedisError
+from google.api_core import exceptions as gcp_exceptions
+from google.cloud import firestore
+from google.cloud.firestore_v1 import AsyncClient
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from src.config import RATE_LIMIT_BASIC, RATE_LIMIT_PRO
+from src.config import RATE_LIMIT_BASIC, RATE_LIMIT_COLLECTION, RATE_LIMIT_PRO
 
 logger = logging.getLogger(__name__)
 
@@ -36,22 +40,22 @@ _TIER_QUOTAS: dict[str, int] = {
 
 
 class RateLimitMiddleware:
-    """ASGI middleware that enforces per-user, per-tier monthly rate limits via Redis.
+    """ASGI middleware that enforces per-user, per-tier monthly rate limits via Firestore.
 
     Uses the Fixed Window algorithm: for each request an integer counter is
-    maintained in Redis keyed by ``rl:{uid}:YYYY-MM``.  The counter is
-    incremented atomically with INCR and expires at the start of the next
-    calendar month, guaranteeing that limits reset cleanly on the billing date.
+    maintained in Firestore document ``rate_limits/{uid}_YYYY-MM``. The counter
+    is incremented atomically with ``firestore.Increment(1)`` and the request is
+    rejected once the value exceeds the tier quota.
 
-    On Redis failure the middleware is fail-open: a warning is logged and the
+    On Firestore failure the middleware is fail-open: a warning is logged and the
     request is forwarded to the next layer unchanged.
 
     The ``/health`` path is exempt from rate limiting.
     """
 
-    def __init__(self, app: ASGIApp, redis_factory: Callable[[], Redis]) -> None:
+    def __init__(self, app: ASGIApp, firestore_factory: Callable[[], AsyncClient]) -> None:
         self.app = app
-        self._redis_factory: Callable[[], Redis] = redis_factory
+        self._firestore_factory: Callable[[], AsyncClient] = firestore_factory
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] not in ("http", "websocket"):
@@ -73,11 +77,11 @@ class RateLimitMiddleware:
         max_requests: int = _TIER_QUOTAS.get(tier, RATE_LIMIT_BASIC)
 
         try:
-            redis_client = self._redis_factory()
-            allowed, retry_after = await _check_fixed_window(redis_client, uid, max_requests)
-        except (RedisError, RuntimeError) as exc:
+            firestore_client = self._firestore_factory()
+            allowed, retry_after = await _check_fixed_window(firestore_client, uid, max_requests)
+        except (gcp_exceptions.GoogleAPICallError, gcp_exceptions.RetryError, RuntimeError) as exc:
             logger.warning(
-                "Redis rate-limit check failed; failing open",
+                "Firestore rate-limit check failed; failing open",
                 extra={"uid": uid, "error": str(exc)},
             )
             await self.app(scope, receive, send)
@@ -112,19 +116,21 @@ def _seconds_until_next_month(now: datetime) -> int:
 
 
 async def _check_fixed_window(
-    redis: Redis,
+    firestore_client: AsyncClient,
     uid: str,
     max_requests: int,
 ) -> tuple[bool, int]:
-    """Apply the Fixed Window algorithm against Redis.
+    """Apply the Fixed Window algorithm against Firestore using an atomic Increment.
 
-    Uses a single atomic INCR per request.  If this is the first request in
-    the current billing cycle (count == 1), an EXPIRE is set so the key is
-    automatically removed at the start of next month.
+    Increments the ``count`` field of ``rate_limits/{uid}_YYYY-MM`` with
+    ``firestore.Increment(1)`` (creating the document on the first request of
+    the month) and reads the new value back. The request is rejected when the
+    post-increment value exceeds the monthly quota. The server-side Increment is
+    atomic, so concurrent replicas processing the same uid never lose updates.
 
     Args:
-        redis: An active async Redis client.
-        uid: The unique user identifier (used as part of the Redis key).
+        firestore_client: An active async Firestore client.
+        uid: The unique user identifier (used as part of the document id).
         max_requests: Maximum number of requests allowed within the month.
 
     Returns:
@@ -133,19 +139,24 @@ async def _check_fixed_window(
         remain until the billing window resets (start of next month).
     """
     now = datetime.now(UTC)
-    key = f"rl:{uid}:{now.strftime('%Y-%m')}"
+    month_key = now.strftime("%Y-%m")
+    doc_id = f"{uid}_{month_key}"
+    doc_ref = firestore_client.collection(RATE_LIMIT_COLLECTION).document(doc_id)
 
-    count: int = await redis.incr(key)
+    await doc_ref.set(
+        {
+            "uid": uid,
+            "month": month_key,
+            "count": firestore.Increment(1),
+            "updated_at": firestore.SERVER_TIMESTAMP,
+        },
+        merge=True,
+    )
+    snapshot = await doc_ref.get()
+    current_count = int(snapshot.get("count") or 0)
 
-    if count == 1:
-        # New billing cycle: set key to expire at the start of next month.
-        expire_seconds = _seconds_until_next_month(now)
-        await redis.expire(key, expire_seconds)
-
-    if count > max_requests:
-        retry_after = _seconds_until_next_month(now)
-        return False, retry_after
-
+    if current_count > max_requests:
+        return False, _seconds_until_next_month(now)
     return True, 0
 
 
