@@ -93,6 +93,10 @@ The development of `jor-mcp` was made possible through the generous support of t
 *   **[JournalismAI Innovation Challenge](https://www.journalismai.info/programmes/innovation):** Supported via "JournalismAI" (a project of POLIS Journalism at LSE) and the "Google News Initiative," targeting the global journalism ecosystem.
 *   **[Codesinfo](https://codesinfo.com.br/en/home-english/):** Supported via "Projor" and the "Google News Initiative," targeting the Brazilian journalism ecosystem.
 
+## Roadmap
+
+*   [🚀 Roadmap](docs/en/3-history-and-specs/roadmap.md)
+
 ## License
 
 *(Placeholder: The open-source license for this project has not yet been determined. Please check back later for licensing details.)*
