@@ -74,6 +74,11 @@ async def health_check(request: Request) -> JSONResponse:
     return JSONResponse({"status": "ok", "service": "jor-mcp"})
 
 
+# Register all @mcp.tool() handlers BEFORE building the HTTP app: http_app()
+# snapshots the tool registry at call time, so importing tools afterwards would
+# expose zero tools. Safe here because src.tools only imports `mcp` (defined above).
+import src.tools  # noqa: E402, F401
+
 _mcp_http_app = mcp.http_app()
 
 
@@ -135,10 +140,11 @@ instrument_asgi_app(_starlette_app)
 
 app = _starlette_app
 
-# Import tools module as a side-effect to register all @mcp.tool() handlers.
-# This must come after `mcp` is defined to avoid a circular import error.
-import src.tools  # noqa: E402, F401
-
 if __name__ == "__main__":  # pragma: no cover
     port = int(os.environ.get("PORT", 8080))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # Pass the import string (not the `app` object) so uvicorn imports this
+    # module as `src.server` once. Passing `app` while running via
+    # `python -m src.server` makes tools.py's `from src.server import mcp`
+    # re-import the module, creating a second `mcp` whose tools never reach the
+    # served `http_app()`.
+    uvicorn.run("src.server:app", host="0.0.0.0", port=port)
