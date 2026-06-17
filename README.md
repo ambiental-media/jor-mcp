@@ -1,5 +1,7 @@
 # Jor-MCP
 
+[Read in English](README.md) | [Leia em Português](README_pt-br.md)
+
 [![License: TBD](https://img.shields.io/badge/License-TBD-lightgrey.svg)](#license)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](#installation-via-docker)
 
@@ -19,11 +21,11 @@ By deploying your own instance of `jor-mcp`, your newsroom can empower AI workfl
 
 ## Documentation
 
-Comprehensive documentation for all audiences is available in the [`docs/`](docs/README.md) directory:
-*   [Technical Architecture](docs/1-technical/)
-*   [Deployment Guides](docs/2-deployment/)
-*   [Usage & Connecting LLMs](docs/3-usage/)
-*   [Research, Learnings & Metrics](docs/4-research-and-learnings/)
+Comprehensive documentation for all audiences is available in the [`docs/`](docs/) directory:
+*   [Technical Architecture](docs/en/1-technical/)
+*   [Replication Guides](docs/en/2-replication/)
+*   [History and Specifications](docs/en/3-history-and-specs/)
+*   [Legal Framework](docs/en/4-legal/)
 
 ## Getting Started
 
@@ -59,7 +61,7 @@ The easiest way to get `jor-mcp` running is via Docker.
 
 To adapt `jor-mcp` for your specific organization, you only need to update the environment variables in your `.env` file. The core logic is designed to be agnostic and will dynamically query the WordPress and GitHub endpoints you provide.
 
-For detailed configuration options (like setting up the `.env` file for your specific newsroom) and deployment guides for various cloud providers, please refer to our **[Deployment Guides](docs/2-deployment/)**.
+For detailed configuration options (like setting up the `.env` file for your specific newsroom) and deployment guides for various cloud providers, please refer to our **[Replication Guides](docs/en/2-replication/)**.
 
 ## Advanced: Installation from Source (For Developers)
 
@@ -74,13 +76,13 @@ If you wish to modify the code or run the server outside of a container, you wil
 
 Once deployed, you can connect your preferred LLM interface (e.g., Claude Desktop, custom AI agents) to your `jor-mcp` instance using the standard Model Context Protocol.
 
-For instructions on connecting Claude Desktop or other AI agents, and a reference of available tools, see our **[Usage Guides](docs/3-usage/)**.
+For instructions on connecting Claude Desktop or other AI agents, and a reference of available tools, see our **[Technical Documentation](docs/en/1-technical/)**.
 
 ## Contributing
 
 We welcome contributions from other journalism organizations and the open-source community! 
 
-Please read our [Contributing Guidelines](CONTRIBUTING.md) to learn about our development standards, environment setup, and code quality requirements before submitting a Pull Request.
+Please read our [Contributing Guidelines](docs/CONTRIBUTING_DOCS_EN.md) to learn about our development standards, environment setup, and code quality requirements before submitting a Pull Request.
 
 AI Agents assisting with this repository must adhere to the rules in [AGENTS.md](AGENTS.md).
 
@@ -88,8 +90,8 @@ AI Agents assisting with this repository must adhere to the rules in [AGENTS.md]
 
 The development of `jor-mcp` was made possible through the generous support of two major journalism initiatives:
 
-*   **[Codesinfo](https://codesinfo.com.br/):** Supported via "Projor" and the "Google News Initiative," targeting the Brazilian journalism ecosystem.
-*   **Journalism AI Innovation Challenge:** Supported via "JournalismAI" with "POLIS Journalism at LSE" and the "Google News Initiative," targeting the global journalism market.
+*   **[JournalismAI Innovation Challenge](https://www.journalismai.info/programmes/innovation):** Supported via "JournalismAI" (a project of POLIS Journalism at LSE) and the "Google News Initiative," targeting the global journalism ecosystem.
+*   **[Codesinfo](https://codesinfo.com.br/en/home-english/):** Supported via "Projor" and the "Google News Initiative," targeting the Brazilian journalism ecosystem.
 
 ## License
 
