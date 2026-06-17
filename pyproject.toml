@@ -71,3 +71,10 @@ omit = ["src/jor_mcp.egg-info/*"]
 exclude_dirs = ["tests/"]
 skips = ["B104"]
 severity = "medium"
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+allow_zero_version = true
+
+[tool.semantic_release.branches.main]
+match = "main"
