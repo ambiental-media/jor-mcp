@@ -3,8 +3,6 @@
 [![License: TBD](https://img.shields.io/badge/License-TBD-lightgrey.svg)](#license)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](#installation-via-docker)
 
-What is it?
-
 `jor-mcp` is an open-source [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server specifically designed for journalism organizations. 
 
 Originally developed by [Ambiental Media](https://ambiental.media/) with support from global journalism initiatives, this server bridges the gap between Large Language Models (LLMs) and standard newsroom infrastructure, allowing AI agents to securely search, retrieve, and analyze content across your organization's WordPress instances and internal GitHub repositories.
