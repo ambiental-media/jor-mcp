@@ -71,12 +71,12 @@ jobs:
           GCP_PROJECT_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
           FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
           WORDPRESS_API_URL: ${{ vars.WORDPRESS_API_URL }}
-          GH_REPOS: ${{ vars.GH_REPOS }}
+          MCP_GITHUB_REPOS: ${{ vars.MCP_GITHUB_REPOS }}
           OTEL_EXPORTER_OTLP_ENDPOINT: ${{ vars.OTEL_EXPORTER_OTLP_ENDPOINT }}
         run: |
           # Allowlist form: only these variables are substituted, leaving any
           # other "$" in the manifest untouched.
-          envsubst '${IMAGE_URL} ${GCP_PROJECT_NUMBER} ${FIREBASE_PROJECT_ID} ${WORDPRESS_API_URL} ${GH_REPOS} ${OTEL_EXPORTER_OTLP_ENDPOINT}' \
+          envsubst '${IMAGE_URL} ${GCP_PROJECT_NUMBER} ${FIREBASE_PROJECT_ID} ${WORDPRESS_API_URL} ${MCP_GITHUB_REPOS} ${OTEL_EXPORTER_OTLP_ENDPOINT}' \
             < service.yaml > service.rendered.yaml
           echo "----- Rendered manifest -----"
           cat service.rendered.yaml
