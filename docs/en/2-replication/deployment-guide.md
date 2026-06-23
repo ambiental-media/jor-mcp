@@ -28,6 +28,8 @@ The server relies strictly on environment variables for configuration. No secret
 | `OTEL_EXPORTER_OTLP_ENDPOINT`| OTLP endpoint for tracing. Empty means console export. | `""` |
 
 > **Note on Rate Limiting (Firestore):** The application relies on Google Cloud Firestore for its state. It automatically utilizes Google Application Default Credentials (ADC) bound to the Cloud Run service account. No explicit connection string or secret is required, but the service account *must* be granted the `roles/datastore.user` IAM role.
+> 
+> **Note on Routing:** Ensure your Global Load Balancer is configured to route traffic destined for `/mcp/*` and `/api/oauth/*` to the Jor-MCP backend service, and all other traffic (`/*`) to the Next.js portal service.
 
 ## 3. Dockerization Strategy
 

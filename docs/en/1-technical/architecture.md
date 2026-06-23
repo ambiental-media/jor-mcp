@@ -27,6 +27,7 @@ graph TD
 
     %% Relationships
     Client -- "1. MCP OAuth 2.1 Flow" --> LB
+    LB -- "2. Route /mcp/*" --> JorMCP
     LB -- "2. Route /api/oauth/*" --> JorMCP
     LB -- "2. Route /*" --> Portal
     

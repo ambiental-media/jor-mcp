@@ -1,10 +1,14 @@
 # API & Tool Contracts
 
-This document defines the strict interfaces for the tools exposed by the Jor-MCP server. These are the operations the LLM Client can invoke.
+## Base URL & Routing
+The Jor-MCP server exposes its Model Context Protocol (MCP) interface exclusively on the `/mcp` route. All SSE (Server-Sent Events) connections and JSON-RPC message exchanges must be directed to endpoints prefixed with this route.
 
-*Note: While this documentation is in English, the `description` fields injected into the `@mcp.tool()` decorators in the Python codebase must be written in Portuguese to provide localized context to the LLMs.*
+*   **SSE Endpoint:** `GET /mcp/sse`
+*   **Message Endpoint:** `POST /mcp/messages` (Inferred via the SSE connection handshake)
+*   **Health Check:** `GET /health` (Bypasses authentication and rate limiting)
 
 ---
+(Note: While this documentation is in English, the `description` fields injected into the `@mcp.tool()` decorators in the Python codebase must be written in Portuguese to provide localized context to the LLMs.)
 
 ## 1. `search_content`
 

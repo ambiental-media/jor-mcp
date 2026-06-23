@@ -27,6 +27,7 @@ graph TD
 
     %% Relacionamentos
     Client -- "1. Fluxo MCP OAuth 2.1" --> LB
+    LB -- "2. Rota /mcp/*" --> JorMCP
     LB -- "2. Rota /api/oauth/*" --> JorMCP
     LB -- "2. Rota /*" --> Portal
     
