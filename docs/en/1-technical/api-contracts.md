@@ -80,3 +80,88 @@ The Jor-MCP server exposes its Model Context Protocol (MCP) interface exclusivel
   }
 ]
 ```
+
+## 4. OAuth 2.1 Proxy Endpoints (Internal API)
+
+These endpoints are used internally to facilitate the Native MCP OAuth 2.1 flow between Claude Desktop, the `jor-mcp-site` Next.js portal, and the `jor-mcp` backend.
+
+### Consistent Error Semantics
+All OAuth endpoints follow this standard error schema for non-2xx responses:
+```json
+{
+  "error": "invalid_request",
+  "error_description": "Human readable details (e.g., PKCE verification failed)"
+}
+```
+
+---
+
+### 4.1 Dynamic Client Registration (DCR)
+**Endpoint:** `POST /api/oauth/register`
+**Purpose:** Called by Claude Desktop to register itself and obtain a `client_id`.
+
+**Request Schema:**
+```json
+{
+  "client_name": "string",
+  "redirect_uris": ["string"],
+  "token_endpoint_auth_method": "none"
+}
+```
+
+**Response Schema (201 Created):**
+```json
+{
+  "client_id": "uuid-string",
+  "client_name": "string",
+  "redirect_uris": ["string"],
+  "token_endpoint_auth_method": "none"
+}
+```
+
+---
+
+### 4.2 Consent Approval
+**Endpoint:** `POST /api/oauth/approve`
+**Purpose:** Called by the `jor-mcp-site` (Next.js) after the user clicks "Allow". Requires CORS.
+
+**Request Schema:**
+*(Requires `Authorization: Bearer <Firebase_ID_Token>` to prove user identity)*
+```json
+{
+  "client_id": "uuid-string",
+  "code_challenge": "string",
+  "redirect_uri": "string"
+}
+```
+
+**Response Schema (200 OK):**
+```json
+{
+  "authorization_code": "short-lived-random-string",
+  "redirect_uri": "http://127.0.0.1:54321/callback?code=..."
+}
+```
+
+---
+
+### 4.3 Token Exchange
+**Endpoint:** `POST /api/oauth/token`
+**Purpose:** Called by Claude to trade the `authorization_code` for Firebase Access/Refresh tokens. Uses `application/x-www-form-urlencoded`.
+
+**Request Parameters:**
+*   `grant_type`: `"authorization_code"`
+*   `client_id`: `"uuid-string"`
+*   `code`: `"short-lived-random-string"`
+*   `code_verifier`: `"string"` (PKCE validator)
+*   `redirect_uri`: `"string"`
+
+**Response Schema (200 OK):**
+```json
+{
+  "access_token": "firebase-jwt-string",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "firebase-long-lived-string"
+}
+```
