@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Semantic Release
+    runs-on: ubuntu-latest
+    # only run when the PR was actually merged into main
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
+
+    env:
+      REGISTRY: us-central1-docker.pkg.dev
+      PROJECT_ID: jor-mcp
+      REPOSITORY: jor-mcp
+      IMAGE: jor-mcp-server
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: main
+          fetch-depth: 0   # PSR needs the full history and tags
+
+      - name: Python Semantic Release
+        id: release
+        uses: python-semantic-release/python-semantic-release@v10.5.3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Decode credentials
+        if: steps.release.outputs.released == 'true'
+        id: decode_sa
+        run: |
+          DECODED_CREDENTIALS="$(echo -n ${{ secrets.GCP_SA_KEY }} | base64 --decode)"
+          echo "::add-mask::$DECODED_CREDENTIALS"
+          echo "creds=$DECODED_CREDENTIALS" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to Google Cloud
+        if: steps.release.outputs.released == 'true'
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: '${{ steps.decode_sa.outputs.creds }}'
+
+      - name: Retag image with release version
+        if: steps.release.outputs.released == 'true'
+        env:
+          PR_TAG: pr-${{ github.event.pull_request.number }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          IMAGE_BASE="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}"
+
+          # retag :pr-N -> :vX.Y.Z
+          gcloud artifacts docker tags add \
+            "${IMAGE_BASE}:${PR_TAG}" \
+            "${IMAGE_BASE}:${RELEASE_TAG}" \
+            --project="${{ env.PROJECT_ID }}"
+
+          # retag :pr-N -> :latest
+          gcloud artifacts docker tags add \
+            "${IMAGE_BASE}:${PR_TAG}" \
+            "${IMAGE_BASE}:latest" \
+            --project="${{ env.PROJECT_ID }}"
+
+          echo "Retagged ${PR_TAG} -> ${RELEASE_TAG} and :latest"
