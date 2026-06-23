@@ -4,7 +4,7 @@ This document provides a high-level overview of the Jor-MCP system architecture,
 
 ## 1. System Context Diagram (C4 Level 1)
 
-This diagram illustrates the Jor-MCP server in its environment. It acts as an orchestrator, receiving requests from an AI Agent (Client), validating authentication via Firebase, applying rate limits via Firestore, and fetching data from WordPress and GitHub.
+This diagram illustrates the Jor-MCP system, including the interaction between the Claude Desktop client, the Python API Server (acting as an OAuth Proxy), and the Portal for user consent.
 
 ```mermaid
 %%{init: {'theme': 'dark'}}%%
@@ -15,68 +15,66 @@ graph TD
     %% Core System
     subgraph GCP Environment
         LB[Global Application Load Balancer]
-        JorMCP[Jor-MCP Server \n FastMCP / Cloud Run \n Internal Ingress Only]
-        Firestore[(Google Cloud Firestore \n NoSQL)]
+        Portal[Jor-MCP Site \n Next.js Portal]
+        JorMCP[Jor-MCP Server \n FastMCP / Cloud Run]
+        Firestore[(Google Cloud Firestore)]
     end
     
     %% External Services
-    FirebaseAuth[Firebase Auth \n Identity Provider]
-    WP[WordPress REST API \n ambiental.media]
-    GH[GitHub API \n Next.js JSONs]
+    FirebaseAuth[Firebase Auth]
+    WP[WordPress REST API]
+    GH[GitHub API]
 
     %% Relationships
-    Client -- "1. HTTP SSE + Bearer Token" --> LB
-    LB -- "2. Route to Serverless NEG" --> JorMCP
-    JorMCP -. "3. Validate JWKS" .-> FirebaseAuth
-    JorMCP -- "4. Check/Update Quota" --> Firestore
-    JorMCP -- "5. Fetch Posts/Pages" --> WP
-    JorMCP -- "6. Fetch JSON Content" --> GH
+    Client -- "1. MCP OAuth 2.1 Flow" --> LB
+    LB -- "2. Route /api/oauth/*" --> JorMCP
+    LB -- "2. Route /*" --> Portal
+    
+    Portal -- "3. Authenticate User" --> FirebaseAuth
+    Portal -- "4. Store Consent/Tier" --> Firestore
+    
+    JorMCP -- "5. DCR & Token Exchange" --> FirebaseAuth
+    JorMCP -- "6. Validate Tier/Quota" --> Firestore
+    
+    JorMCP -- "7. Fetch Content" --> WP
+    JorMCP -- "8. Fetch JSON Content" --> GH
     
     class Client,FirebaseAuth,WP,GH external;
-    class JorMCP internal;
+    class JorMCP,Portal internal;
     class LB gateway;
     class Firestore db;
 ```
 
 ## 2. Request Lifecycle (Sequence Diagram)
 
-This sequence diagram details the strict order of operations for every incoming request. It highlights the security layers (Auth and Rate Limiting) executing before the business logic (FastMCP Tools).
+This diagram details the Native MCP OAuth 2.1 flow.
 
 ```mermaid
 %%{init: {'theme': 'dark'}}%%
 sequenceDiagram
     participant C as LLM Client
-    participant Auth as Auth Middleware
-    participant RL as Rate Limit Middleware
-    participant Firestore as Google Cloud Firestore
+    participant Proxy as Jor-MCP Proxy Layer
+    participant Portal as Next.js Consent Portal
+    participant Auth as Firebase Auth
     participant MCP as FastMCP Engine
-    participant Ext as External APIs (WP/GH)
+    participant Ext as External APIs
 
-    C->>Auth: HTTP POST /mcp (Bearer Token)
+    C->>Proxy: 1. Discovery/DCR
+    Proxy-->>C: 2. Auth Discovery Metadata
     
-    Note over Auth: Firebase JWT Validation
-    alt Token Invalid/Expired
-        Auth-->>C: 401 Unauthorized
-    else Token Valid
-        Auth->>RL: Forward Request (User ID, Tier)
-    end
+    C->>Portal: 3. Browser Popup / Consent
+    Portal->>Auth: Login
+    Portal->>Proxy: 4. Auth Code
+    
+    C->>Proxy: 5. Token Exchange (PKCE)
+    Proxy->>Auth: 6. Mint Access/Refresh Tokens
+    Proxy-->>C: 7. Tokens
 
-    Note over RL: Fixed Window (Monthly) Check
-    RL->>Firestore: Get / Increment document
-    Firestore-->>RL: Current Count
-    
-    alt Quota Exceeded
-        RL-->>C: 429 Too Many Requests
-    else Quota Available
-        RL->>MCP: Execute Tool
-    end
-
-    Note over MCP: Tool Logic Execution
-    MCP->>Ext: Async HTTP Request (httpx)
-    Ext-->>MCP: Raw JSON/HTML Response
-    
-    Note over MCP: HTML Parsing & Aggregation
-    MCP-->>C: Formatted Tool Result (JSON)
+    C->>MCP: 8. MCP Tool Request (Bearer Token)
+    Note over MCP: Validate Token & Tier
+    MCP->>Ext: 9. Data Request
+    Ext-->>MCP: 10. Response
+    MCP-->>C: 11. Tool Result
 ```
 
 ## 3. Core Technologies
