@@ -114,3 +114,4 @@ Pytest is the gold standard. The approach emphasizes composition over inheritanc
 - **Performance:** When dealing with external APIs, request only the fields you need. For example, with WordPress, use `_fields=id,title,excerpt,date,link` to limit the payload size. Utilize pagination limits and handle rate limiting carefully.
 - **Tool Decorators:** Use `@mcp.tool()` to expose functions to the Model Context Protocol.
 - **Descriptions:** Every tool must have a highly detailed `description` parameter string in its decorator. Explain exactly what it does, the parameters it accepts, and when an LLM should use it. Write these descriptions in Portuguese, as the target audience/domain is Brazilian journalism.
+

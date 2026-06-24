@@ -129,9 +129,9 @@ When you are ready to submit a Pull Request, please ensure your contributions al
 
 Before any proposed change can be integrated into the `main` branch, you **must** review the `docs/` directory to ensure all relevant documentation is up-to-date with your code changes.
 
-*   **New Features/Tools:** Update the [Usage Guides](docs/3-usage/).
-*   **Architecture/Logic Changes:** Update the [Technical Documentation](docs/1-technical/).
-*   **New Environment Variables/Dependencies:** Update the [Deployment Guides](docs/2-deployment/).
+*   **New Features/Tools:** Update the [Technical Reference](docs/en/1-technical/).
+*   **Architecture/Logic Changes:** Update the [Technical Reference](docs/en/1-technical/).
+*   **New Environment Variables/Dependencies:** Update the [Replication Guides](docs/en/2-replication/).
 
 Pull Requests that introduce changes without corresponding documentation updates will be blocked from merging.
 
