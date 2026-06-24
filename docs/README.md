@@ -1,17 +1,13 @@
-# jor-mcp Documentation
+# Jor-MCP Documentation
 
-Welcome to the documentation for the `jor-mcp` (Journalism Model Context Protocol) server. Because this project serves multiple audiences—from core developers to journalists deploying their own instances, to stakeholders reviewing our research—we have structured this documentation into distinct categories.
+Welcome to the Jor-MCP documentation. Please choose your language and navigate according to your goals:
 
-Please navigate to the section that best matches your goals:
+[Read in English](en/) | [Leia em Português](pt-br/)
 
-### [1. Technical Documentation](1-technical/)
-For developers contributing to the core codebase. Includes architecture overviews, integration specifics (WordPress/GitHub), and security implementations.
+## Documentation Structure
 
-### [2. Deployment Guides](2-deployment/)
-For journalism organizations looking to fork, configure, and host their own instance of `jor-mcp`.
+- **1-technical**: Architecture, API contracts, and developer setup.
+- **2-replication**: Guides for cloning and deploying your own instance.
+- **3-history-and-specs**: Project journey, specifications, and architectural decision records.
+- **4-legal**: Licenses, terms of use, and privacy policies.
 
-### [3. Usage Guides](3-usage/)
-For users (and AI Agents) connecting to a running `jor-mcp` instance. Includes tool references and prompting best practices.
-
-### [4. Research & Learnings](4-research-and-learnings/)
-For stakeholders, funders (Codesinfo, JournalismAI, GNI), and academia. Includes the project journey, methodology, and post-launch technical and user experience reports.
