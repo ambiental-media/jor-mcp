@@ -11,8 +11,8 @@ Transition `jor-mcp` from a basic Resource Server to an OAuth 2.1 Defensive Prox
 
 ## 2. Tech Stack & Infrastructure
 - **Backend:** Python 3.12, `fastmcp`, `uvicorn`, `firebase-admin`, `google-cloud-firestore`.
-- **Frontend:** Next.js (Static Export), React, Firebase Auth JS SDK.
-- **Routing:** GCP Global Load Balancer (`/mcp/*` and `/api/oauth/*` -> Backend; `/*` -> Frontend).
+- **Frontend:** Next.js (Static Export) hosted on **Google Cloud Storage (GCS) Bucket** behind Cloud CDN, React, Firebase Auth JS SDK.
+- **Routing:** GCP Global Load Balancer (`/mcp/*` and `/api/oauth/*` -> Backend Serverless NEG; `/*` -> GCS Backend Bucket).
 
 ## 3. Commands (Python Backend)
 - **Dev:** `uv run uvicorn src.server:app --reload`

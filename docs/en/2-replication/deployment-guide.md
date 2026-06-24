@@ -7,6 +7,7 @@ This document outlines the deployment architecture for the Jor-MCP server on Goo
 The system is designed to be fully serverless, highly available, and stateless at the application layer.
 
 - **Entrypoint:** Global External Application Load Balancer (Handles custom domains, SSL, and SSE streaming).
+- **Frontend Hosting:** Google Cloud Storage (GCS) Bucket configured as a Backend Bucket on the Load Balancer, with Cloud CDN enabled.
 - **Compute:** Google Cloud Run (Containerized, auto-scaling). Locked down to "Internal and Cloud Load Balancing traffic only."
 - **Database/State:** Google Cloud Firestore (Handles distributed rate-limiting via atomic increments).
 - **Identity:** Google Cloud Identity Platform / Firebase Auth (Validates JWTs).
@@ -29,7 +30,7 @@ The server relies strictly on environment variables for configuration. No secret
 
 > **Note on Rate Limiting (Firestore):** The application relies on Google Cloud Firestore for its state. It automatically utilizes Google Application Default Credentials (ADC) bound to the Cloud Run service account. No explicit connection string or secret is required, but the service account *must* be granted the `roles/datastore.user` IAM role.
 > 
-> **Note on Routing:** Ensure your Global Load Balancer is configured to route traffic destined for `/mcp/*` and `/api/oauth/*` to the Jor-MCP backend service, and all other traffic (`/*`) to the Next.js portal service.
+> **Note on Routing:** Ensure your Global Load Balancer is configured to route traffic destined for `/mcp/*` and `/api/oauth/*` to the Serverless NEG (Cloud Run service), and all other traffic (`/*`) to the Backend Bucket (GCS).
 
 ## 3. Dockerization Strategy
 
@@ -46,6 +47,7 @@ Deployment should be automated via GitHub Actions:
 3. Builds the Docker image.
 4. Pushes the image to Google Artifact Registry.
 5. Deploys the new revision to Cloud Run using the existing service account.
+6. Uploads the static Next.js export (`out/` directory) to the GCS bucket.
 
 ## 5. Declarative Service Manifest
 

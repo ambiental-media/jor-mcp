@@ -11,8 +11,8 @@ Transição do `jor-mcp` de um Servidor de Recursos básico para um Proxy Defens
 
 ## 2. Tech Stack & Infraestrutura
 - **Backend:** Python 3.12, `fastmcp`, `uvicorn`, `firebase-admin`, `google-cloud-firestore`.
-- **Frontend:** Next.js (Exportação Estática), React, Firebase Auth JS SDK.
-- **Roteamento:** Global Load Balancer do GCP (`/mcp/*` e `/api/oauth/*` -> Backend; `/*` -> Frontend).
+- **Frontend:** Next.js (Exportação Estática) hospedado em **Google Cloud Storage (GCS) Bucket** por trás do Cloud CDN, React, Firebase Auth JS SDK.
+- **Roteamento:** Global Load Balancer do GCP (`/mcp/*` e `/api/oauth/*` -> Backend Serverless NEG; `/*` -> GCS Backend Bucket).
 
 ## 3. Comandos (Backend Python)
 - **Dev:** `uv run uvicorn src.server:app --reload`

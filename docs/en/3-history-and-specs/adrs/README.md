@@ -8,3 +8,4 @@ This directory contains records of significant architectural decisions made duri
 - [004: POC Outcomes](004-poc-outcomes.md)
 - [005: Mentorship Outcomes](005-mentorship-outcomes.md)
 - [006: OAuth 2.1 Implementation Strategy](006-oauth2-1-implementation-strategy.md)
+- [007: Frontend Hosting Strategy (GCS Bucket)](007-frontend-hosting-gcs.md)

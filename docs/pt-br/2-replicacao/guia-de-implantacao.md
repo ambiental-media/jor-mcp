@@ -7,6 +7,7 @@ Este documento descreve a arquitetura de implantação do servidor Jor-MCP no Go
 O sistema foi projetado para ser totalmente serverless, altamente disponível e stateless na camada de aplicação.
 
 - **Entrypoint:** Global External Application Load Balancer (Gerencia domínios personalizados, SSL e streaming SSE).
+- **Hospedagem Frontend:** Google Cloud Storage (GCS) Bucket configurado como Backend Bucket no Load Balancer, com Cloud CDN ativado.
 - **Compute:** Google Cloud Run (Containerizado, auto-scaling). Bloqueado para "Internal and Cloud Load Balancing traffic only."
 - **Banco de Dados/Estado:** Google Cloud Firestore (Gerencia a limitação de taxa distribuída via incrementos atômicos).
 - **Identidade:** Google Cloud Identity Platform / Firebase Auth (Valida JWTs).
@@ -29,7 +30,7 @@ O servidor depende estritamente de variáveis de ambiente para configuração. N
 
 > **Nota sobre Limitação de Taxa (Firestore):** A aplicação depende do Google Cloud Firestore para seu estado. Ele utiliza automaticamente as Google Application Default Credentials (ADC) vinculadas à conta de serviço do Cloud Run. Nenhuma string de conexão ou segredo explícito é necessário, mas a conta de serviço *deve* receber a função IAM `roles/datastore.user`.
 > 
-> **Nota sobre Roteamento:** Certifique-se de que seu Load Balancer Global esteja configurado para rotear o tráfego destinado a `/mcp/*` e `/api/oauth/*` para o serviço de backend Jor-MCP, e todo o outro tráfego (`/*`) para o serviço do portal Next.js.
+> **Nota sobre Roteamento:** Certifique-se de que seu Load Balancer Global esteja configurado para rotear o tráfego destinado a `/mcp/*` e `/api/oauth/*` para o Serverless NEG (serviço Cloud Run), e todo o outro tráfego (`/*`) para o Backend Bucket (GCS).
 
 ## 3. Estratégia de Dockerização
 
@@ -46,6 +47,7 @@ A implantação deve ser automatizada via GitHub Actions:
 3. Constrói a imagem Docker.
 4. Envia a imagem para o Google Artifact Registry.
 5. Implanta a nova revisão no Cloud Run usando a conta de serviço existente.
+6. Faz o upload da exportação estática do Next.js (diretório `out/`) para o bucket GCS.
 
 ## 5. Manifesto de Serviço Declarativo
 

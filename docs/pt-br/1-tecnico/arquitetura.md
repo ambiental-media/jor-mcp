@@ -15,7 +15,7 @@ graph TD
     %% Sistema Principal
     subgraph Ambiente GCP
         LB[Load Balancer Global]
-        Portal[Jor-MCP Site \n Portal Next.js]
+        GCSBucket[(Google Cloud Storage \n Exportação Estática)]
         JorMCP[Servidor Jor-MCP \n FastMCP / Cloud Run]
         Firestore[(Google Cloud Firestore)]
     end
@@ -29,10 +29,10 @@ graph TD
     Client -- "1. Fluxo MCP OAuth 2.1" --> LB
     LB -- "2. Rota /mcp/*" --> JorMCP
     LB -- "2. Rota /api/oauth/*" --> JorMCP
-    LB -- "2. Rota /*" --> Portal
+    LB -- "2. Rota /*" --> GCSBucket
     
-    Portal -- "3. Autentica Usuário" --> FirebaseAuth
-    Portal -- "4. Armazena Consentimento/Tier" --> Firestore
+    GCSBucket -- "3. Autentica Usuário" --> FirebaseAuth
+    GCSBucket -- "4. Armazena Consentimento/Tier" --> Firestore
     
     JorMCP -- "5. DCR & Troca de Token" --> FirebaseAuth
     JorMCP -- "6. Valida Tier/Quota" --> Firestore
@@ -41,7 +41,7 @@ graph TD
     JorMCP -- "8. Busca Conteúdo JSON" --> GH
     
     class Client,FirebaseAuth,WP,GH externo;
-    class JorMCP,Portal interno;
+    class JorMCP,GCSBucket interno;
     class LB gateway;
     class Firestore db;
 ```
@@ -80,6 +80,7 @@ sequenceDiagram
 
 ## 3. Tecnologias Principais
 
+- **Hospedagem Frontend:** `Google Cloud Storage` e `Cloud CDN` para cache global na borda (edge) dos ativos estáticos do Next.js.
 - **Framework:** `fastmcp` (Servidor ASGI impulsionado pelo `uvicorn`).
 - **Cliente HTTP:** `httpx` (Pool de conexões assíncronas).
 - **Segurança:** `firebase-admin` (validação de JWT) e `google-cloud-firestore` (limitação de taxa).
