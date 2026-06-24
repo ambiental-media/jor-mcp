@@ -6,7 +6,7 @@ Este documento descreve a arquitetura de implantação do servidor Jor-MCP no Go
 
 O sistema foi projetado para ser totalmente serverless, altamente disponível e stateless na camada de aplicação.
 
-- **Entrypoint:** Global External Application Load Balancer (Gerencia domínios personalizados, SSL e streaming SSE).
+- **Entrypoint:** Global External Application Load Balancer (Gerencia domínios personalizados, SSL e streaming SSE). [Veja o guia detalhado de configuração](configuracao-load-balancer.md).
 - **Hospedagem Frontend:** Google Cloud Storage (GCS) Bucket configurado como Backend Bucket no Load Balancer, com Cloud CDN ativado.
 - **Compute:** Google Cloud Run (Containerizado, auto-scaling). Bloqueado para "Internal and Cloud Load Balancing traffic only."
 - **Banco de Dados/Estado:** Google Cloud Firestore (Gerencia a limitação de taxa distribuída via incrementos atômicos).
