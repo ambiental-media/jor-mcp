@@ -14,7 +14,7 @@ Para conectar o Claude Desktop (ou outros agentes compatíveis com MCP) ao servi
       "args": [
         "-y",
         "@modelcontextprotocol/inspector",
-        "https://jor-mcp.ambiental.media/mcp/sse"
+        "https://jormcp.ambiental.media/mcp/sse"
       ]
     }
   }

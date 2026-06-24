@@ -1,7 +1,7 @@
 # Configuração do Load Balancer Global
 
 ## 1. Visão Geral
-O Global External Application Load Balancer atua como o único ponto de entrada para `jor-mcp.ambiental.media`. Ele tem duas funções críticas:
+O Global External Application Load Balancer atua como o único ponto de entrada para `jormcp.ambiental.media`. Ele tem duas funções críticas:
 1.  **Terminação SSL/TLS:** Gerencia o certificado SSL gerenciado pelo Google.
 2.  **Roteamento Baseado em Caminho:** Divide o tráfego entre a API Python (Cloud Run) e o Frontend Next.js (Cloud Storage).
 
@@ -26,9 +26,9 @@ O núcleo do load balancer é o Mapa de URL. Configure as regras de Host e Camin
 
 | Host | Caminho | Backend |
 | :--- | :--- | :--- |
-| `jor-mcp.ambiental.media` | `/mcp/*` | API (Serverless NEG) |
-| `jor-mcp.ambiental.media` | `/api/oauth/*` | API (Serverless NEG) |
-| `jor-mcp.ambiental.media` | `/*` (Padrão) | Frontend (Backend Bucket) |
+| `jormcp.ambiental.media` | `/mcp/*` | API (Serverless NEG) |
+| `jormcp.ambiental.media` | `/api/oauth/*` | API (Serverless NEG) |
+| `jormcp.ambiental.media` | `/*` (Padrão) | Frontend (Backend Bucket) |
 
 ## 4. Políticas de Segurança & CORS
 *   **CORS:** Certifique-se de que o Load Balancer esteja configurado para permitir que solicitações preflight `OPTIONS` cheguem ao serviço Cloud Run, para que o backend Python possa responder com os cabeçalhos `Access-Control-Allow-Origin` corretos para o endpoint `/api/oauth/approve`.

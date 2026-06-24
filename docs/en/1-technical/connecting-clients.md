@@ -14,7 +14,7 @@ To connect Claude Desktop (or other MCP-compliant agents) to the Ambiental Media
       "args": [
         "-y",
         "@modelcontextprotocol/inspector",
-        "https://jor-mcp.ambiental.media/mcp/sse"
+        "https://jormcp.ambiental.media/mcp/sse"
       ]
     }
   }
