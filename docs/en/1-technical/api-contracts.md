@@ -200,13 +200,22 @@ load balancer must route `/.well-known/*` to the backend NEG.
 **Endpoint:** `POST /api/oauth/approve`
 **Purpose:** Called by the `jor-mcp-site` (Next.js) after the user clicks "Allow". Requires CORS.
 
+**Server-side behavior:**
+*   **Authentication:** requires `Authorization: Bearer <Firebase_ID_Token>`, verified via `firebase-admin`. Missing/invalid token returns `401 invalid_token`.
+*   `client_id` and `code_challenge` are required; only `code_challenge_method = "S256"` is accepted.
+*   The `client_id` must exist in `oauth_clients`, otherwise `400 invalid_client`.
+*   `redirect_uri` is optional: when present it is loopback-normalized and must match a registered URI (else `400 invalid_request`); when absent the client's first registered URI is used.
+*   A random `authorization_code` is generated and stored in `oauth_codes` together with the `code_challenge`, `uid`, `redirect_uri` and a short expiry (`OAUTH_CODE_TTL_SECONDS`, default 600s).
+
 **Request Schema:**
 *(Requires `Authorization: Bearer <Firebase_ID_Token>` to prove user identity)*
 ```json
 {
   "client_id": "uuid-string",
   "code_challenge": "string",
-  "redirect_uri": "string"
+  "code_challenge_method": "S256",
+  "redirect_uri": "string (optional)",
+  "state": "string (optional, echoed back on the redirect)"
 }
 ```
 
@@ -214,7 +223,7 @@ load balancer must route `/.well-known/*` to the backend NEG.
 ```json
 {
   "authorization_code": "short-lived-random-string",
-  "redirect_uri": "http://127.0.0.1:54321/callback?code=..."
+  "redirect_uri": "http://localhost:54321/callback?code=...&state=..."
 }
 ```
 
