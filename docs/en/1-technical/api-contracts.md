@@ -94,6 +94,32 @@ All OAuth endpoints follow this standard error schema for non-2xx responses:
 }
 ```
 
+### CORS Policy
+All `/api/oauth/*` routes are served behind a CORS middleware so the browser-based
+consent portal (`jor-mcp-site`) can call them via AJAX. They also bypass Firebase
+authentication and rate limiting — they are the mechanism through which clients
+obtain Firebase tokens in the first place.
+
+*   **Allowed Origins:** configured via the `CORS_ALLOWED_ORIGINS` environment
+    variable (comma-separated). Defaults to `http://localhost:3000` (dev portal)
+    and `https://jor-mcp.ambiental.media` (prod portal).
+*   **Allowed Methods:** `GET`, `POST`, `OPTIONS`.
+*   **Allowed Headers:** `Authorization`, `Content-Type`.
+
+---
+
+### 4.0 Router Health
+**Endpoint:** `GET /api/oauth/health`
+**Purpose:** Liveness probe for the OAuth proxy router. Requires no authentication.
+
+**Response Schema (200 OK):**
+```json
+{
+  "status": "ok",
+  "service": "jor-mcp-oauth"
+}
+```
+
 ---
 
 ### 4.1 Dynamic Client Registration (DCR)

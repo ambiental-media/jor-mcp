@@ -10,12 +10,16 @@ from fastmcp import FastMCP
 from google.cloud.firestore_v1 import AsyncClient as FirestoreAsyncClient
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
 import src.http_client as _http_client_mod
+from src.api.oauth import OAUTH_PATH_PREFIX
+from src.api.oauth import routes as oauth_routes
 from src.config import (
+    CORS_ALLOWED_ORIGINS,
     FIRESTORE_DATABASE_ID,
     HTTP_MAX_CONNECTIONS,
     HTTP_MAX_KEEPALIVE_CONNECTIONS,
@@ -122,11 +126,18 @@ async def server_lifespan(app: Starlette) -> AsyncGenerator[None, None]:
 _starlette_app = Starlette(
     lifespan=server_lifespan,
     middleware=[
+        Middleware(
+            CORSMiddleware,
+            allow_origins=CORS_ALLOWED_ORIGINS,
+            allow_methods=["GET", "POST", "OPTIONS"],
+            allow_headers=["Authorization", "Content-Type"],
+        ),
         Middleware(AuthMiddleware),
         Middleware(RateLimitMiddleware, firestore_factory=get_firestore_client),
     ],
     routes=[
         Route("/health", health_check),
+        Mount(OAUTH_PATH_PREFIX, routes=oauth_routes),
         Mount("/", app=_mcp_http_app),
     ],
 )
@@ -135,7 +146,7 @@ _starlette_app = Starlette(
 # forbids add_middleware() after startup.  OTel's ProxyTracer mechanism ensures
 # that spans are correlated with the real TracerProvider configured later inside
 # server_lifespan.  Final middleware order (outermost first):
-#   OTel → AuthMiddleware → RateLimitMiddleware → routes
+#   OTel → CORS → AuthMiddleware → RateLimitMiddleware → routes
 instrument_asgi_app(_starlette_app)
 
 app = _starlette_app

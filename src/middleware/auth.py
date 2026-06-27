@@ -7,6 +7,8 @@ from firebase_admin import auth
 from pydantic import BaseModel, ValidationError
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from src.api.oauth import is_oauth_path
+
 logger = logging.getLogger(__name__)
 
 _HEALTH_PATH = "/health"
@@ -23,7 +25,9 @@ class DecodedToken(BaseModel):
 class AuthMiddleware:
     """ASGI middleware that validates Firebase ID tokens for all incoming requests.
 
-    Requests to /health bypass validation to allow Cloud Run health checks.
+    Requests to /health bypass validation to allow Cloud Run health checks, and
+    requests under the OAuth proxy prefix (/api/oauth) bypass it because they are
+    the mechanism through which clients obtain Firebase tokens in the first place.
     On success, injects scope["user"] = {"uid": ..., "tier": ...} for downstream
     middleware (e.g. RateLimitMiddleware) to consume.
     """
@@ -36,7 +40,8 @@ class AuthMiddleware:
             await self.app(scope, receive, send)
             return
 
-        if scope.get("path") == _HEALTH_PATH:
+        path = scope.get("path", "")
+        if path == _HEALTH_PATH or is_oauth_path(path):
             await self.app(scope, receive, send)
             return
 

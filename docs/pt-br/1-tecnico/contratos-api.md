@@ -94,6 +94,32 @@ Todos os endpoints OAuth seguem este esquema de erro padrão para respostas não
 }
 ```
 
+### Política de CORS
+Todas as rotas `/api/oauth/*` são servidas atrás de um middleware de CORS para que
+o portal de consentimento no navegador (`jor-mcp-site`) possa chamá-las via AJAX.
+Elas também ignoram a autenticação Firebase e o rate limiting — são o mecanismo
+pelo qual os clientes obtêm os tokens Firebase em primeiro lugar.
+
+*   **Origens Permitidas:** configuradas pela variável de ambiente
+    `CORS_ALLOWED_ORIGINS` (separadas por vírgula). Padrão: `http://localhost:3000`
+    (portal de dev) e `https://jor-mcp.ambiental.media` (portal de prod).
+*   **Métodos Permitidos:** `GET`, `POST`, `OPTIONS`.
+*   **Cabeçalhos Permitidos:** `Authorization`, `Content-Type`.
+
+---
+
+### 4.0 Saúde do Roteador
+**Endpoint:** `GET /api/oauth/health`
+**Objetivo:** Sonda de liveness do roteador do proxy OAuth. Não requer autenticação.
+
+**Esquema de Resposta (200 OK):**
+```json
+{
+  "status": "ok",
+  "service": "jor-mcp-oauth"
+}
+```
+
 ---
 
 ### 4.1 Registro Dinâmico de Cliente (DCR)
