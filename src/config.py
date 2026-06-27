@@ -31,7 +31,7 @@ CORS_ALLOWED_ORIGINS: list[str] = [
     origin.strip()
     for origin in os.environ.get(
         "CORS_ALLOWED_ORIGINS",
-        "http://localhost:3000,https://jor-mcp.ambiental.media",
+        "http://localhost:3000,https://jormcp.ambiental.media",
     ).split(",")
     if origin.strip()
 ]
@@ -39,8 +39,33 @@ CORS_ALLOWED_ORIGINS: list[str] = [
 
 Comma-separated list provided through the ``CORS_ALLOWED_ORIGINS`` environment
 variable. Defaults to the local Next.js dev portal (``http://localhost:3000``)
-and the production consent portal (``https://jor-mcp.ambiental.media``).
+and the production consent portal (``https://jormcp.ambiental.media``).
 """
+
+# ---------------------------------------------------------------------------
+# OAuth 2.1 Proxy
+# ---------------------------------------------------------------------------
+
+OAUTH_SERVER_BASE_URL: str = os.environ.get(
+    "OAUTH_SERVER_BASE_URL", "https://jormcp.ambiental.media"
+).rstrip("/")
+"""Public base URL of this backend (OAuth issuer / resource server).
+
+Used to build the absolute token and registration endpoint URLs advertised in
+the discovery metadata. Override in dev (e.g. ``http://localhost:8080``).
+"""
+
+OAUTH_PORTAL_BASE_URL: str = os.environ.get(
+    "OAUTH_PORTAL_BASE_URL", "https://jormcp.ambiental.media"
+).rstrip("/")
+"""Public base URL of the Next.js consent portal (``jor-mcp-site``).
+
+Used to build the ``authorization_endpoint`` advertised in the discovery
+metadata. Override in dev (e.g. ``http://localhost:3000``).
+"""
+
+OAUTH_CLIENTS_COLLECTION: str = os.environ.get("OAUTH_CLIENTS_COLLECTION", "oauth_clients")
+"""Firestore collection storing dynamically registered OAuth clients (DCR)."""
 
 # ---------------------------------------------------------------------------
 # HTTP Client

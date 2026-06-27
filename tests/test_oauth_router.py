@@ -1,13 +1,26 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 from starlette.testclient import TestClient
 
 DEV_ORIGIN = "http://localhost:3000"
-PROD_ORIGIN = "https://jor-mcp.ambiental.media"
+PROD_ORIGIN = "https://jormcp.ambiental.media"
 
 
 def _client() -> TestClient:
     from src.server import app
 
     return TestClient(app, raise_server_exceptions=False)
+
+
+def _fake_firestore() -> tuple[MagicMock, MagicMock]:
+    """Return (db, doc_ref) where db.collection(...).document(...).set is awaitable."""
+    doc_ref = MagicMock()
+    doc_ref.set = AsyncMock()
+    collection = MagicMock()
+    collection.document.return_value = doc_ref
+    db = MagicMock()
+    db.collection.return_value = collection
+    return db, doc_ref
 
 
 # ---------------------------------------------------------------------------
@@ -70,3 +83,92 @@ def test_simple_request_includes_cors_header() -> None:
     resp = _client().get("/api/oauth/health", headers={"Origin": DEV_ORIGIN})
     assert resp.status_code == 200
     assert resp.headers["access-control-allow-origin"] == DEV_ORIGIN
+
+
+# ---------------------------------------------------------------------------
+# Discovery metadata (Task 2, acceptance criterion 1)
+# ---------------------------------------------------------------------------
+
+
+def test_authorization_server_metadata_returns_server_and_portal_urls() -> None:
+    resp = _client().get("/.well-known/oauth-authorization-server")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["issuer"]
+    assert data["authorization_endpoint"].endswith("/authorize")
+    assert data["token_endpoint"].endswith("/api/oauth/token")
+    assert data["registration_endpoint"].endswith("/api/oauth/register")
+    assert data["code_challenge_methods_supported"] == ["S256"]
+    assert data["token_endpoint_auth_methods_supported"] == ["none"]
+
+
+def test_protected_resource_metadata_points_at_auth_server() -> None:
+    resp = _client().get("/.well-known/oauth-protected-resource")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["resource"]
+    assert isinstance(data["authorization_servers"], list)
+    assert data["authorization_servers"]
+
+
+# ---------------------------------------------------------------------------
+# Dynamic Client Registration (Task 2, acceptance criteria 2 & 3)
+# ---------------------------------------------------------------------------
+
+
+@patch("src.server.get_firestore_client")
+def test_register_forces_public_client_and_normalizes_loopback(
+    mock_get_db: MagicMock,
+) -> None:
+    db, doc_ref = _fake_firestore()
+    mock_get_db.return_value = db
+
+    resp = _client().post(
+        "/api/oauth/register",
+        json={
+            "client_name": "Claude Desktop",
+            "redirect_uris": [
+                "http://127.0.0.1:54321/callback",
+                "https://example.com/cb",
+            ],
+            "token_endpoint_auth_method": "client_secret_basic",
+        },
+    )
+
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["token_endpoint_auth_method"] == "none"
+    assert data["redirect_uris"] == [
+        "http://localhost:54321/callback",
+        "https://example.com/cb",
+    ]
+    assert data["client_id"]
+
+    db.collection.assert_called_once_with("oauth_clients")
+    db.collection.return_value.document.assert_called_once_with(data["client_id"])
+    doc_ref.set.assert_awaited_once()
+    saved = doc_ref.set.call_args.args[0]
+    assert saved["client_id"] == data["client_id"]
+    assert saved["token_endpoint_auth_method"] == "none"
+    assert saved["redirect_uris"] == [
+        "http://localhost:54321/callback",
+        "https://example.com/cb",
+    ]
+
+
+@patch("src.server.get_firestore_client")
+def test_register_rejects_missing_redirect_uris(mock_get_db: MagicMock) -> None:
+    resp = _client().post("/api/oauth/register", json={"client_name": "X"})
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_client_metadata"
+    mock_get_db.assert_not_called()
+
+
+def test_register_rejects_non_json_body() -> None:
+    resp = _client().post(
+        "/api/oauth/register",
+        content="not-json",
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_request"

@@ -102,9 +102,18 @@ pelo qual os clientes obtêm os tokens Firebase em primeiro lugar.
 
 *   **Origens Permitidas:** configuradas pela variável de ambiente
     `CORS_ALLOWED_ORIGINS` (separadas por vírgula). Padrão: `http://localhost:3000`
-    (portal de dev) e `https://jor-mcp.ambiental.media` (portal de prod).
+    (portal de dev) e `https://jormcp.ambiental.media` (portal de prod).
 *   **Métodos Permitidos:** `GET`, `POST`, `OPTIONS`.
 *   **Cabeçalhos Permitidos:** `Authorization`, `Content-Type`.
+
+### URLs Base
+As URLs absolutas anunciadas pelos metadados de discovery são montadas a partir de
+duas variáveis de ambiente (para que dev e prod possam divergir):
+
+*   `OAUTH_SERVER_BASE_URL` — este backend / issuer (endpoints de token e registro).
+    Padrão `https://jormcp.ambiental.media`.
+*   `OAUTH_PORTAL_BASE_URL` — o portal de consentimento Next.js (`authorization_endpoint`).
+    Padrão `https://jormcp.ambiental.media`.
 
 ---
 
@@ -122,9 +131,49 @@ pelo qual os clientes obtêm os tokens Firebase em primeiro lugar.
 
 ---
 
+### 4.0.1 Metadados de Discovery
+**Endpoints:**
+*   `GET /.well-known/oauth-authorization-server` (RFC 8414)
+*   `GET /.well-known/oauth-protected-resource` (RFC 9728)
+
+**Objetivo:** Permitir que clientes MCP (ex: Claude Desktop) descubram onde se
+registrar e autenticar. Não requer autenticação. Servidos pelo backend Python,
+então o load balancer deve rotear `/.well-known/*` para o NEG do backend.
+
+**Resposta de `oauth-authorization-server` (200 OK):**
+```json
+{
+  "issuer": "https://jormcp.ambiental.media",
+  "authorization_endpoint": "https://jormcp.ambiental.media/authorize",
+  "token_endpoint": "https://jormcp.ambiental.media/api/oauth/token",
+  "registration_endpoint": "https://jormcp.ambiental.media/api/oauth/register",
+  "response_types_supported": ["code"],
+  "grant_types_supported": ["authorization_code", "refresh_token"],
+  "code_challenge_methods_supported": ["S256"],
+  "token_endpoint_auth_methods_supported": ["none"]
+}
+```
+
+**Resposta de `oauth-protected-resource` (200 OK):**
+```json
+{
+  "resource": "https://jormcp.ambiental.media/mcp",
+  "authorization_servers": ["https://jormcp.ambiental.media"]
+}
+```
+
+---
+
 ### 4.1 Registro Dinâmico de Cliente (DCR)
 **Endpoint:** `POST /api/oauth/register`
 **Objetivo:** Chamado pelo Claude Desktop para registrar-se e obter um `client_id`.
+
+**Comportamento no servidor:**
+*   `redirect_uris` é obrigatório (não-vazio); campos de metadados desconhecidos são ignorados.
+*   **Forçar cliente público:** `token_endpoint_auth_method` é sempre sobrescrito para `"none"`.
+*   **Normalização de loopback:** qualquer host `127.0.0.1` em `redirect_uris` é reescrito para `localhost`.
+*   Um `client_id` (UUID) é gerado e o cliente é persistido na coleção `oauth_clients` do Firestore.
+*   JSON inválido retorna `400 invalid_request`; metadados inválidos retornam `400 invalid_client_metadata`.
 
 **Esquema de Solicitação:**
 ```json
