@@ -102,7 +102,7 @@ pelo qual os clientes obtêm os tokens Firebase em primeiro lugar.
 
 *   **Origens Permitidas:** configuradas pela variável de ambiente
     `CORS_ALLOWED_ORIGINS` (separadas por vírgula). Padrão: `http://localhost:3000`
-    (portal de dev) e `https://jor-mcp.ambiental.media` (portal de prod).
+    (portal de dev) e `https://jormcp.ambiental.media` (portal de prod).
 *   **Métodos Permitidos:** `GET`, `POST`, `OPTIONS`.
 *   **Cabeçalhos Permitidos:** `Authorization`, `Content-Type`.
 

@@ -1,7 +1,7 @@
 from starlette.testclient import TestClient
 
 DEV_ORIGIN = "http://localhost:3000"
-PROD_ORIGIN = "https://jor-mcp.ambiental.media"
+PROD_ORIGIN = "https://jormcp.ambiental.media"
 
 
 def _client() -> TestClient:

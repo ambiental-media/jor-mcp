@@ -102,7 +102,7 @@ obtain Firebase tokens in the first place.
 
 *   **Allowed Origins:** configured via the `CORS_ALLOWED_ORIGINS` environment
     variable (comma-separated). Defaults to `http://localhost:3000` (dev portal)
-    and `https://jor-mcp.ambiental.media` (prod portal).
+    and `https://jormcp.ambiental.media` (prod portal).
 *   **Allowed Methods:** `GET`, `POST`, `OPTIONS`.
 *   **Allowed Headers:** `Authorization`, `Content-Type`.
 

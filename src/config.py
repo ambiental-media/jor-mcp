@@ -31,7 +31,7 @@ CORS_ALLOWED_ORIGINS: list[str] = [
     origin.strip()
     for origin in os.environ.get(
         "CORS_ALLOWED_ORIGINS",
-        "http://localhost:3000,https://jor-mcp.ambiental.media",
+        "http://localhost:3000,https://jormcp.ambiental.media",
     ).split(",")
     if origin.strip()
 ]
@@ -39,7 +39,7 @@ CORS_ALLOWED_ORIGINS: list[str] = [
 
 Comma-separated list provided through the ``CORS_ALLOWED_ORIGINS`` environment
 variable. Defaults to the local Next.js dev portal (``http://localhost:3000``)
-and the production consent portal (``https://jor-mcp.ambiental.media``).
+and the production consent portal (``https://jormcp.ambiental.media``).
 """
 
 # ---------------------------------------------------------------------------
