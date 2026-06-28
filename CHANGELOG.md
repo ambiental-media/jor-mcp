@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.3.0 (2026-06-28)
+
+### Documentation
+
+- Align CI/CD docs with implemented release pipeline
+  ([`2d2df95`](https://github.com/ambiental-media/jor-mcp/commit/2d2df9548c65e8b2565f9056fdfb02b1612ebac7))
+
+### Features
+
+- Add conventional commits check to CI
+  ([`7806caa`](https://github.com/ambiental-media/jor-mcp/commit/7806caa2379c02b23ca4e80dcf6d5b1451859ea2))
+
+
 ## v0.2.1 (2026-06-28)
 
 ### Bug Fixes
