@@ -73,6 +73,21 @@ OAUTH_CODES_COLLECTION: str = os.environ.get("OAUTH_CODES_COLLECTION", "oauth_co
 OAUTH_CODE_TTL_SECONDS: int = int(os.environ.get("OAUTH_CODE_TTL_SECONDS", "600"))
 """Lifetime of an issued authorization code before it is considered expired."""
 
+FIREBASE_WEB_API_KEY: str = os.environ.get("FIREBASE_WEB_API_KEY", "")
+"""Firebase Web API key used by the token endpoint to exchange a custom token for
+real ID/refresh tokens via the Google Identity Toolkit REST API. Same value as
+the portal's ``NEXT_PUBLIC_FIREBASE_API_KEY``."""
+
+IDENTITY_TOOLKIT_BASE_URL: str = os.environ.get(
+    "IDENTITY_TOOLKIT_BASE_URL", "https://identitytoolkit.googleapis.com/v1"
+).rstrip("/")
+"""Base URL for the Google Identity Toolkit REST API (override for the emulator)."""
+
+SECURE_TOKEN_BASE_URL: str = os.environ.get(
+    "SECURE_TOKEN_BASE_URL", "https://securetoken.googleapis.com/v1"
+).rstrip("/")
+"""Base URL for the Google Secure Token REST API used by the refresh_token grant."""
+
 # ---------------------------------------------------------------------------
 # HTTP Client
 # ---------------------------------------------------------------------------

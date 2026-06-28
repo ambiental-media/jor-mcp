@@ -8,10 +8,17 @@ from pydantic import BaseModel, ValidationError
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from src.api.oauth import is_oauth_path
+from src.config import OAUTH_SERVER_BASE_URL
 
 logger = logging.getLogger(__name__)
 
 _HEALTH_PATH = "/health"
+
+# RFC 9728 §5.1: a 401 from the resource server must advertise where the protected
+# resource metadata lives, so MCP clients can discover the authorization server and
+# start the OAuth flow (this is what makes Claude Desktop open the login browser).
+_RESOURCE_METADATA_URL = f"{OAUTH_SERVER_BASE_URL}/.well-known/oauth-protected-resource"
+_WWW_AUTHENTICATE = f'Bearer resource_metadata="{_RESOURCE_METADATA_URL}"'
 
 
 class DecodedToken(BaseModel):
@@ -81,7 +88,10 @@ async def _send_unauthorized(send: Send) -> None:
         {
             "type": "http.response.start",
             "status": 401,
-            "headers": [(b"content-type", b"application/json")],
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"www-authenticate", _WWW_AUTHENTICATE.encode("ascii")),
+            ],
         }
     )
     await send(
