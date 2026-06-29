@@ -36,6 +36,9 @@ dev = [
     "ruff==0.15.5",
 ]
 
+[tool.uv]
+constraint-dependencies = ["joserfc>=1.6.7"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
