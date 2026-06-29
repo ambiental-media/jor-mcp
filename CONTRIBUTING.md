@@ -57,7 +57,7 @@ All information targeted to users and developers must be in English. This explic
 
 *(Note: The only exception is the `description` parameter inside `@mcp.tool()` decorators, which currently target Brazilian LLM contexts, as noted in the Docstrings section below).*
 
-This project uses modern Python (>= 3.12) and relies heavily on asynchronous programming. To understand the high-level system design and integration specifics before contributing, please review our **[Technical Documentation](docs/1-technical/)**.
+This project uses modern Python (>= 3.12) and relies heavily on asynchronous programming. To understand the high-level system design and integration specifics before contributing, please review our **[Technical Documentation](docs/en/1-technical/)**.
 
 To maintain high code quality and consistency, we strictly enforce the following standards. Please ensure your code adheres to these before submitting a Pull Request.
 
@@ -174,18 +174,34 @@ Runs all code quality and security validations. This job mirrors the local `make
 | Format check | `ruff format --check .` | Reports issues, never auto-fixes |
 | Type check | `mypy .` | Fails the job on any type error |
 | Tests & Coverage | `pytest --cov=src --cov-fail-under=90` | Fails if coverage drops below 90% |
-| SAST | `bandit -c pyproject.toml -r src/` | Fails on critical severity findings |
+| SAST | `bandit -c pyproject.toml -r src/` | Fails on medium or higher severity findings |
 | Dependency audit | `pip-audit` | Fails on known vulnerabilities |
 
 ### Job: `build-and-push`
 
-Only runs if the `check` job completes successfully. Builds the Docker image, scans it for critical vulnerabilities with Trivy, and pushes it to the Artifact Registry with the tag `:test`.
+Only runs if the `check` job completes successfully. Builds the Docker image, scans it for vulnerabilities with Trivy, and pushes it to the Artifact Registry tagged `:pr-<PR_NUMBER>` (e.g. `:pr-44`). This per-PR tag is what the release pipeline later promotes to a versioned tag (see [Release & Versioning](#release--versioning)).
 
 | Step | Detail |
 |---|---|
 | Build | Docker image built from the project `Dockerfile` |
-| Security scan | Trivy scans the image — fails if `CRITICAL` vulnerabilities are found |
-| Push | Image pushed to Artifact Registry with tag `:test` |
+| Security scan | Trivy scans the image — fails if `CRITICAL` or `HIGH` library vulnerabilities are found |
+| Push | Image pushed to Artifact Registry with tag `:pr-<PR_NUMBER>` |
+
+### Job: `commitlint`
+
+Runs in parallel with the other jobs on every Pull Request. It checks that **at least one commit** in the PR range follows the Conventional Commits format. If no commit matches, the job fails and the PR is blocked.
+
+This is the gate that makes automated versioning possible: the release pipeline (below) reads these conventional commits to decide the next version number. See the [Conventional Commits](#conventional-commits) section for the rules.
+
+### Release & Versioning
+
+Versioning is fully automated and lives in a separate workflow, `.github/workflows/release.yml`, which runs **when a Pull Request is merged into `main`** (not on every push). It uses [`python-semantic-release`](https://python-semantic-release.readthedocs.io/) to:
+
+1. Parse the Conventional Commits in the merged PR and compute the next SemVer version (`fix` → PATCH, `feat` → MINOR, `BREAKING CHANGE` → MAJOR).
+2. Bump the `version` in `pyproject.toml`, push the `vX.Y.Z` git tag, and publish a GitHub Release with auto-generated notes.
+3. Promote the image: the `:pr-<N>` image built during CI is retagged in Artifact Registry to `:vX.Y.Z` and `:latest` — no rebuild, the same digest is promoted.
+
+Deployment itself is **manual**: the `.github/workflows/cd.yml` workflow is triggered on demand (`workflow_dispatch`) with the image tag you want to roll out to Cloud Run. Merging a PR produces a versioned image but does **not** deploy it.
 
 ### Required GitHub Secrets
 
@@ -238,7 +254,11 @@ Trivy is the only security tool that requires a separate local installation (Ban
 
 ### Severity Policy
 
-The CI pipeline is configured to **fail only on `CRITICAL` severity findings** for both Bandit and Trivy. This is intentional — lower severity findings are reported in the logs for awareness but do not block the pipeline. This threshold can be adjusted in `pyproject.toml` (`[tool.bandit]`) and in the `ci.yml` workflow file.
+The CI pipeline fails the build on:
+- **Trivy:** `CRITICAL` and `HIGH` library vulnerabilities (`--severity CRITICAL,HIGH`).
+- **Bandit:** `MEDIUM` and `HIGH` severity findings. Bandit's severity scale is `LOW`/`MEDIUM`/`HIGH` (there is no "critical" level), and the `-ll` flag in `ci.yml` sets the threshold to medium-and-above.
+
+Findings below these thresholds are reported in the logs for awareness but do not block the pipeline. These thresholds can be adjusted in the `ci.yml` workflow file and in `pyproject.toml` (`[tool.bandit]`).
 
 ---
 
