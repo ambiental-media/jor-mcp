@@ -4,7 +4,7 @@ This document outlines the high-level goals and upcoming features for the Jor-MC
 
 ## Currently Under Development 🏗️
 *   **Native MCP OAuth 2.1 Integration:** Transitioning from static API keys to a fully interactive OAuth flow using PKCE for zero-configuration Claude Desktop connections.
-*   **Next.js Portal Development:** Building the `jor-mcp-site` to handle user consent, authentication, and the B2B admin dashboard.
+*   **Next.js Portal Development:** Building the `jor-mcp-site` to handle user consent and authentication via Google SSO.
 *   **Legal Framework:** Establish the legal foundation for the project, including defining the Open Source License, drafting Terms of Use for the public instance, and creating the Privacy Policy for user data handling.
 
 ## Next Up (Near Term) ⏳
