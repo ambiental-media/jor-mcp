@@ -7,12 +7,13 @@ Transition `jor-mcp` from a basic Resource Server to an OAuth 2.1 Defensive Prox
 - [ ] Claude Desktop completes the 4-phase PKCE flow natively without user configuration files.
 - [ ] Python proxy correctly normalizes `localhost` / `127.0.0.1` DCR mismatches.
 - [ ] Python proxy correctly mints short-lived Access Tokens and long-lived Refresh Tokens via the Firebase Admin SDK.
-- [ ] The static Next.js frontend successfully triggers the `/api/oauth/approve` backend endpoint via CORS.
+- [ ] The static Next.js frontend successfully triggers the `/api/oauth/approve` backend endpoint via CORS after validating the user against a Firestore whitelist.
 
 ## 2. Tech Stack & Infrastructure
 - **Backend:** Python 3.12, `fastmcp`, `uvicorn`, `firebase-admin`, `google-cloud-firestore`.
-- **Frontend:** Next.js (Static Export) hosted on **Google Cloud Storage (GCS) Bucket** behind Cloud CDN, React, Firebase Auth JS SDK.
+- **Frontend:** Next.js (Static Export) hosted on **Google Cloud Storage (GCS) Bucket** behind Cloud CDN, React, Firebase Auth JS SDK (Google SSO only).
 - **Routing:** GCP Global Load Balancer (`/mcp/*` and `/api/oauth/*` -> Backend Serverless NEG; `/*` -> GCS Backend Bucket).
+- **Identity:** Strict B2B Whitelist. Public sign-ups disabled. Administrators provision users manually via the Firebase Console.
 
 ## 3. Commands (Python Backend)
 - **Dev:** `uv run uvicorn src.server:app --reload`
@@ -37,7 +38,7 @@ Transition `jor-mcp` from a basic Resource Server to an OAuth 2.1 Defensive Prox
 - Use `TestClient` for HTTP endpoint verification.
 
 ## 7. Boundaries
-- **Always do:** Validate all incoming OAuth payloads using Pydantic. Normalize redirect URIs to `localhost`.
+- **Always do:** Validate all incoming OAuth payloads using Pydantic. Normalize redirect URIs to `localhost`. Enforce the Firestore whitelist check on both frontend (`/authorize`) and backend (`/api/oauth/approve`).
 - **Ask first:** Before adding new external dependencies to `pyproject.toml`. Before altering Firestore collection schemas.
 - **Never do:** Never return raw HTML from Python; UI remains in the Next.js portal. Never log raw Auth codes or Access Tokens.
 
