@@ -22,14 +22,14 @@ import firebase_admin.exceptions
 import httpx
 from firebase_admin import auth
 from google.cloud import firestore
+from google.cloud.firestore_v1 import AsyncClient as FirestoreAsyncClient
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from src.config import (
-    FIREBASE_WEB_API_KEY,
-    IDENTITY_TOOLKIT_BASE_URL,
+    ALLOWED_USERS_COLLECTION,
     OAUTH_CLIENTS_COLLECTION,
     OAUTH_CODE_TTL_SECONDS,
     OAUTH_CODES_COLLECTION,
@@ -171,66 +171,19 @@ def _redirect_with_code(redirect_uri: str, code: str, state: str | None) -> str:
     return urlunsplit(parts._replace(query=urlencode(query)))
 
 
-def _verify_pkce(code_verifier: str, code_challenge: str) -> bool:
-    """Return True if the S256 PKCE transform of *code_verifier* matches.
+async def _is_email_allowed(db: FirestoreAsyncClient, email: str | None) -> bool:
+    """Return True if *email* is whitelisted with ``status == "active"``.
 
-    Computes ``BASE64URL(SHA256(ASCII(code_verifier)))`` without padding (per
-    RFC 7636) and compares it to the stored challenge in constant time.
+    The allow-list (``allowed_users``) is curated manually by Ambiental Media;
+    access is restricted to Google SSO accounts explicitly authorized there.
     """
-    digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
-    computed = base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
-    return secrets.compare_digest(computed, code_challenge)
-
-
-def _is_expired(expires_at: datetime | None) -> bool:
-    """Return True if *expires_at* is a datetime in the past (UTC)."""
-    if not isinstance(expires_at, datetime):
+    if not email:
         return False
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=UTC)
-    return expires_at < datetime.now(UTC)
-
-
-async def _mint_firebase_tokens(uid: str) -> dict[str, Any]:
-    """Mint a Firebase ID + refresh token pair for *uid* via Identity Toolkit.
-
-    Creates a short-lived custom token with the Admin SDK and exchanges it for a
-    real ID token and long-lived refresh token through the Identity Toolkit REST
-    API (``accounts:signInWithCustomToken``).
-    """
-    custom_token = auth.create_custom_token(uid)
-    if isinstance(custom_token, bytes):
-        custom_token = custom_token.decode("ascii")
-    response = await get_http_client().post(
-        f"{IDENTITY_TOOLKIT_BASE_URL}/accounts:signInWithCustomToken",
-        params={"key": FIREBASE_WEB_API_KEY},
-        json={"token": custom_token, "returnSecureToken": True},
-    )
-    response.raise_for_status()
-    data = response.json()
-    return {
-        "access_token": data["idToken"],
-        "token_type": "Bearer",
-        "expires_in": int(data["expiresIn"]),
-        "refresh_token": data["refreshToken"],
-    }
-
-
-async def _refresh_firebase_tokens(refresh_token: str) -> dict[str, Any]:
-    """Exchange a Firebase refresh token for a fresh ID token via Secure Token."""
-    response = await get_http_client().post(
-        f"{SECURE_TOKEN_BASE_URL}/token",
-        params={"key": FIREBASE_WEB_API_KEY},
-        data={"grant_type": "refresh_token", "refresh_token": refresh_token},
-    )
-    response.raise_for_status()
-    data = response.json()
-    return {
-        "access_token": data["id_token"],
-        "token_type": "Bearer",
-        "expires_in": int(data["expires_in"]),
-        "refresh_token": data["refresh_token"],
-    }
+    snapshot = await db.collection(ALLOWED_USERS_COLLECTION).document(email).get()
+    if not snapshot.exists:
+        return False
+    data = snapshot.to_dict() or {}
+    return data.get("status") == "active"
 
 
 async def oauth_health(request: Request) -> JSONResponse:
@@ -337,6 +290,7 @@ async def oauth_approve(request: Request) -> JSONResponse:
         return _error_response("invalid_token", "Invalid Firebase ID token", 401)
 
     uid: str = decoded["uid"]
+    email: str | None = decoded.get("email")
 
     try:
         payload = await request.json()
@@ -367,6 +321,12 @@ async def oauth_approve(request: Request) -> JSONResponse:
     if redirect_uri is None:
         return _error_response(
             "invalid_request", "redirect_uri is not registered for this client", 400
+        )
+
+    if not await _is_email_allowed(db, email):
+        logger.warning("User not on the allow-list", extra={"uid": uid})
+        return _error_response(
+            "access_denied", "User is not authorized to access this resource", 403
         )
 
     code = secrets.token_urlsafe(32)

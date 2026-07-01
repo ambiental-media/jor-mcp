@@ -205,6 +205,7 @@ load balancer must route `/.well-known/*` to the backend NEG.
 *   `client_id` and `code_challenge` are required; only `code_challenge_method = "S256"` is accepted.
 *   The `client_id` must exist in `oauth_clients`, otherwise `400 invalid_client`.
 *   `redirect_uri` is optional: when present it is loopback-normalized and must match a registered URI (else `400 invalid_request`); when absent the client's first registered URI is used.
+*   **Allow-list:** the user's email (from the JWT) must exist in the `allowed_users` collection with `status == "active"`. A valid token whose email is missing/not whitelisted/not active returns `403 access_denied`. The list is curated manually by Ambiental Media (e.g. Firebase console); access is Google-SSO only.
 *   A random `authorization_code` is generated and stored in `oauth_codes` together with the `code_challenge`, `uid`, `redirect_uri` and a short expiry (`OAUTH_CODE_TTL_SECONDS`, default 600s).
 
 **Request Schema:**
