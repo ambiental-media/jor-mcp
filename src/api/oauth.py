@@ -19,12 +19,14 @@ from urllib.parse import SplitResult, parse_qsl, urlencode, urlsplit, urlunsplit
 import firebase_admin.exceptions
 from firebase_admin import auth
 from google.cloud import firestore
+from google.cloud.firestore_v1 import AsyncClient as FirestoreAsyncClient
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from src.config import (
+    ALLOWED_USERS_COLLECTION,
     OAUTH_CLIENTS_COLLECTION,
     OAUTH_CODE_TTL_SECONDS,
     OAUTH_CODES_COLLECTION,
@@ -151,6 +153,21 @@ def _redirect_with_code(redirect_uri: str, code: str, state: str | None) -> str:
     return urlunsplit(parts._replace(query=urlencode(query)))
 
 
+async def _is_email_allowed(db: FirestoreAsyncClient, email: str | None) -> bool:
+    """Return True if *email* is whitelisted with ``status == "active"``.
+
+    The allow-list (``allowed_users``) is curated manually by Ambiental Media;
+    access is restricted to Google SSO accounts explicitly authorized there.
+    """
+    if not email:
+        return False
+    snapshot = await db.collection(ALLOWED_USERS_COLLECTION).document(email).get()
+    if not snapshot.exists:
+        return False
+    data = snapshot.to_dict() or {}
+    return data.get("status") == "active"
+
+
 async def oauth_health(request: Request) -> JSONResponse:
     """Liveness probe for the OAuth proxy router."""
     return JSONResponse({"status": "ok", "service": "jor-mcp-oauth"})
@@ -255,6 +272,7 @@ async def oauth_approve(request: Request) -> JSONResponse:
         return _error_response("invalid_token", "Invalid Firebase ID token", 401)
 
     uid: str = decoded["uid"]
+    email: str | None = decoded.get("email")
 
     try:
         payload = await request.json()
@@ -285,6 +303,12 @@ async def oauth_approve(request: Request) -> JSONResponse:
     if redirect_uri is None:
         return _error_response(
             "invalid_request", "redirect_uri is not registered for this client", 400
+        )
+
+    if not await _is_email_allowed(db, email):
+        logger.warning("User not on the allow-list", extra={"uid": uid})
+        return _error_response(
+            "access_denied", "User is not authorized to access this resource", 403
         )
 
     code = secrets.token_urlsafe(32)

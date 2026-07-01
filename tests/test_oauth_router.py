@@ -24,9 +24,13 @@ def _fake_firestore() -> tuple[MagicMock, MagicMock]:
 
 
 def _fake_firestore_for_approve(
-    redirect_uris: list[str], *, client_exists: bool = True
+    redirect_uris: list[str],
+    *,
+    client_exists: bool = True,
+    user_allowed: bool = True,
+    user_status: str = "active",
 ) -> tuple[MagicMock, MagicMock]:
-    """Return (db, codes_doc) wiring the oauth_clients lookup and oauth_codes write."""
+    """Return (db, codes_doc) wiring the client, allow-list and oauth_codes access."""
     snapshot = MagicMock()
     snapshot.exists = client_exists
     snapshot.get.return_value = redirect_uris
@@ -35,15 +39,26 @@ def _fake_firestore_for_approve(
     clients_collection = MagicMock()
     clients_collection.document.return_value = clients_doc
 
+    allowed_snapshot = MagicMock()
+    allowed_snapshot.exists = user_allowed
+    allowed_snapshot.to_dict.return_value = {"status": user_status}
+    allowed_doc = MagicMock()
+    allowed_doc.get = AsyncMock(return_value=allowed_snapshot)
+    allowed_collection = MagicMock()
+    allowed_collection.document.return_value = allowed_doc
+
     codes_doc = MagicMock()
     codes_doc.set = AsyncMock()
     codes_collection = MagicMock()
     codes_collection.document.return_value = codes_doc
 
+    collections = {
+        "oauth_clients": clients_collection,
+        "allowed_users": allowed_collection,
+        "oauth_codes": codes_collection,
+    }
     db = MagicMock()
-    db.collection.side_effect = lambda name: (
-        clients_collection if name == "oauth_clients" else codes_collection
-    )
+    db.collection.side_effect = lambda name: collections[name]
     return db, codes_doc
 
 
@@ -304,7 +319,10 @@ def test_approve_unregistered_redirect_returns_400(
 
 
 @patch("src.server.get_firestore_client")
-@patch("src.api.oauth.auth.verify_id_token", return_value={"uid": "user-123"})
+@patch(
+    "src.api.oauth.auth.verify_id_token",
+    return_value={"uid": "user-123", "email": "user@ambiental.media"},
+)
 def test_approve_issues_code_and_persists_pkce_state(
     _mock_verify: MagicMock, mock_get_db: MagicMock
 ) -> None:
@@ -341,7 +359,10 @@ def test_approve_issues_code_and_persists_pkce_state(
 
 
 @patch("src.server.get_firestore_client")
-@patch("src.api.oauth.auth.verify_id_token", return_value={"uid": "u"})
+@patch(
+    "src.api.oauth.auth.verify_id_token",
+    return_value={"uid": "u", "email": "user@ambiental.media"},
+)
 def test_approve_falls_back_to_registered_redirect(
     _mock_verify: MagicMock, mock_get_db: MagicMock
 ) -> None:
@@ -354,3 +375,76 @@ def test_approve_falls_back_to_registered_redirect(
     )
     assert resp.status_code == 200
     assert resp.json()["redirect_uri"].startswith("http://localhost:9000/cb?code=")
+
+
+# ---------------------------------------------------------------------------
+# Consent allow-list (Task 3, updated: 403 for non-whitelisted users)
+# ---------------------------------------------------------------------------
+
+
+@patch("src.server.get_firestore_client")
+@patch(
+    "src.api.oauth.auth.verify_id_token",
+    return_value={"uid": "u", "email": "blocked@gmail.com"},
+)
+def test_approve_rejects_user_not_in_whitelist(
+    _mock_verify: MagicMock, mock_get_db: MagicMock
+) -> None:
+    """Acceptance criterion 4: valid JWT but email not whitelisted -> 403."""
+    db, codes_doc = _fake_firestore_for_approve(["http://localhost:1/cb"], user_allowed=False)
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "Bearer ok"},
+        json={
+            "client_id": "c",
+            "code_challenge": "ch",
+            "redirect_uri": "http://localhost:1/cb",
+        },
+    )
+    assert resp.status_code == 403
+    assert resp.json()["error"] == "access_denied"
+    codes_doc.set.assert_not_awaited()
+
+
+@patch("src.server.get_firestore_client")
+@patch(
+    "src.api.oauth.auth.verify_id_token",
+    return_value={"uid": "u", "email": "inactive@ambiental.media"},
+)
+def test_approve_rejects_inactive_user(_mock_verify: MagicMock, mock_get_db: MagicMock) -> None:
+    """A whitelisted email whose status is not 'active' is rejected with 403."""
+    db, _ = _fake_firestore_for_approve(["http://localhost:1/cb"], user_status="disabled")
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "Bearer ok"},
+        json={
+            "client_id": "c",
+            "code_challenge": "ch",
+            "redirect_uri": "http://localhost:1/cb",
+        },
+    )
+    assert resp.status_code == 403
+    assert resp.json()["error"] == "access_denied"
+
+
+@patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.verify_id_token", return_value={"uid": "u"})
+def test_approve_rejects_token_without_email(
+    _mock_verify: MagicMock, mock_get_db: MagicMock
+) -> None:
+    """A token carrying no email claim cannot be whitelisted -> 403."""
+    db, _ = _fake_firestore_for_approve(["http://localhost:1/cb"])
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "Bearer ok"},
+        json={
+            "client_id": "c",
+            "code_challenge": "ch",
+            "redirect_uri": "http://localhost:1/cb",
+        },
+    )
+    assert resp.status_code == 403
+    assert resp.json()["error"] == "access_denied"
