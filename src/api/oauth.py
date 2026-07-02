@@ -30,6 +30,8 @@ from starlette.routing import Route
 
 from src.config import (
     ALLOWED_USERS_COLLECTION,
+    FIREBASE_WEB_API_KEY,
+    IDENTITY_TOOLKIT_BASE_URL,
     OAUTH_CLIENTS_COLLECTION,
     OAUTH_CODE_TTL_SECONDS,
     OAUTH_CODES_COLLECTION,
@@ -354,6 +356,68 @@ async def oauth_approve(request: Request) -> JSONResponse:
             "redirect_uri": _redirect_with_code(redirect_uri, code, approval.state),
         }
     )
+
+
+def _verify_pkce(code_verifier: str, code_challenge: str) -> bool:
+    """Return True if the S256 PKCE transform of *code_verifier* matches.
+
+    Computes ``BASE64URL(SHA256(ASCII(code_verifier)))`` without padding (per
+    RFC 7636) and compares it to the stored challenge in constant time.
+    """
+    digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
+    computed = base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+    return secrets.compare_digest(computed, code_challenge)
+
+
+def _is_expired(expires_at: datetime | None) -> bool:
+    """Return True if *expires_at* is a datetime in the past (UTC)."""
+    if not isinstance(expires_at, datetime):
+        return False
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    return expires_at < datetime.now(UTC)
+
+
+async def _mint_firebase_tokens(uid: str) -> dict[str, Any]:
+    """Mint a Firebase ID + refresh token pair for *uid* via Identity Toolkit.
+
+    Creates a short-lived custom token with the Admin SDK and exchanges it for a
+    real ID token and long-lived refresh token through the Identity Toolkit REST
+    API (``accounts:signInWithCustomToken``).
+    """
+    custom_token = auth.create_custom_token(uid)
+    if isinstance(custom_token, bytes):
+        custom_token = custom_token.decode("ascii")
+    response = await get_http_client().post(
+        f"{IDENTITY_TOOLKIT_BASE_URL}/accounts:signInWithCustomToken",
+        params={"key": FIREBASE_WEB_API_KEY},
+        json={"token": custom_token, "returnSecureToken": True},
+    )
+    response.raise_for_status()
+    data = response.json()
+    return {
+        "access_token": data["idToken"],
+        "token_type": "Bearer",
+        "expires_in": int(data["expiresIn"]),
+        "refresh_token": data["refreshToken"],
+    }
+
+
+async def _refresh_firebase_tokens(refresh_token: str) -> dict[str, Any]:
+    """Exchange a Firebase refresh token for a fresh ID token via Secure Token."""
+    response = await get_http_client().post(
+        f"{SECURE_TOKEN_BASE_URL}/token",
+        params={"key": FIREBASE_WEB_API_KEY},
+        data={"grant_type": "refresh_token", "refresh_token": refresh_token},
+    )
+    response.raise_for_status()
+    data = response.json()
+    return {
+        "access_token": data["id_token"],
+        "token_type": "Bearer",
+        "expires_in": int(data["expires_in"]),
+        "refresh_token": data["refresh_token"],
+    }
 
 
 async def oauth_token(request: Request) -> JSONResponse:

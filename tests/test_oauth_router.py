@@ -482,3 +482,230 @@ def test_approve_rejects_token_without_email(
     )
     assert resp.status_code == 403
     assert resp.json()["error"] == "access_denied"
+
+
+# ---------------------------------------------------------------------------
+# Token exchange (Task 5)
+# ---------------------------------------------------------------------------
+
+
+def _valid_code_record() -> dict[str, Any]:
+    return {
+        "client_id": "client-1",
+        "code_challenge": PKCE_CHALLENGE,
+        "redirect_uri": "http://localhost:54321/callback",
+        "uid": "user-1",
+        "expires_at": datetime.now(UTC) + timedelta(seconds=300),
+    }
+
+
+def test_verify_pkce_matches_rfc_vector() -> None:
+    """Acceptance criterion 1: isolated S256 PKCE math (RFC 7636 vector)."""
+    from src.api.oauth import _verify_pkce
+
+    assert _verify_pkce(PKCE_VERIFIER, PKCE_CHALLENGE) is True
+
+
+def test_verify_pkce_rejects_wrong_verifier() -> None:
+    from src.api.oauth import _verify_pkce
+
+    assert _verify_pkce("wrong-verifier", PKCE_CHALLENGE) is False
+
+
+def test_token_unsupported_grant_returns_400() -> None:
+    resp = _client().post("/api/oauth/token", data={"grant_type": "password"})
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "unsupported_grant_type"
+
+
+def test_token_missing_grant_type_returns_400() -> None:
+    resp = _client().post("/api/oauth/token", data={"code": "x"})
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_request"
+
+
+@patch("src.server.get_firestore_client")
+def test_token_missing_code_returns_400(mock_get_db: MagicMock) -> None:
+    resp = _client().post("/api/oauth/token", data={"grant_type": "authorization_code"})
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_request"
+    mock_get_db.assert_not_called()
+
+
+@patch("src.server.get_firestore_client")
+def test_token_invalid_code_returns_400(mock_get_db: MagicMock) -> None:
+    """Acceptance criterion 2: unknown code -> 400."""
+    db, _ = _fake_firestore_for_token({}, code_exists=False)
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/token",
+        data={"grant_type": "authorization_code", "code": "nope", "code_verifier": "v"},
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_grant"
+
+
+@patch("src.server.get_firestore_client")
+def test_token_pkce_mismatch_returns_400_and_deletes(mock_get_db: MagicMock) -> None:
+    """Acceptance criterion 2: wrong verifier -> 400, and the code is consumed."""
+    record = _valid_code_record() | {"code_challenge": "DIFFERENT"}
+    db, code_ref = _fake_firestore_for_token(record)
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "code": "the-code",
+            "code_verifier": PKCE_VERIFIER,
+        },
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_grant"
+    code_ref.delete.assert_awaited_once()
+
+
+@patch("src.server.get_firestore_client")
+def test_token_client_id_mismatch_returns_400(mock_get_db: MagicMock) -> None:
+    db, code_ref = _fake_firestore_for_token(_valid_code_record())
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "client_id": "other-client",
+            "code": "the-code",
+            "code_verifier": PKCE_VERIFIER,
+        },
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_grant"
+    code_ref.delete.assert_awaited_once()
+
+
+@patch("src.server.get_firestore_client")
+def test_token_redirect_uri_mismatch_returns_400(mock_get_db: MagicMock) -> None:
+    db, _ = _fake_firestore_for_token(_valid_code_record())
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "code": "the-code",
+            "code_verifier": PKCE_VERIFIER,
+            "redirect_uri": "http://localhost:9999/other",
+        },
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_grant"
+
+
+@patch("src.server.get_firestore_client")
+def test_token_expired_code_returns_400(mock_get_db: MagicMock) -> None:
+    record = _valid_code_record() | {
+        # Naive past datetime exercises the tz-normalization branch.
+        "expires_at": datetime.now(UTC).replace(tzinfo=None) - timedelta(seconds=10)
+    }
+    db, code_ref = _fake_firestore_for_token(record)
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "code": "the-code",
+            "code_verifier": PKCE_VERIFIER,
+        },
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_grant"
+    code_ref.delete.assert_awaited_once()
+
+
+@patch("src.api.oauth.get_http_client")
+@patch("src.api.oauth.auth.create_custom_token", return_value=b"custom")
+@patch("src.server.get_firestore_client")
+def test_token_authorization_code_success(
+    mock_get_db: MagicMock, _mock_custom: MagicMock, mock_get_http: MagicMock
+) -> None:
+    """Acceptance criterion 3: valid code -> deletes doc and returns token payload."""
+    db, code_ref = _fake_firestore_for_token(_valid_code_record())
+    mock_get_db.return_value = db
+    mock_get_http.return_value = _mock_http_client(
+        {"idToken": "id-tok", "refreshToken": "refr-tok", "expiresIn": "3600"}
+    )
+
+    resp = _client().post(
+        "/api/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "client_id": "client-1",
+            "code": "the-code",
+            "code_verifier": PKCE_VERIFIER,
+            "redirect_uri": "http://127.0.0.1:54321/callback",
+        },
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["access_token"] == "id-tok"
+    assert body["refresh_token"] == "refr-tok"
+    assert body["token_type"] == "Bearer"
+    assert body["expires_in"] == 3600
+    code_ref.delete.assert_awaited_once()
+    db.collection.return_value.document.assert_called_once_with("the-code")
+
+
+@patch("src.api.oauth.get_http_client")
+@patch("src.api.oauth.auth.create_custom_token", return_value=b"custom")
+@patch("src.server.get_firestore_client")
+def test_token_minting_failure_returns_502(
+    mock_get_db: MagicMock, _mock_custom: MagicMock, mock_get_http: MagicMock
+) -> None:
+    db, _ = _fake_firestore_for_token(_valid_code_record())
+    mock_get_db.return_value = db
+    client = MagicMock()
+    client.post = AsyncMock(side_effect=httpx.HTTPError("boom"))
+    mock_get_http.return_value = client
+    resp = _client().post(
+        "/api/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "code": "the-code",
+            "code_verifier": PKCE_VERIFIER,
+        },
+    )
+    assert resp.status_code == 502
+    assert resp.json()["error"] == "server_error"
+
+
+@patch("src.api.oauth.get_http_client")
+def test_token_refresh_grant_success(mock_get_http: MagicMock) -> None:
+    mock_get_http.return_value = _mock_http_client(
+        {"id_token": "new-id", "refresh_token": "new-refr", "expires_in": "3600"}
+    )
+    resp = _client().post(
+        "/api/oauth/token",
+        data={"grant_type": "refresh_token", "refresh_token": "old-refr"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["access_token"] == "new-id"
+    assert body["refresh_token"] == "new-refr"
+
+
+def test_token_refresh_missing_token_returns_400() -> None:
+    resp = _client().post("/api/oauth/token", data={"grant_type": "refresh_token"})
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_request"
+
+
+@patch("src.api.oauth.get_http_client")
+def test_token_refresh_invalid_returns_400(mock_get_http: MagicMock) -> None:
+    client = MagicMock()
+    client.post = AsyncMock(side_effect=httpx.HTTPError("bad"))
+    mock_get_http.return_value = client
+    resp = _client().post(
+        "/api/oauth/token",
+        data={"grant_type": "refresh_token", "refresh_token": "old-refr"},
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_grant"
