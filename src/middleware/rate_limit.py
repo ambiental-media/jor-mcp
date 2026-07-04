@@ -68,7 +68,7 @@ class RateLimitMiddleware:
 
         user: dict[str, str] | None = scope.get("user")
         if not user:
-            # AuthMiddleware already rejected the request upstream; pass through.
+            # AuthMiddleware bypassed authentication (no authenticated user present); pass through.
             await self.app(scope, receive, send)
             return
 
