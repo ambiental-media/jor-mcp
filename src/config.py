@@ -24,6 +24,25 @@ RATE_LIMIT_PRO: int = int(os.environ.get("RATE_LIMIT_PRO_REQUESTS", "2000"))
 """Monthly request quota for 'pro' tier users."""
 
 # ---------------------------------------------------------------------------
+# CORS (OAuth consent portal)
+# ---------------------------------------------------------------------------
+
+CORS_ALLOWED_ORIGINS: list[str] = [
+    origin.strip()
+    for origin in os.environ.get(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:3000,https://jormcp.ambiental.media",
+    ).split(",")
+    if origin.strip()
+]
+"""Browser origins allowed to call the OAuth proxy endpoints via CORS.
+
+Comma-separated list provided through the ``CORS_ALLOWED_ORIGINS`` environment
+variable. Defaults to the local Next.js dev portal (``http://localhost:3000``)
+and the production consent portal (``https://jormcp.ambiental.media``).
+"""
+
+# ---------------------------------------------------------------------------
 # HTTP Client
 # ---------------------------------------------------------------------------
 
