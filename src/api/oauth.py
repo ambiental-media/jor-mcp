@@ -248,7 +248,7 @@ async def oauth_register(request: Request) -> JSONResponse:
         "client_name": metadata.client_name,
         "redirect_uris": redirect_uris,
         # Business rule: MCP clients must be public regardless of what they ask for.
-        "token_endpoint_auth_method": "none",
+        "token_endpoint_auth_method": "none",  # nosec B105
         "grant_types": metadata.grant_types or ["authorization_code", "refresh_token"],
         "created_at": firestore.SERVER_TIMESTAMP,
     }
@@ -267,7 +267,7 @@ async def oauth_register(request: Request) -> JSONResponse:
             "client_id": client_id,
             "client_name": metadata.client_name,
             "redirect_uris": redirect_uris,
-            "token_endpoint_auth_method": "none",
+            "token_endpoint_auth_method": "none",  # nosec B105
         },
         status_code=201,
     )

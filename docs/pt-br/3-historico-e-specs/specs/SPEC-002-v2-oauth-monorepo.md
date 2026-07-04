@@ -7,12 +7,13 @@ Transição do `jor-mcp` de um Servidor de Recursos básico para um Proxy Defens
 - [ ] O Claude Desktop conclui o fluxo PKCE de 4 fases nativamente sem arquivos de configuração do usuário.
 - [ ] O proxy Python normaliza corretamente incompatibilidades de `localhost` / `127.0.0.1` do DCR.
 - [ ] O proxy Python emite corretamente *Access Tokens* de curta duração e *Refresh Tokens* de longa duração via Firebase Admin SDK.
-- [ ] O frontend Next.js estático dispara com sucesso o endpoint de backend `/api/oauth/approve` via CORS.
+- [ ] O frontend Next.js estático dispara com sucesso o endpoint de backend `/api/oauth/approve` via CORS após validar o usuário contra uma whitelist no Firestore.
 
 ## 2. Tech Stack & Infraestrutura
 - **Backend:** Python 3.12, `fastmcp`, `uvicorn`, `firebase-admin`, `google-cloud-firestore`.
-- **Frontend:** Next.js (Exportação Estática) hospedado em **Google Cloud Storage (GCS) Bucket** por trás do Cloud CDN, React, Firebase Auth JS SDK.
+- **Frontend:** Next.js (Exportação Estática) hospedado em **Google Cloud Storage (GCS) Bucket** por trás do Cloud CDN, React, Firebase Auth JS SDK (apenas Google SSO).
 - **Roteamento:** Global Load Balancer do GCP (`/mcp/*` e `/api/oauth/*` -> Backend Serverless NEG; `/*` -> GCS Backend Bucket).
+- **Identidade:** Whitelist B2B estrita. Inscrições públicas desativadas. Administradores provisionam usuários manualmente via Console do Firebase.
 
 ## 3. Comandos (Backend Python)
 - **Dev:** `uv run uvicorn src.server:app --reload`
@@ -37,7 +38,7 @@ Transição do `jor-mcp` de um Servidor de Recursos básico para um Proxy Defens
 - Use `TestClient` para verificação de endpoints HTTP OAuth.
 
 ## 7. Limites (Boundaries)
-- **Sempre fazer:** Validar todos os payloads OAuth recebidos usando Pydantic. Normalizar URIs de redirecionamento para `localhost`.
+- **Sempre fazer:** Validar todos os payloads OAuth recebidos usando Pydantic. Normalizar URIs de redirecionamento para `localhost`. Impor a verificação de whitelist do Firestore tanto no frontend (`/authorize`) quanto no backend (`/api/oauth/approve`).
 - **Perguntar antes:** Antes de adicionar novas dependências externas ao `pyproject.toml`. Antes de alterar os esquemas da coleção Firestore `oauth_clients`.
 - **Nunca fazer:** Nunca retornar HTML puro a partir do Python; a UI permanece no portal Next.js. Nunca logar códigos de Auth brutos ou Access Tokens.
 

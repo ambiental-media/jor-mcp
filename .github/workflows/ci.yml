@@ -10,6 +10,39 @@ env:
   IMAGE: jor-mcp-server
 
 jobs:
+
+  commitlint:
+    name: Conventional Commits
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0   # needed to read the full commit history of the PR
+
+      - name: Check for at least one Conventional Commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Conventional Commits type prefix, e.g. "feat:", "fix(scope):", "feat!:"
+          PATTERN='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([^)]+\))?!?: .+'
+
+          # Read the subject line of every commit in the PR range
+          COMMITS=$(git log --format=%s "${BASE_SHA}..${HEAD_SHA}")
+
+          echo "----- Commits in this PR -----"
+          echo "$COMMITS"
+          echo "------------------------------"
+
+          if echo "$COMMITS" | grep -qE "$PATTERN"; then
+            echo "✅ Found at least one Conventional Commit."
+          else
+            echo "::error::No Conventional Commit found in this PR. At least one commit must follow the Conventional Commits format (e.g. 'feat: ...', 'fix: ...')."
+            exit 1
+          fi
+
   check:
     name: Code Quality & Security
     runs-on: ubuntu-latest

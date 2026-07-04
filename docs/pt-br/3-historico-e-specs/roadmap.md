@@ -4,7 +4,7 @@ Este documento descreve os objetivos de alto nível e as próximas funcionalidad
 
 ## Atualmente em Desenvolvimento 🏗️
 *   **Integração Nativa MCP OAuth 2.1:** Transição de chaves de API estáticas para um fluxo OAuth totalmente interativo usando PKCE para conexões de configuração zero no Claude Desktop.
-*   **Desenvolvimento do Portal Next.js:** Construção do `jor-mcp-site` para lidar com consentimento do usuário, autenticação e o painel administrativo B2B.
+*   **Desenvolvimento do Portal Next.js:** Construção do `jor-mcp-site` para lidar com o consentimento do usuário e autenticação via Google SSO.
 *   **Marco Legal:** Estabelecer a base legal do projeto, incluindo a definição da Licença Open Source, a elaboração dos Termos de Uso para a instância pública e a criação da Política de Privacidade para o tratamento de dados dos usuários.
 
 ## Próximos Passos (Curto Prazo) ⏳

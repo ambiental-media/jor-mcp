@@ -39,15 +39,37 @@ Usamos um `Dockerfile` de múltiplos estágios para manter a imagem de produçã
 1. **Estágio Builder:** Usa o gerenciador de pacotes `uv` para resolver e instalar dependências em um ambiente virtual isolado (`.venv`).
 2. **Estágio Runtime:** Copia apenas o `.venv` e o diretório `src/` para uma imagem base leve do Python. Executa a aplicação como um usuário não root (`appuser`) para cumprir as melhores práticas de segurança de containers.
 
-## 4. Pipeline de Implantação
+## 4. Pipeline de CI/CD
 
-A implantação deve ser automatizada via GitHub Actions:
-1. Disparado no push para o branch `main`.
-2. Executa `make check` (Testes, Lint, checagem de tipos).
-3. Constrói a imagem Docker.
-4. Envia a imagem para o Google Artifact Registry.
-5. Implanta a nova revisão no Cloud Run usando a conta de serviço existente.
-6. Faz o upload da exportação estática do Next.js (diretório `out/`) para o bucket GCS.
+O projeto usa três workflows separados do GitHub Actions. A Integração Contínua e o release/versionamento são totalmente automatizados; a implantação no Cloud Run é um passo manual e deliberado.
+
+### 4.1 Integração Contínua — `.github/workflows/ci.yml`
+
+Disparado em todo Pull Request. Possui três jobs independentes:
+
+1. **`check`** — Gate de qualidade e segurança de código. Executa lint (`ruff check`), checagem de formatação (`ruff format --check`), checagem de tipos (`mypy`), testes com cobertura mínima de 90% (`pytest --cov-fail-under=90`), SAST (`bandit`) e auditoria de dependências (`pip-audit`).
+2. **`build-and-push`** — Roda apenas após o `check` passar. Constrói a imagem Docker, escaneia com Trivy (falha em vulnerabilidades de biblioteca `CRITICAL` e `HIGH`) e a envia para o Artifact Registry com a tag `:pr-<NÚMERO_DO_PR>` (ex.: `:pr-44`).
+3. **`commitlint`** — Verifica se ao menos um commit do PR segue o formato Conventional Commits. É isso que alimenta o versionamento automático no momento do release.
+
+### 4.2 Release & Versionamento — `.github/workflows/release.yml`
+
+Disparado quando um Pull Request é **mergeado na `main`**. Executa o [`python-semantic-release`](https://python-semantic-release.readthedocs.io/), que:
+
+1. Analisa os Conventional Commits do PR mergeado e calcula a próxima versão [SemVer](https://semver.org/) (`fix` → PATCH, `feat` → MINOR, `BREAKING CHANGE` → MAJOR).
+2. Atualiza o campo `version` no `pyproject.toml`, cria e envia a tag git `vX.Y.Z` e publica uma GitHub Release com notas geradas automaticamente.
+3. Se (e somente se) um release foi produzido, **re-tagueia a imagem existente** — a imagem `:pr-<N>` construída durante o CI é re-tagueada no Artifact Registry para `:vX.Y.Z` e `:latest`. Nenhum rebuild acontece; o mesmo digest é promovido.
+
+Isso significa que um PR mergeado nunca reconstrói a imagem — o artefato testado no CI é exatamente o mesmo promovido para um release versionado.
+
+### 4.3 Continuous Deployment — `.github/workflows/cd.yml`
+
+A implantação é **manual e intencional**, não disparada por merges. Roda via `workflow_dispatch` com um input obrigatório `image_tag` (ex.: `pr-44` ou `v1.2.0`). O workflow:
+
+1. Verifica se a tag solicitada realmente existe no Artifact Registry (falha imediatamente caso contrário).
+2. Renderiza o `service.yaml` com `envsubst`, substituindo apenas uma allowlist explícita de variáveis.
+3. Implanta a imagem selecionada no Cloud Run via `gcloud run services replace`.
+
+Como a implantação consome uma imagem existente por tag, ela é totalmente desacoplada do versionamento: você escolhe exatamente qual build chega à produção, e o passo de deploy nunca altera a versão do projeto.
 
 ## 5. Manifesto de Serviço Declarativo
 
