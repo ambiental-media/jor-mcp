@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.4.0 (2026-07-04)
+
+### Documentation
+
+- Enforce B2B whitelist auth model and remove custom admin UI
+  ([`5852e8e`](https://github.com/ambiental-media/jor-mcp/commit/5852e8ecb73cdc7191e5919536d3b7135fc6bdc6))
+
+
 ## v0.3.0 (2026-06-28)
 
 ### Documentation

@@ -1,6 +1,6 @@
 [project]
 name = "jor-mcp"
-version = "0.3.0"
+version = "0.4.0"
 description = "Servidor MCP para a Ambiental Media"
 requires-python = ">=3.12"
 
