@@ -1,6 +1,6 @@
 [project]
 name = "jor-mcp"
-version = "0.2.0"
+version = "0.4.0"
 description = "Servidor MCP para a Ambiental Media"
 requires-python = ">=3.12"
 
@@ -35,6 +35,9 @@ dev = [
     "respx>=0.21.0",
     "ruff==0.15.5",
 ]
+
+[tool.uv]
+constraint-dependencies = ["joserfc>=1.6.7"]
 
 [tool.ruff]
 line-length = 100

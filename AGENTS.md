@@ -115,3 +115,4 @@ Pytest is the gold standard. The approach emphasizes composition over inheritanc
 - **Tool Decorators:** Use `@mcp.tool()` to expose functions to the Model Context Protocol.
 - **Descriptions:** Every tool must have a highly detailed `description` parameter string in its decorator. Explain exactly what it does, the parameters it accepts, and when an LLM should use it. Write these descriptions in Portuguese, as the target audience/domain is Brazilian journalism.
 
+
