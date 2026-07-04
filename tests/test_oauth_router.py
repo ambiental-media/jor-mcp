@@ -7,6 +7,7 @@ PROD_ORIGIN = "https://jormcp.ambiental.media"
 
 
 def _client() -> TestClient:
+    """Return a TestClient instance bound to the Starlette application."""
     from src.server import app
 
     return TestClient(app, raise_server_exceptions=False)
@@ -94,6 +95,7 @@ def test_preflight_allows_dev_origin() -> None:
 
 
 def test_preflight_allows_prod_origin() -> None:
+    """OPTIONS preflight from the production portal returns the matching ACAO header."""
     resp = _client().options(
         "/api/oauth/approve",
         headers={
@@ -130,6 +132,7 @@ def test_simple_request_includes_cors_header() -> None:
 
 
 def test_authorization_server_metadata_returns_server_and_portal_urls() -> None:
+    """GET /.well-known/oauth-authorization-server returns valid RFC 8414 metadata."""
     resp = _client().get("/.well-known/oauth-authorization-server")
     assert resp.status_code == 200
     data = resp.json()
@@ -142,6 +145,7 @@ def test_authorization_server_metadata_returns_server_and_portal_urls() -> None:
 
 
 def test_protected_resource_metadata_points_at_auth_server() -> None:
+    """GET /.well-known/oauth-protected-resource returns valid RFC 9728 metadata."""
     resp = _client().get("/.well-known/oauth-protected-resource")
     assert resp.status_code == 200
     data = resp.json()
@@ -159,6 +163,8 @@ def test_protected_resource_metadata_points_at_auth_server() -> None:
 def test_register_forces_public_client_and_normalizes_loopback(
     mock_get_db: MagicMock,
 ) -> None:
+    """POST /api/oauth/register registers a public client and normalizes
+    loopback URIs in Firestore."""
     db, doc_ref = _fake_firestore()
     mock_get_db.return_value = db
 
@@ -197,6 +203,7 @@ def test_register_forces_public_client_and_normalizes_loopback(
 
 @patch("src.server.get_firestore_client")
 def test_register_rejects_missing_redirect_uris(mock_get_db: MagicMock) -> None:
+    """POST /api/oauth/register rejects payload with a 400 error when redirect_uris is missing."""
     resp = _client().post("/api/oauth/register", json={"client_name": "X"})
     assert resp.status_code == 400
     assert resp.json()["error"] == "invalid_client_metadata"
@@ -204,6 +211,7 @@ def test_register_rejects_missing_redirect_uris(mock_get_db: MagicMock) -> None:
 
 
 def test_register_rejects_non_json_body() -> None:
+    """POST /api/oauth/register rejects unparseable non-JSON request bodies with a 400 error."""
     resp = _client().post(
         "/api/oauth/register",
         content="not-json",
