@@ -512,6 +512,28 @@ def test_verify_pkce_rejects_wrong_verifier() -> None:
     assert _verify_pkce("wrong-verifier", PKCE_CHALLENGE) is False
 
 
+def test_verify_pkce_handles_non_ascii_verifier() -> None:
+    """A non-ASCII code_verifier must return False, not raise UnicodeEncodeError."""
+    from src.api.oauth import _verify_pkce
+
+    assert _verify_pkce("café🎉", PKCE_CHALLENGE) is False
+
+
+@patch(
+    "starlette.requests.Request.form",
+    side_effect=RuntimeError("bad content type"),
+)
+def test_token_bad_content_type_returns_400(_mock_form: MagicMock) -> None:
+    """A body that makes request.form() raise RuntimeError yields 400, not 500."""
+    resp = _client().post(
+        "/api/oauth/token",
+        content=b"not-a-form",
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_request"
+
+
 def test_token_unsupported_grant_returns_400() -> None:
     resp = _client().post("/api/oauth/token", data={"grant_type": "password"})
     assert resp.status_code == 400

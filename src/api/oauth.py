@@ -364,7 +364,7 @@ def _verify_pkce(code_verifier: str, code_challenge: str) -> bool:
     Computes ``BASE64URL(SHA256(ASCII(code_verifier)))`` without padding (per
     RFC 7636) and compares it to the stored challenge in constant time.
     """
-    digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
+    digest = hashlib.sha256(code_verifier.encode("utf-8")).digest()
     computed = base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
     return secrets.compare_digest(computed, code_challenge)
 
@@ -428,7 +428,14 @@ async def oauth_token(request: Request) -> JSONResponse:
     consumes the code (anti-replay) and mints real Firebase tokens. The
     ``refresh_token`` grant exchanges a refresh token for a fresh ID token.
     """
-    form = await request.form()
+    try:
+        form = await request.form()
+    except RuntimeError:
+        return _error_response(
+            "invalid_request",
+            "Expected application/x-www-form-urlencoded or multipart/form-data content type",
+            400,
+        )
     try:
         token_request = TokenRequest.model_validate(dict(form))
     except ValidationError as exc:
