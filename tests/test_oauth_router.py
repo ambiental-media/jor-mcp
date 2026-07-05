@@ -233,7 +233,7 @@ def test_register_normalizes_ipv6_loopback(mock_get_db: MagicMock) -> None:
             "client_name": "Claude Desktop",
             "redirect_uris": [
                 "http://[::1]:54321/callback",
-                "http://::1:54321/callback",
+                "http://[::1]:9000/callback",
             ],
         },
     )
@@ -241,7 +241,7 @@ def test_register_normalizes_ipv6_loopback(mock_get_db: MagicMock) -> None:
     data = resp.json()
     assert data["redirect_uris"] == [
         "http://localhost:54321/callback",
-        "http://localhost:54321/callback",
+        "http://localhost:9000/callback",
     ]
 
 

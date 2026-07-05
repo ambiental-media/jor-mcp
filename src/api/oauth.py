@@ -280,9 +280,7 @@ async def oauth_approve(request: Request) -> JSONResponse:
         return _error_response("invalid_token", "Missing bearer token", 401)
 
     try:
-        decoded = await asyncio.to_thread(
-            auth.verify_id_token, token, clock_skew_seconds=60
-        )
+        decoded = await asyncio.to_thread(auth.verify_id_token, token, clock_skew_seconds=60)
     except (firebase_admin.exceptions.FirebaseError, ValueError) as exc:
         logger.warning("Firebase token verification failed", extra={"error": str(exc)})
         return _error_response("invalid_token", "Invalid Firebase ID token", 401)
