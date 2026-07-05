@@ -8,9 +8,9 @@ from Firebase authentication: they are the very mechanism through which clients
 obtain Firebase tokens, so requiring a token to reach them would be circular.
 """
 
+import asyncio
 import base64
 import hashlib
-import asyncio
 import json
 import logging
 import secrets
@@ -411,7 +411,7 @@ async def _mint_firebase_tokens(uid: str) -> dict[str, Any]:
     data = response.json()
     return {
         "access_token": data["idToken"],
-        "token_type": "Bearer",
+        "token_type": "Bearer",  # nosec B105
         "expires_in": int(data["expiresIn"]),
         "refresh_token": data["refreshToken"],
     }
@@ -428,7 +428,7 @@ async def _refresh_firebase_tokens(refresh_token: str) -> dict[str, Any]:
     data = response.json()
     return {
         "access_token": data["id_token"],
-        "token_type": "Bearer",
+        "token_type": "Bearer",  # nosec B105
         "expires_in": int(data["expires_in"]),
         "refresh_token": data["refresh_token"],
     }

@@ -777,6 +777,8 @@ def test_token_refresh_invalid_returns_400(mock_get_http: MagicMock) -> None:
     )
     assert resp.status_code == 400
     assert resp.json()["error"] == "invalid_grant"
+
+
 @patch("src.server.get_firestore_client")
 @patch(
     "src.api.oauth.auth.verify_id_token",
