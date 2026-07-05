@@ -2,6 +2,32 @@
 
 <!-- version list -->
 
+## v0.6.0 (2026-07-05)
+
+### Bug Fixes
+
+- Minor issues
+  ([`d0c1c04`](https://github.com/ambiental-media/jor-mcp/commit/d0c1c04c23c99baa3045db7c542fa3479d33b366))
+
+### Chores
+
+- Gitignore .tokensave
+  ([`5bc907a`](https://github.com/ambiental-media/jor-mcp/commit/5bc907a59464719b8d9ef63b5bb131f0d4718804))
+
+### Features
+
+- Allow login via google
+  ([`6811242`](https://github.com/ambiental-media/jor-mcp/commit/6811242354ecb628aad03085e50bf3b548a79d3b))
+
+- Implement approval of consent
+  ([`a6f6f69`](https://github.com/ambiental-media/jor-mcp/commit/a6f6f6960882d853ffc03abcf5d2172dec3c1f31))
+
+### Testing
+
+- Test coverage for ipv6 callback
+  ([`14cd047`](https://github.com/ambiental-media/jor-mcp/commit/14cd047edd602ec3901603e6e994cb892f326fff))
+
+
 ## v0.5.0 (2026-07-05)
 
 
