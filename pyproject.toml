@@ -1,6 +1,6 @@
 [project]
 name = "jor-mcp"
-version = "0.4.0"
+version = "0.6.0"
 description = "Servidor MCP para a Ambiental Media"
 requires-python = ">=3.12"
 
@@ -42,6 +42,11 @@ constraint-dependencies = ["joserfc>=1.6.7"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+exclude = [
+    ".aider-desk",
+    ".tokensave",
+    ".venv",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

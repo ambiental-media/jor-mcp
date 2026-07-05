@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any, cast
 
@@ -57,7 +58,7 @@ class AuthMiddleware:
         header_map: dict[bytes, bytes] = {k.lower(): v for k, v in raw_headers}
         auth_header = header_map.get(b"authorization", b"").decode("utf-8", errors="ignore")
 
-        token = auth_header.removeprefix("Bearer ") if auth_header.startswith("Bearer ") else ""
+        token = auth_header[7:].strip() if auth_header.lower().startswith("bearer ") else ""
         if not token:
             logger.warning(
                 "Missing or malformed Authorization header",
@@ -67,7 +68,9 @@ class AuthMiddleware:
             return
 
         try:
-            decoded_dict: dict[str, Any] = auth.verify_id_token(token, clock_skew_seconds=60)
+            decoded_dict: dict[str, Any] = await asyncio.to_thread(
+                auth.verify_id_token, token, clock_skew_seconds=60
+            )
             decoded_token = DecodedToken.model_validate(decoded_dict)
         except (firebase_admin.exceptions.FirebaseError, ValueError, ValidationError) as exc:
             logger.warning("Firebase token verification failed", extra={"error": str(exc)})
