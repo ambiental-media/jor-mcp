@@ -221,6 +221,44 @@ def test_register_rejects_non_json_body() -> None:
     assert resp.json()["error"] == "invalid_request"
 
 
+@patch("src.server.get_firestore_client")
+def test_register_normalizes_ipv6_loopback(mock_get_db: MagicMock) -> None:
+    """POST /api/oauth/register normalizes IPv6 loopback redirect URIs to localhost."""
+    db, doc_ref = _fake_firestore()
+    mock_get_db.return_value = db
+
+    resp = _client().post(
+        "/api/oauth/register",
+        json={
+            "client_name": "Claude Desktop",
+            "redirect_uris": [
+                "http://[::1]:54321/callback",
+                "http://::1:54321/callback",
+            ],
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["redirect_uris"] == [
+        "http://localhost:54321/callback",
+        "http://localhost:54321/callback",
+    ]
+
+
+@patch("src.server.get_firestore_client")
+def test_register_rejects_invalid_redirect_uris(mock_get_db: MagicMock) -> None:
+    """POST /api/oauth/register rejects relative or malformed redirect URIs."""
+    resp = _client().post(
+        "/api/oauth/register",
+        json={
+            "client_name": "X",
+            "redirect_uris": ["/relative/path", "ftp://not-supported", "malformed-uri"],
+        },
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_client_metadata"
+
+
 # ---------------------------------------------------------------------------
 # Consent approval (Task 3)
 # ---------------------------------------------------------------------------
@@ -456,3 +494,56 @@ def test_approve_rejects_token_without_email(
     )
     assert resp.status_code == 403
     assert resp.json()["error"] == "access_denied"
+
+
+@patch("src.server.get_firestore_client")
+@patch(
+    "src.api.oauth.auth.verify_id_token",
+)
+def test_approve_normalizes_email_case_insensitivity(
+    mock_verify: MagicMock, mock_get_db: MagicMock
+) -> None:
+    """POST /api/oauth/approve normalizes email case.
+
+    Converts JWT email with uppercase to lowercase document query.
+    """
+    mock_verify.return_value = {"uid": "user-123", "email": "USER@Ambiental.Media"}
+    db, codes_doc = _fake_firestore_for_approve(["http://localhost:54321/callback"])
+    mock_get_db.return_value = db
+
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "Bearer ok"},
+        json={
+            "client_id": "client-abc",
+            "code_challenge": "challenge-xyz",
+            "redirect_uri": "http://localhost:54321/callback",
+        },
+    )
+    assert resp.status_code == 200
+    db.collection.assert_any_call("allowed_users")
+    db.collection("allowed_users").document.assert_called_with("user@ambiental.media")
+
+
+@patch("src.server.get_firestore_client")
+@patch(
+    "src.api.oauth.auth.verify_id_token",
+    return_value={"uid": "u", "email": "user@ambiental.media"},
+)
+def test_approve_allows_case_insensitive_bearer_token(
+    mock_verify: MagicMock, mock_get_db: MagicMock
+) -> None:
+    """POST /api/oauth/approve accepts 'bearer' scheme with any casing."""
+    db, codes_doc = _fake_firestore_for_approve(["http://localhost:1/cb"])
+    mock_get_db.return_value = db
+
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "bearer ok"},
+        json={
+            "client_id": "c",
+            "code_challenge": "ch",
+            "redirect_uri": "http://localhost:1/cb",
+        },
+    )
+    assert resp.status_code == 200

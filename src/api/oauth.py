@@ -8,6 +8,7 @@ from Firebase authentication: they are the very mechanism through which clients
 obtain Firebase tokens, so requiring a token to reach them would be circular.
 """
 
+import asyncio
 import json
 import logging
 import secrets
@@ -20,7 +21,7 @@ import firebase_admin.exceptions
 from firebase_admin import auth
 from google.cloud import firestore
 from google.cloud.firestore_v1 import AsyncClient as FirestoreAsyncClient
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
@@ -79,6 +80,18 @@ class ClientRegistrationRequest(BaseModel):
     response_types: list[str] | None = None
     scope: str | None = None
 
+    @field_validator("redirect_uris")
+    @classmethod
+    def validate_redirect_uris(cls, uris: list[str]) -> list[str]:
+        """Verify redirect URIs are absolute and valid HTTP/HTTPS URLs."""
+        for uri in uris:
+            parts = urlsplit(uri)
+            if not parts.scheme or parts.scheme not in ("http", "https"):
+                raise ValueError("redirect_uris must be absolute HTTP or HTTPS URLs")
+            if not parts.netloc:
+                raise ValueError("redirect_uris must include a host")
+        return uris
+
 
 class ApproveRequest(BaseModel):
     """Validated consent-approval payload sent by the Next.js portal."""
@@ -101,7 +114,7 @@ def _error_response(error: str, description: str, status_code: int) -> JSONRespo
 
 
 def _normalize_loopback(uri: str) -> str:
-    """Rewrite a ``127.0.0.1`` loopback host to ``localhost``.
+    """Rewrite IPv4/IPv6 loopback hosts to ``localhost``.
 
     MCP clients are inconsistent about which loopback form they register versus
     redirect to; normalizing both to ``localhost`` at registration time avoids
@@ -111,11 +124,11 @@ def _normalize_loopback(uri: str) -> str:
         uri: A redirect URI as supplied by the client.
 
     Returns:
-        The URI with a ``127.0.0.1`` host replaced by ``localhost``; otherwise
-        the URI unchanged.
+        The URI with loopback hosts (127.0.0.1, [::1], ::1) replaced by
+        ``localhost``; otherwise the URI unchanged.
     """
     parts = urlsplit(uri)
-    if parts.hostname != "127.0.0.1":
+    if parts.hostname not in ("127.0.0.1", "[::1]", "::1"):
         return uri
     netloc = "localhost" if parts.port is None else f"localhost:{parts.port}"
     normalized: SplitResult = parts._replace(netloc=netloc)
@@ -125,9 +138,9 @@ def _normalize_loopback(uri: str) -> str:
 def _extract_bearer_token(request: Request) -> str | None:
     """Return the Bearer token from the Authorization header, or None."""
     header = request.headers.get("authorization", "")
-    if not header.startswith("Bearer "):
+    if not header.lower().startswith("bearer "):
         return None
-    return header.removeprefix("Bearer ").strip() or None
+    return header[7:].strip() or None
 
 
 def _resolve_redirect_uri(requested: str | None, registered: list[str]) -> str | None:
@@ -161,7 +174,8 @@ async def _is_email_allowed(db: FirestoreAsyncClient, email: str | None) -> bool
     """
     if not email:
         return False
-    snapshot = await db.collection(ALLOWED_USERS_COLLECTION).document(email).get()
+    normalized_email = email.strip().lower()
+    snapshot = await db.collection(ALLOWED_USERS_COLLECTION).document(normalized_email).get()
     if not snapshot.exists:
         return False
     data = snapshot.to_dict() or {}
@@ -266,7 +280,9 @@ async def oauth_approve(request: Request) -> JSONResponse:
         return _error_response("invalid_token", "Missing bearer token", 401)
 
     try:
-        decoded = auth.verify_id_token(token, clock_skew_seconds=60)
+        decoded = await asyncio.to_thread(
+            auth.verify_id_token, token, clock_skew_seconds=60
+        )
     except (firebase_admin.exceptions.FirebaseError, ValueError) as exc:
         logger.warning("Firebase token verification failed", extra={"error": str(exc)})
         return _error_response("invalid_token", "Invalid Firebase ID token", 401)
