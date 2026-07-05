@@ -67,6 +67,19 @@ metadata. Override in dev (e.g. ``http://localhost:3000``).
 OAUTH_CLIENTS_COLLECTION: str = os.environ.get("OAUTH_CLIENTS_COLLECTION", "oauth_clients")
 """Firestore collection storing dynamically registered OAuth clients (DCR)."""
 
+OAUTH_CODES_COLLECTION: str = os.environ.get("OAUTH_CODES_COLLECTION", "oauth_codes")
+"""Firestore collection storing short-lived authorization codes and PKCE state."""
+
+OAUTH_CODE_TTL_SECONDS: int = int(os.environ.get("OAUTH_CODE_TTL_SECONDS", "600"))
+"""Lifetime of an issued authorization code before it is considered expired."""
+
+ALLOWED_USERS_COLLECTION: str = os.environ.get("ALLOWED_USERS_COLLECTION", "allowed_users")
+"""Firestore collection whitelisting who may complete consent.
+
+Each document id is a user email; the user is granted access only when the
+document exists and its ``status`` field equals ``"active"``. Managed manually
+by Ambiental Media (e.g. via the Firebase console)."""
+
 # ---------------------------------------------------------------------------
 # HTTP Client
 # ---------------------------------------------------------------------------

@@ -8,20 +8,29 @@ from Firebase authentication: they are the very mechanism through which clients
 obtain Firebase tokens, so requiring a token to reach them would be circular.
 """
 
+import asyncio
 import json
 import logging
+import secrets
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Any
-from urllib.parse import SplitResult, urlsplit, urlunsplit
+from urllib.parse import SplitResult, parse_qsl, urlencode, urlsplit, urlunsplit
 
+import firebase_admin.exceptions
+from firebase_admin import auth
 from google.cloud import firestore
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from google.cloud.firestore_v1 import AsyncClient as FirestoreAsyncClient
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from src.config import (
+    ALLOWED_USERS_COLLECTION,
     OAUTH_CLIENTS_COLLECTION,
+    OAUTH_CODE_TTL_SECONDS,
+    OAUTH_CODES_COLLECTION,
     OAUTH_PORTAL_BASE_URL,
     OAUTH_SERVER_BASE_URL,
 )
@@ -71,6 +80,30 @@ class ClientRegistrationRequest(BaseModel):
     response_types: list[str] | None = None
     scope: str | None = None
 
+    @field_validator("redirect_uris")
+    @classmethod
+    def validate_redirect_uris(cls, uris: list[str]) -> list[str]:
+        """Verify redirect URIs are absolute and valid HTTP/HTTPS URLs."""
+        for uri in uris:
+            parts = urlsplit(uri)
+            if not parts.scheme or parts.scheme not in ("http", "https"):
+                raise ValueError("redirect_uris must be absolute HTTP or HTTPS URLs")
+            if not parts.netloc:
+                raise ValueError("redirect_uris must include a host")
+        return uris
+
+
+class ApproveRequest(BaseModel):
+    """Validated consent-approval payload sent by the Next.js portal."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    client_id: str = Field(min_length=1)
+    code_challenge: str = Field(min_length=1)
+    code_challenge_method: str = "S256"
+    redirect_uri: str | None = None
+    state: str | None = None
+
 
 def _error_response(error: str, description: str, status_code: int) -> JSONResponse:
     """Build a standard OAuth error JSON response."""
@@ -81,7 +114,7 @@ def _error_response(error: str, description: str, status_code: int) -> JSONRespo
 
 
 def _normalize_loopback(uri: str) -> str:
-    """Rewrite a ``127.0.0.1`` loopback host to ``localhost``.
+    """Rewrite IPv4/IPv6 loopback hosts to ``localhost``.
 
     MCP clients are inconsistent about which loopback form they register versus
     redirect to; normalizing both to ``localhost`` at registration time avoids
@@ -91,15 +124,62 @@ def _normalize_loopback(uri: str) -> str:
         uri: A redirect URI as supplied by the client.
 
     Returns:
-        The URI with a ``127.0.0.1`` host replaced by ``localhost``; otherwise
-        the URI unchanged.
+        The URI with loopback hosts (127.0.0.1, [::1], ::1) replaced by
+        ``localhost``; otherwise the URI unchanged.
     """
     parts = urlsplit(uri)
-    if parts.hostname != "127.0.0.1":
+    if parts.hostname not in ("127.0.0.1", "[::1]", "::1"):
         return uri
     netloc = "localhost" if parts.port is None else f"localhost:{parts.port}"
     normalized: SplitResult = parts._replace(netloc=netloc)
     return urlunsplit(normalized)
+
+
+def _extract_bearer_token(request: Request) -> str | None:
+    """Return the Bearer token from the Authorization header, or None."""
+    header = request.headers.get("authorization", "")
+    if not header.lower().startswith("bearer "):
+        return None
+    return header[7:].strip() or None
+
+
+def _resolve_redirect_uri(requested: str | None, registered: list[str]) -> str | None:
+    """Pick the redirect URI to use, validating it against the registered set.
+
+    Loopback hosts are normalized before comparison. When no redirect URI is
+    supplied the first registered one is used. Returns ``None`` when the
+    requested URI is not registered.
+    """
+    if requested is None:
+        return registered[0] if registered else None
+    normalized = _normalize_loopback(requested)
+    return normalized if normalized in registered else None
+
+
+def _redirect_with_code(redirect_uri: str, code: str, state: str | None) -> str:
+    """Append the authorization code (and optional state) to the redirect URI."""
+    parts = urlsplit(redirect_uri)
+    query = parse_qsl(parts.query, keep_blank_values=True)
+    query.append(("code", code))
+    if state is not None:
+        query.append(("state", state))
+    return urlunsplit(parts._replace(query=urlencode(query)))
+
+
+async def _is_email_allowed(db: FirestoreAsyncClient, email: str | None) -> bool:
+    """Return True if *email* is whitelisted with ``status == "active"``.
+
+    The allow-list (``allowed_users``) is curated manually by Ambiental Media;
+    access is restricted to Google SSO accounts explicitly authorized there.
+    """
+    if not email:
+        return False
+    normalized_email = email.strip().lower()
+    snapshot = await db.collection(ALLOWED_USERS_COLLECTION).document(normalized_email).get()
+    if not snapshot.exists:
+        return False
+    data = snapshot.to_dict() or {}
+    return data.get("status") == "active"
 
 
 async def oauth_health(request: Request) -> JSONResponse:
@@ -187,9 +267,95 @@ async def oauth_register(request: Request) -> JSONResponse:
     )
 
 
+async def oauth_approve(request: Request) -> JSONResponse:
+    """Consent approval endpoint: issue an authorization code bound to PKCE state.
+
+    Requires a valid Firebase ID token (``Authorization: Bearer``) to prove the
+    user's identity. Validates the client and redirect URI, then persists a
+    short-lived authorization code plus the PKCE ``code_challenge`` and the user
+    ``uid`` under :data:`OAUTH_CODES_COLLECTION` for the later token exchange.
+    """
+    token = _extract_bearer_token(request)
+    if token is None:
+        return _error_response("invalid_token", "Missing bearer token", 401)
+
+    try:
+        decoded = await asyncio.to_thread(auth.verify_id_token, token, clock_skew_seconds=60)
+    except (firebase_admin.exceptions.FirebaseError, ValueError) as exc:
+        logger.warning("Firebase token verification failed", extra={"error": str(exc)})
+        return _error_response("invalid_token", "Invalid Firebase ID token", 401)
+
+    uid: str = decoded["uid"]
+    email: str | None = decoded.get("email")
+
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        return _error_response("invalid_request", "Request body must be valid JSON", 400)
+
+    try:
+        approval = ApproveRequest.model_validate(payload)
+    except ValidationError as exc:
+        return _error_response("invalid_request", str(exc), 400)
+
+    if approval.code_challenge_method != "S256":
+        return _error_response(
+            "invalid_request", "Only S256 code_challenge_method is supported", 400
+        )
+
+    # Lazy import: avoids the circular import described in oauth_register.
+    from src.server import get_firestore_client
+
+    db = get_firestore_client()
+    client_ref = db.collection(OAUTH_CLIENTS_COLLECTION).document(approval.client_id)
+    client_snapshot = await client_ref.get()
+    if not client_snapshot.exists:
+        return _error_response("invalid_client", "Unknown client_id", 400)
+
+    registered_uris: list[str] = client_snapshot.get("redirect_uris") or []
+    redirect_uri = _resolve_redirect_uri(approval.redirect_uri, registered_uris)
+    if redirect_uri is None:
+        return _error_response(
+            "invalid_request", "redirect_uri is not registered for this client", 400
+        )
+
+    if not await _is_email_allowed(db, email):
+        logger.warning("User not on the allow-list", extra={"uid": uid})
+        return _error_response(
+            "access_denied", "User is not authorized to access this resource", 403
+        )
+
+    code = secrets.token_urlsafe(32)
+    now = datetime.now(UTC)
+    document: dict[str, Any] = {
+        "code": code,
+        "client_id": approval.client_id,
+        "code_challenge": approval.code_challenge,
+        "code_challenge_method": approval.code_challenge_method,
+        "redirect_uri": redirect_uri,
+        "uid": uid,
+        "created_at": firestore.SERVER_TIMESTAMP,
+        "expires_at": now + timedelta(seconds=OAUTH_CODE_TTL_SECONDS),
+    }
+    await db.collection(OAUTH_CODES_COLLECTION).document(code).set(document)
+
+    logger.info(
+        "Issued authorization code",
+        extra={"client_id": approval.client_id, "uid": uid},
+    )
+
+    return JSONResponse(
+        {
+            "authorization_code": code,
+            "redirect_uri": _redirect_with_code(redirect_uri, code, approval.state),
+        }
+    )
+
+
 routes: list[Route] = [
     Route("/health", oauth_health, methods=["GET"]),
     Route("/register", oauth_register, methods=["POST"]),
+    Route("/approve", oauth_approve, methods=["POST"]),
 ]
 """Routes mounted under :data:`OAUTH_PATH_PREFIX` (``/api/oauth``)."""
 

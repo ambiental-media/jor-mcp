@@ -200,13 +200,23 @@ então o load balancer deve rotear `/.well-known/*` para o NEG do backend.
 **Endpoint:** `POST /api/oauth/approve`
 **Objetivo:** Chamado pelo `jor-mcp-site` (Next.js) após o usuário clicar em "Permitir". Requer CORS.
 
+**Comportamento no servidor:**
+*   **Autenticação:** exige `Authorization: Bearer <Firebase_ID_Token>`, verificado via `firebase-admin`. Token ausente/inválido retorna `401 invalid_token`.
+*   `client_id` e `code_challenge` são obrigatórios; apenas `code_challenge_method = "S256"` é aceito.
+*   O `client_id` deve existir em `oauth_clients`, caso contrário `400 invalid_client`.
+*   `redirect_uri` é opcional: quando presente é normalizado (loopback) e deve corresponder a uma URI registrada (senão `400 invalid_request`); quando ausente, usa-se a primeira URI registrada do cliente.
+*   **Whitelist:** o email do usuário (extraído do JWT) deve existir na coleção `allowed_users` com `status == "active"`. Um token válido cujo email esteja ausente/fora da whitelist/inativo retorna `403 access_denied`. A lista é curada manualmente pela Ambiental Media (ex: console do Firebase); o acesso é só via Google SSO.
+*   Um `authorization_code` aleatório é gerado e salvo em `oauth_codes` junto com o `code_challenge`, o `uid`, o `redirect_uri` e uma expiração curta (`OAUTH_CODE_TTL_SECONDS`, padrão 600s).
+
 **Esquema de Solicitação:**
 *(Requer `Authorization: Bearer <Firebase_ID_Token>` para provar a identidade do usuário)*
 ```json
 {
   "client_id": "uuid-string",
   "code_challenge": "string",
-  "redirect_uri": "string"
+  "code_challenge_method": "S256",
+  "redirect_uri": "string (opcional)",
+  "state": "string (opcional, devolvido no redirect)"
 }
 ```
 
@@ -214,7 +224,7 @@ então o load balancer deve rotear `/.well-known/*` para o NEG do backend.
 ```json
 {
   "authorization_code": "short-lived-random-string",
-  "redirect_uri": "http://127.0.0.1:54321/callback?code=..."
+  "redirect_uri": "http://localhost:54321/callback?code=...&state=..."
 }
 ```
 
