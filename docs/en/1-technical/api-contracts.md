@@ -106,6 +106,15 @@ obtain Firebase tokens in the first place.
 *   **Allowed Methods:** `GET`, `POST`, `OPTIONS`.
 *   **Allowed Headers:** `Authorization`, `Content-Type`.
 
+### Base URLs
+The absolute URLs advertised by the discovery metadata are built from two
+environment variables (so dev and prod can diverge):
+
+*   `OAUTH_SERVER_BASE_URL` — this backend / issuer (token + registration
+    endpoints). Default `https://jormcp.ambiental.media`.
+*   `OAUTH_PORTAL_BASE_URL` — the Next.js consent portal (`authorization_endpoint`).
+    Default `https://jormcp.ambiental.media`.
+
 ---
 
 ### 4.0 Router Health
@@ -122,9 +131,49 @@ obtain Firebase tokens in the first place.
 
 ---
 
+### 4.0.1 Discovery Metadata
+**Endpoints:**
+*   `GET /.well-known/oauth-authorization-server` (RFC 8414)
+*   `GET /.well-known/oauth-protected-resource` (RFC 9728)
+
+**Purpose:** Let MCP clients (e.g. Claude Desktop) discover where to register and
+authenticate. No authentication required. Served by the Python backend, so the
+load balancer must route `/.well-known/*` to the backend NEG.
+
+**`oauth-authorization-server` Response (200 OK):**
+```json
+{
+  "issuer": "https://jormcp.ambiental.media",
+  "authorization_endpoint": "https://jormcp.ambiental.media/authorize",
+  "token_endpoint": "https://jormcp.ambiental.media/api/oauth/token",
+  "registration_endpoint": "https://jormcp.ambiental.media/api/oauth/register",
+  "response_types_supported": ["code"],
+  "grant_types_supported": ["authorization_code", "refresh_token"],
+  "code_challenge_methods_supported": ["S256"],
+  "token_endpoint_auth_methods_supported": ["none"]
+}
+```
+
+**`oauth-protected-resource` Response (200 OK):**
+```json
+{
+  "resource": "https://jormcp.ambiental.media/mcp",
+  "authorization_servers": ["https://jormcp.ambiental.media"]
+}
+```
+
+---
+
 ### 4.1 Dynamic Client Registration (DCR)
 **Endpoint:** `POST /api/oauth/register`
 **Purpose:** Called by Claude Desktop to register itself and obtain a `client_id`.
+
+**Server-side behavior:**
+*   `redirect_uris` is required (non-empty); unknown client metadata fields are ignored.
+*   **Force public client:** `token_endpoint_auth_method` is always overwritten to `"none"`.
+*   **Loopback normalization:** any `127.0.0.1` host in `redirect_uris` is rewritten to `localhost`.
+*   A `client_id` (UUID) is generated and the client persisted to the `oauth_clients` Firestore collection.
+*   Invalid JSON returns `400 invalid_request`; invalid metadata returns `400 invalid_client_metadata`.
 
 **Request Schema:**
 ```json

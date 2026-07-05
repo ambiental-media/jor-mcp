@@ -16,7 +16,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
 import src.http_client as _http_client_mod
-from src.api.oauth import OAUTH_PATH_PREFIX
+from src.api.oauth import OAUTH_PATH_PREFIX, well_known_routes
 from src.api.oauth import routes as oauth_routes
 from src.config import (
     CORS_ALLOWED_ORIGINS,
@@ -137,6 +137,7 @@ _starlette_app = Starlette(
     ],
     routes=[
         Route("/health", health_check),
+        *well_known_routes,
         Mount(OAUTH_PATH_PREFIX, routes=oauth_routes),
         Mount("/", app=_mcp_http_app),
     ],

@@ -26,8 +26,9 @@ class AuthMiddleware:
     """ASGI middleware that validates Firebase ID tokens for all incoming requests.
 
     Requests to /health bypass validation to allow Cloud Run health checks, and
-    requests under the OAuth proxy prefix (/api/oauth) bypass it because they are
-    the mechanism through which clients obtain Firebase tokens in the first place.
+    requests under the OAuth proxy prefix (/api/oauth) or the discovery metadata
+    (/.well-known) bypass it because they are the mechanism through which clients
+    obtain Firebase tokens in the first place.
     On success, injects scope["user"] = {"uid": ..., "tier": ...} for downstream
     middleware (e.g. RateLimitMiddleware) to consume.
     """
