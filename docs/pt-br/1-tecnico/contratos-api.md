@@ -234,12 +234,22 @@ então o load balancer deve rotear `/.well-known/*` para o NEG do backend.
 **Endpoint:** `POST /api/oauth/token`
 **Objetivo:** Chamado pelo Claude para trocar o `authorization_code` por tokens de Acesso/Refresh do Firebase. Usa `application/x-www-form-urlencoded`.
 
-**Parâmetros de Solicitação:**
+**Comportamento no servidor:**
+*   **Grant `authorization_code`:** busca o `code` em `oauth_codes`, **exclui imediatamente** (anti-replay), e então valida expiração, `client_id`, `redirect_uri` (normalizado loopback) e a transformação PKCE: `BASE64URL(SHA256(ASCII(code_verifier)))` deve ser igual ao `code_challenge` salvo (comparação em tempo constante). No sucesso, gera um custom token Firebase (`firebase-admin`) e o troca por um ID + refresh token reais via a API REST do Identity Toolkit.
+*   **Grant `refresh_token`:** troca um refresh token por um ID token novo via a API REST do Secure Token.
+*   Códigos inválidos/usados, expirados, divergências ou PKCE inválido retornam `400 invalid_grant`; `grant_type` desconhecido retorna `400 unsupported_grant_type`.
+*   Requer a env var `FIREBASE_WEB_API_KEY` (mesmo valor do `NEXT_PUBLIC_FIREBASE_API_KEY` do portal).
+
+**Parâmetros de Solicitação (`authorization_code`):**
 *   `grant_type`: `"authorization_code"`
-*   `client_id`: `"uuid-string"`
+*   `client_id`: `"uuid-string"` (opcional; validado contra o código salvo se enviado)
 *   `code`: `"short-lived-random-string"`
 *   `code_verifier`: `"string"` (validador PKCE)
-*   `redirect_uri`: `"string"`
+*   `redirect_uri`: `"string"` (opcional; validado contra o código salvo se enviado)
+
+**Parâmetros de Solicitação (`refresh_token`):**
+*   `grant_type`: `"refresh_token"`
+*   `refresh_token`: `"firebase-long-lived-string"`
 
 **Esquema de Resposta (200 OK):**
 ```json

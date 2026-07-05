@@ -9,6 +9,8 @@ obtain Firebase tokens, so requiring a token to reach them would be circular.
 """
 
 import asyncio
+import base64
+import hashlib
 import json
 import logging
 import secrets
@@ -18,6 +20,7 @@ from typing import Any
 from urllib.parse import SplitResult, parse_qsl, urlencode, urlsplit, urlunsplit
 
 import firebase_admin.exceptions
+import httpx
 from firebase_admin import auth
 from google.cloud import firestore
 from google.cloud.firestore_v1 import AsyncClient as FirestoreAsyncClient
@@ -28,12 +31,16 @@ from starlette.routing import Route
 
 from src.config import (
     ALLOWED_USERS_COLLECTION,
+    FIREBASE_WEB_API_KEY,
+    IDENTITY_TOOLKIT_BASE_URL,
     OAUTH_CLIENTS_COLLECTION,
     OAUTH_CODE_TTL_SECONDS,
     OAUTH_CODES_COLLECTION,
     OAUTH_PORTAL_BASE_URL,
     OAUTH_SERVER_BASE_URL,
+    SECURE_TOKEN_BASE_URL,
 )
+from src.http_client import get_http_client
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +110,19 @@ class ApproveRequest(BaseModel):
     code_challenge_method: str = "S256"
     redirect_uri: str | None = None
     state: str | None = None
+
+
+class TokenRequest(BaseModel):
+    """Validated token-exchange payload (application/x-www-form-urlencoded)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    grant_type: str
+    client_id: str | None = None
+    code: str | None = None
+    code_verifier: str | None = None
+    redirect_uri: str | None = None
+    refresh_token: str | None = None
 
 
 def _error_response(error: str, description: str, status_code: int) -> JSONResponse:
@@ -352,10 +372,155 @@ async def oauth_approve(request: Request) -> JSONResponse:
     )
 
 
+def _verify_pkce(code_verifier: str, code_challenge: str) -> bool:
+    """Return True if the S256 PKCE transform of *code_verifier* matches.
+
+    Computes ``BASE64URL(SHA256(ASCII(code_verifier)))`` without padding (per
+    RFC 7636) and compares it to the stored challenge in constant time.
+    """
+    digest = hashlib.sha256(code_verifier.encode("utf-8")).digest()
+    computed = base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+    return secrets.compare_digest(computed, code_challenge)
+
+
+def _is_expired(expires_at: datetime | None) -> bool:
+    """Return True if *expires_at* is a datetime in the past (UTC)."""
+    if not isinstance(expires_at, datetime):
+        return False
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    return expires_at < datetime.now(UTC)
+
+
+async def _mint_firebase_tokens(uid: str) -> dict[str, Any]:
+    """Mint a Firebase ID + refresh token pair for *uid* via Identity Toolkit.
+
+    Creates a short-lived custom token with the Admin SDK and exchanges it for a
+    real ID token and long-lived refresh token through the Identity Toolkit REST
+    API (``accounts:signInWithCustomToken``).
+    """
+    custom_token = auth.create_custom_token(uid)
+    if isinstance(custom_token, bytes):
+        custom_token = custom_token.decode("ascii")
+    response = await get_http_client().post(
+        f"{IDENTITY_TOOLKIT_BASE_URL}/accounts:signInWithCustomToken",
+        params={"key": FIREBASE_WEB_API_KEY},
+        json={"token": custom_token, "returnSecureToken": True},
+    )
+    response.raise_for_status()
+    data = response.json()
+    return {
+        "access_token": data["idToken"],
+        "token_type": "Bearer",  # nosec B105
+        "expires_in": int(data["expiresIn"]),
+        "refresh_token": data["refreshToken"],
+    }
+
+
+async def _refresh_firebase_tokens(refresh_token: str) -> dict[str, Any]:
+    """Exchange a Firebase refresh token for a fresh ID token via Secure Token."""
+    response = await get_http_client().post(
+        f"{SECURE_TOKEN_BASE_URL}/token",
+        params={"key": FIREBASE_WEB_API_KEY},
+        data={"grant_type": "refresh_token", "refresh_token": refresh_token},
+    )
+    response.raise_for_status()
+    data = response.json()
+    return {
+        "access_token": data["id_token"],
+        "token_type": "Bearer",  # nosec B105
+        "expires_in": int(data["expires_in"]),
+        "refresh_token": data["refresh_token"],
+    }
+
+
+async def oauth_token(request: Request) -> JSONResponse:
+    """Token endpoint (RFC 6749) completing the OAuth 2.1 flow.
+
+    Accepts ``application/x-www-form-urlencoded``. The ``authorization_code``
+    grant verifies the PKCE ``code_verifier`` against the stored ``code_challenge``,
+    consumes the code (anti-replay) and mints real Firebase tokens. The
+    ``refresh_token`` grant exchanges a refresh token for a fresh ID token.
+    """
+    try:
+        form = await request.form()
+    except RuntimeError:
+        return _error_response(
+            "invalid_request",
+            "Expected application/x-www-form-urlencoded or multipart/form-data content type",
+            400,
+        )
+    try:
+        token_request = TokenRequest.model_validate(dict(form))
+    except ValidationError as exc:
+        return _error_response("invalid_request", str(exc), 400)
+
+    if token_request.grant_type == "authorization_code":
+        return await _handle_authorization_code(token_request)
+    if token_request.grant_type == "refresh_token":
+        return await _handle_refresh_token(token_request)
+    return _error_response("unsupported_grant_type", "Unsupported grant_type", 400)
+
+
+async def _handle_authorization_code(token_request: TokenRequest) -> JSONResponse:
+    """Validate PKCE for the authorization_code grant and mint Firebase tokens."""
+    if not token_request.code or not token_request.code_verifier:
+        return _error_response("invalid_request", "Missing code or code_verifier", 400)
+
+    # Lazy import: avoids the circular import described in oauth_register.
+    from src.server import get_firestore_client
+
+    db = get_firestore_client()
+    code_ref = db.collection(OAUTH_CODES_COLLECTION).document(token_request.code)
+    snapshot = await code_ref.get()
+    if not snapshot.exists:
+        return _error_response("invalid_grant", "Invalid or expired authorization code", 400)
+
+    record: dict[str, Any] = snapshot.to_dict() or {}
+    # Consume the code immediately so a failed or replayed exchange cannot reuse it.
+    await code_ref.delete()
+
+    if _is_expired(record.get("expires_at")):
+        return _error_response("invalid_grant", "Authorization code expired", 400)
+    if token_request.client_id and token_request.client_id != record.get("client_id"):
+        return _error_response("invalid_grant", "client_id mismatch", 400)
+    if token_request.redirect_uri and _normalize_loopback(token_request.redirect_uri) != record.get(
+        "redirect_uri"
+    ):
+        return _error_response("invalid_grant", "redirect_uri mismatch", 400)
+    if not _verify_pkce(token_request.code_verifier, record.get("code_challenge", "")):
+        return _error_response("invalid_grant", "PKCE verification failed", 400)
+
+    try:
+        tokens = await _mint_firebase_tokens(record["uid"])
+    except (httpx.HTTPError, KeyError, ValueError):
+        logger.exception("Failed to mint Firebase tokens")
+        return _error_response("server_error", "Token minting failed", 502)
+
+    logger.info(
+        "Issued tokens",
+        extra={"client_id": record.get("client_id"), "uid": record.get("uid")},
+    )
+    return JSONResponse(tokens)
+
+
+async def _handle_refresh_token(token_request: TokenRequest) -> JSONResponse:
+    """Exchange a refresh token for a fresh ID token (refresh_token grant)."""
+    if not token_request.refresh_token:
+        return _error_response("invalid_request", "Missing refresh_token", 400)
+    try:
+        tokens = await _refresh_firebase_tokens(token_request.refresh_token)
+    except (httpx.HTTPError, KeyError, ValueError):
+        logger.exception("Failed to refresh Firebase token")
+        return _error_response("invalid_grant", "Invalid refresh token", 400)
+    return JSONResponse(tokens)
+
+
 routes: list[Route] = [
     Route("/health", oauth_health, methods=["GET"]),
     Route("/register", oauth_register, methods=["POST"]),
     Route("/approve", oauth_approve, methods=["POST"]),
+    Route("/token", oauth_token, methods=["POST"]),
 ]
 """Routes mounted under :data:`OAUTH_PATH_PREFIX` (``/api/oauth``)."""
 

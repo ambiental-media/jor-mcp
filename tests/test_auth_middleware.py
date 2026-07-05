@@ -29,6 +29,19 @@ def test_missing_authorization_header_returns_401(client: TestClient) -> None:
     assert resp.json() == {"detail": "Unauthorized"}
 
 
+def test_401_advertises_resource_metadata(client: TestClient) -> None:
+    """The 401 must carry a WWW-Authenticate header pointing at the resource metadata.
+
+    This is the discovery trigger that makes MCP clients (e.g. Claude Desktop)
+    start the OAuth flow instead of giving up.
+    """
+    resp = client.get("/mcp/")
+    header = resp.headers["www-authenticate"]
+    assert header.startswith("Bearer ")
+    assert 'resource_metadata="' in header
+    assert header.endswith('/.well-known/oauth-protected-resource"')
+
+
 def test_wrong_auth_scheme_returns_401(client: TestClient) -> None:
     resp = client.get("/mcp/", headers={"Authorization": "Basic dXNlcjpwYXNz"})
     assert resp.status_code == 401
