@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.7.0 (2026-07-05)
+
+### Bug Fixes
+
+- Fix false sec flag
+  ([`42657e2`](https://github.com/ambiental-media/jor-mcp/commit/42657e256d352299d8f3049ae756de93d9b98f6c))
+
+
 ## v0.6.0 (2026-07-05)
 
 ### Bug Fixes
