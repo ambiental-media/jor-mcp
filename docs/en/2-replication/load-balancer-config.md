@@ -28,6 +28,7 @@ The core of the load balancer is the URL Map. Configure the Host and Path rules 
 | :--- | :--- | :--- |
 | `jormcp.ambiental.media` | `/mcp/*` | API (Serverless NEG) |
 | `jormcp.ambiental.media` | `/api/oauth/*` | API (Serverless NEG) |
+| `jormcp.ambiental.media` | `/.well-known/*` | API (Serverless NEG) |
 | `jormcp.ambiental.media` | `/*` (Default) | Frontend (Backend Bucket) |
 
 ## 4. Security Policies & CORS

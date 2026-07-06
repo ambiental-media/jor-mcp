@@ -28,6 +28,7 @@ O núcleo do load balancer é o Mapa de URL. Configure as regras de Host e Camin
 | :--- | :--- | :--- |
 | `jormcp.ambiental.media` | `/mcp/*` | API (Serverless NEG) |
 | `jormcp.ambiental.media` | `/api/oauth/*` | API (Serverless NEG) |
+| `jormcp.ambiental.media` | `/.well-known/*` | API (Serverless NEG) |
 | `jormcp.ambiental.media` | `/*` (Padrão) | Frontend (Backend Bucket) |
 
 ## 4. Políticas de Segurança & CORS
