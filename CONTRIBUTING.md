@@ -1,5 +1,7 @@
 <img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right vertical-align:middle" height="50em"><img src="/assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left vertical-align:middle" height="50em">
 
+---
+
 # Contributing to jor-mcp
 
 First off, thank you for considering contributing to `jor-mcp`! It's people like you that make open-source tools for journalism better.
