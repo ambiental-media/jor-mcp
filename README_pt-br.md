@@ -2,7 +2,9 @@
 
 ---
 
-[Read in English](README.md) | [Leia em Português](README_pt-br.md)    <img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right vertical-align:middle" height="50em">
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right vertical-align:middle" height="50em">
+
+[Read in English](README.md) | [Leia em Português](README_pt-br.md)
 
 ---
 
