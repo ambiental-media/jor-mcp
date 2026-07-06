@@ -2,7 +2,7 @@
 
 ---
 
-[Read in English](README.md) | [Leia em Português](README_pt-br.md)    [![License: TBD](https://img.shields.io/badge/License-TBD-lightgrey.svg)](#license) [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](#installation-via-docker)   <img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right vertical-align:middle" height="50em">
+[Read in English](README.md) | [Leia em Português](README_pt-br.md)    <img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right vertical-align:middle" height="50em">
 
 ---
 
