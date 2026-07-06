@@ -39,37 +39,25 @@ Usamos um `Dockerfile` de múltiplos estágios para manter a imagem de produçã
 1. **Estágio Builder:** Usa o gerenciador de pacotes `uv` para resolver e instalar dependências em um ambiente virtual isolado (`.venv`).
 2. **Estágio Runtime:** Copia apenas o `.venv` e o diretório `src/` para uma imagem base leve do Python. Executa a aplicação como um usuário não root (`appuser`) para cumprir as melhores práticas de segurança de containers.
 
-## 4. Pipeline de CI/CD
+## 4. Automatizando a Implantação com GitHub Actions (Replicação)
 
-O projeto usa três workflows separados do GitHub Actions. A Integração Contínua e o release/versionamento são totalmente automatizados; a implantação no Cloud Run é um passo manual e deliberado.
+Se a sua organização está replicando o `jor-mcp` usando um fork ou um repositório clonado, você pode utilizar os workflows do GitHub Actions inclusos (`.github/workflows/`) para automatizar a compilação de suas imagens Docker e a implantação no Google Cloud Run.
 
-### 4.1 Integração Contínua — `.github/workflows/ci.yml`
+### 4.1 Configurando Segredos do Repositório
+Para habilitar os workflows de implantação no seu repositório, navegue até **Settings > Secrets and variables > Actions** no seu repositório do GitHub e defina os seguintes segredos:
 
-Disparado em todo Pull Request. Possui três jobs independentes:
+| Nome do Segredo | Descrição | Exemplo / Recurso |
+| :--- | :--- | :--- |
+| `GCP_SA_KEY` | Chave JSON de uma Conta de Serviço do GCP com permissões para gravar no Artifact Registry e implantar no Cloud Run. | *(Obrigatório)* |
+| `GCP_PROJECT_ID` | O ID do seu projeto no Google Cloud. | `meu-projeto-mcp-123` |
+| `GCP_PROJECT_NUMBER` | O número do seu projeto no Google Cloud (usado nas anotações do serviço Knative). | `959918358302` |
 
-1. **`check`** — Gate de qualidade e segurança de código. Executa lint (`ruff check`), checagem de formatação (`ruff format --check`), checagem de tipos (`mypy`), testes com cobertura mínima de 90% (`pytest --cov-fail-under=90`), SAST (`bandit`) e auditoria de dependências (`pip-audit`).
-2. **`build-and-push`** — Roda apenas após o `check` passar. Constrói a imagem Docker, escaneia com Trivy (falha em vulnerabilidades de biblioteca `CRITICAL` e `HIGH`) e a envia para o Artifact Registry com a tag `:pr-<NÚMERO_DO_PR>` (ex.: `:pr-44`).
-3. **`commitlint`** — Verifica se ao menos um commit do PR segue o formato Conventional Commits. É isso que alimenta o versionamento automático no momento do release.
+### 4.2 Workflows Disponíveis
+Nosso repositório contém workflows pré-configurados que você pode adaptar:
+*   **`ci.yml`**: Compila, executa testes, realiza varreduras de segurança e constrói/envia o container para o seu próprio Google Artifact Registry.
+*   **`cd.yml`**: Dispara um fluxo de implantação manual via `workflow_dispatch` do GitHub (permitindo que você selecione exatamente qual tag de imagem deseja implantar no Cloud Run, sem fazer deploy automático de cada merge).
 
-### 4.2 Release & Versionamento — `.github/workflows/release.yml`
-
-Disparado quando um Pull Request é **mergeado na `main`**. Executa o [`python-semantic-release`](https://python-semantic-release.readthedocs.io/), que:
-
-1. Analisa os Conventional Commits do PR mergeado e calcula a próxima versão [SemVer](https://semver.org/) (`fix` → PATCH, `feat` → MINOR, `BREAKING CHANGE` → MAJOR).
-2. Atualiza o campo `version` no `pyproject.toml`, cria e envia a tag git `vX.Y.Z` e publica uma GitHub Release com notas geradas automaticamente.
-3. Se (e somente se) um release foi produzido, **re-tagueia a imagem existente** — a imagem `:pr-<N>` construída durante o CI é re-tagueada no Artifact Registry para `:vX.Y.Z` e `:latest`. Nenhum rebuild acontece; o mesmo digest é promovido.
-
-Isso significa que um PR mergeado nunca reconstrói a imagem — o artefato testado no CI é exatamente o mesmo promovido para um release versionado.
-
-### 4.3 Continuous Deployment — `.github/workflows/cd.yml`
-
-A implantação é **manual e intencional**, não disparada por merges. Roda via `workflow_dispatch` com um input obrigatório `image_tag` (ex.: `pr-44` ou `v1.2.0`). O workflow:
-
-1. Verifica se a tag solicitada realmente existe no Artifact Registry (falha imediatamente caso contrário).
-2. Renderiza o `service.yaml` com `envsubst`, substituindo apenas uma allowlist explícita de variáveis.
-3. Implanta a imagem selecionada no Cloud Run via `gcloud run services replace`.
-
-Como a implantação consome uma imagem existente por tag, ela é totalmente desacoplada do versionamento: você escolhe exatamente qual build chega à produção, e o passo de deploy nunca altera a versão do projeto.
+Para obter a documentação detalhada sobre os critérios de teste internos, mecanismos de versionamento e detalhes de cada job da pipeline, consulte o **[Guia de Contribuição](../../../CONTRIBUTING.md#continuous-integration-ci)**.
 
 ## 5. Manifesto de Serviço Declarativo
 

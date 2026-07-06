@@ -203,6 +203,13 @@ Versioning is fully automated and lives in a separate workflow, `.github/workflo
 
 Deployment itself is **manual**: the `.github/workflows/cd.yml` workflow is triggered on demand (`workflow_dispatch`) with the image tag you want to roll out to Cloud Run. Merging a PR produces a versioned image but does **not** deploy it.
 
+The deployment workflow:
+1. Verifies the requested tag actually exists in Artifact Registry (fails fast otherwise).
+2. Renders `service.yaml` with `envsubst`, substituting only an explicit allowlist of variables.
+3. Deploys the selected image to Cloud Run via `gcloud run services replace`.
+
+Because deployment consumes an existing image by tag, it is fully decoupled from versioning: you choose exactly which build reaches production, and the deploy step never changes the project version.
+
 ### Required GitHub Secrets
 
 For the `build-and-push` job to authenticate with Google Cloud, the following secret must be configured in the repository settings by a maintainer:
