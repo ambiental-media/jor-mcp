@@ -1,8 +1,8 @@
 <img src="assets/ambiental-logo.png" alt="Logo da Ambiental Media" style="float:right" height="60em">
 
-<p align="center" height="120em"><img src="assets/jor-logo.png" alt="Logo do Jor-MCP" style="float:left vertical-align:middle" height="180em"></p>
+<p align="center" height="120em"><img src="assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left vertical-align:middle" height="180em"></p>
 
-# Jor-MCP
+<h1 align="center">Jor-MCP</h1>
 
 [Read in English](README.md) | [Leia em Português](README_pt-br.md)
 
