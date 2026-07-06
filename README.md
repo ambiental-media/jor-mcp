@@ -1,15 +1,14 @@
-<img src="assets/ambiental-logo.png" alt="Logo da Ambiental Media" style="float:right" height="60em">
-
 <p align="center" height="120em"><img src="assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left vertical-align:middle" height="180em"></p>
 
-<h1 align="center">Jor-MCP</h1>
+---
 
 [Read in English](README.md) | [Leia em Português](README_pt-br.md)
 
-[![License: TBD](https://img.shields.io/badge/License-TBD-lightgrey.svg)](#license)
-[![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](#installation-via-docker)
-
 ---
+
+## Status
+
+[![License: TBD](https://img.shields.io/badge/License-TBD-lightgrey.svg)](#license) [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](#installation-via-docker)
 
 ### ⚠️ Project Status: Beta
 
@@ -24,8 +23,6 @@ The current release state of `jor-mcp` is **Beta**.
     *   Detect issues specific to regional context or configurations.
 *   **Advantages over Alpha:** Greater diversity of test profiles without risk to the public brand.
 
----
-
 ### 🚀 Join our Replication Pilot!
 
 We are gearing up to test the **replicability** of `jor-mcp` by deploying and adapting it in the infrastructure of a **partner journalism organization**. 
@@ -34,6 +31,8 @@ We are gearing up to test the **replicability** of `jor-mcp` by deploying and ad
 *   **Want to participate?** If your newsroom wants to pilot secure AI search over WordPress and GitHub, please **reach out to us** to express interest!
 
 ---
+
+## About
 
 `jor-mcp` is an open-source [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server specifically designed for journalism organizations. 
 

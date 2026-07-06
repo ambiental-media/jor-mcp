@@ -1,15 +1,14 @@
-<img src="assets/ambiental-logo.png" alt="Logo da Ambiental Media" style="float:right" height="60em">
-
 <p align="center" height="120em"><img src="assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left vertical-align:middle" height="180em"></p>
 
-<h1 align="center">Jor-MCP</h1>
+---
 
 [Read in English](README.md) | [Leia em Português](README_pt-br.md)
 
-[![License: TBD](https://img.shields.io/badge/License-TBD-lightgrey.svg)](#license)
-[![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](#installation-via-docker)
-
 ---
+
+## Estado
+
+[![License: TBD](https://img.shields.io/badge/License-TBD-lightgrey.svg)](#license) [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](#installation-via-docker)
 
 ### ⚠️ Estado do Projeto: Beta
 
@@ -24,8 +23,6 @@ O estado atual de lançamento do `jor-mcp` é **Beta**.
     *   Detectar problemas específicos de contexto regional/configuração.
 *   **Vantagens sobre Alpha:** Maior diversidade de perfis de teste sem risco à marca pública.
 
----
-
 ### 🚀 Participe do nosso Piloto de Replicação!
 
 Estamos nos preparando para testar a **replabilidade** do `jor-mcp`, instalando e adaptando-o na infraestrutura de outra **organização de jornalismo parceira**.
@@ -34,6 +31,8 @@ Estamos nos preparando para testar a **replabilidade** do `jor-mcp`, instalando 
 *   **Quer participar?** Se a sua redação tem interesse em pilotar buscas seguras de IA sobre WordPress e GitHub, **entre em contato conosco** para manifestar interesse!
 
 ---
+
+## Sobre
 
 `jor-mcp` é um servidor [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) de código aberto projetado especificamente para organizações jornalísticas.
 
