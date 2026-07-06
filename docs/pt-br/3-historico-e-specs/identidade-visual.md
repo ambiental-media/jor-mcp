@@ -1,3 +1,8 @@
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right; vertical-align:middle" height="50em"><img src="/assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left; vertical-align:middle" height="50em">
+
+---
+
+
 # Da informação ao fluxo: o processo de criação da identidade visual do JOR-MCP
 
 O desenvolvimento da identidade visual do JOR-MCP partiu de um desafio central: traduzir visualmente o funcionamento de uma ferramenta baseada em processamento, organização e retorno de informações. O objetivo era construir um sistema visual capaz de comunicar tecnologia, clareza e confiabilidade.

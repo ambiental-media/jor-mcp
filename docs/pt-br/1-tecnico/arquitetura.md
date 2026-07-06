@@ -1,3 +1,8 @@
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right; vertical-align:middle" height="50em"><img src="/assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left; vertical-align:middle" height="50em">
+
+---
+
+
 # Arquitetura do Jor-MCP
 
 Este documento fornece uma visão geral de alto nível da arquitetura do sistema Jor-MCP, detalhando como os componentes interagem com sistemas externos e ilustrando o ciclo de vida de uma solicitação recebida.

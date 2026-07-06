@@ -1,3 +1,8 @@
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right; vertical-align:middle" height="50em"><img src="/assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left; vertical-align:middle" height="50em">
+
+---
+
+
 # Jor-MCP Project Roadmap
 
 This document outlines the high-level goals and upcoming features for the Jor-MCP project. It provides transparency into our current focus areas and what users can expect in the future.

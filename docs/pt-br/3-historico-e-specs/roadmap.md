@@ -1,3 +1,8 @@
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right; vertical-align:middle" height="50em"><img src="/assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left; vertical-align:middle" height="50em">
+
+---
+
+
 # Roteiro do Projeto Jor-MCP
 
 Este documento descreve os objetivos de alto nível e as próximas funcionalidades do projeto Jor-MCP. Ele oferece transparência sobre nossas áreas de foco atuais e o que os usuários podem esperar no futuro.

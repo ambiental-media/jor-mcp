@@ -1,3 +1,8 @@
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right; vertical-align:middle" height="50em"><img src="/assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left; vertical-align:middle" height="50em">
+
+---
+
+
 # Project Journey
 
 The `jor-mcp` project was born from a vision to provide investigative journalism organizations with a secure, modular, and replicable infrastructure for structured journalistic data. 

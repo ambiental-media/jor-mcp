@@ -1,3 +1,8 @@
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right; vertical-align:middle" height="50em"><img src="/assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left; vertical-align:middle" height="50em">
+
+---
+
+
 # Conectando a LLMs
 
 Para conectar o Claude Desktop (ou outros agentes compatíveis com MCP) ao servidor Jor-MCP da Ambiental Media, siga estes passos simples e não técnicos:
