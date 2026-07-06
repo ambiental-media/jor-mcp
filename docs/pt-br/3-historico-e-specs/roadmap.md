@@ -10,7 +10,7 @@ Este documento descreve os objetivos de alto nível e as próximas funcionalidad
 ## Próximos Passos (Curto Prazo) ⏳
 *   **Rate Limiting Baseado em Tokens e Quotas Semanais:** Migrar de limites baseados em requisições para limites baseados no consumo de tokens, alterando o ciclo de reset de mensal para semanal para um controle mais preciso e métricas de faturamento ajustadas.
 *   **Expansão da Autenticação Firebase:** Explorar a configuração do Firebase para habilitar métodos de autenticação adicionais, como Google, OpenID Connect (OIDC), SAML, Microsoft e Apple.
-*   **Validação da Replicação:** Selecionar uma organização parceira para replicar o Jor-MCP em sua própria infraestrutura. Forneceremos suporte prático durante o processo e utilizaremos os aprendizados para refinar o manual de replicação (playbook) e a documentação definitiva.
+*   **Validação da Replicação (Programa Piloto):** Selecionar e colaborar com uma organização de jornalismo parceira piloto inicial para implantar o `jor-mcp` em sua infraestrutura. Ofereceremos suporte dedicado, usando as lições aprendidas para gerar um **Playbook de Replicação** padronizado, além de blueprints de **Infraestrutura como Código (IaC)** e **Configuração como Código (CaC)** para tornar implantações futuras livres de atritos. Organizações parceiras interessadas são convidadas a entrar em contato conosco para participar desta rodada piloto inicial.
 
 ## Visão de Futuro (Longo Prazo) 🚀
 (A definir)

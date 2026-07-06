@@ -10,7 +10,7 @@ This document outlines the high-level goals and upcoming features for the Jor-MC
 ## Next Up (Near Term) ⏳
 *   **Token-Based Rate Limiting & Weekly Quotas:** Migrate from request-based limits to token-consumption-based limits, moving from monthly to weekly reset cycles for tighter control and more precise billing metrics.
 *   **Firebase Authentication Expansion:** Exploring Firebase configuration to enable additional authentication methods such as Google, OpenID Connect (OIDC), SAML, Microsoft, and Apple.
-*   **Replication Validation:** Partner with a pilot media organization to deploy their own instance of Jor-MCP, provide hands-on support, and refine the definitive replication playbook and documentation.
+*   **Replication Validation (Pilot Program):** Select and collaborate with an initial pilot partner journalism organization to deploy `jor-mcp` in their infrastructure. We will provide dedicated hands-on support, using the lessons learned to generate a standardized **Replication Playbook**, **Infrastructure as Code (IaC)**, and **Configuration as Code (CaC)** blueprints to make future deployments friction-free. Interested partner organizations are invited to reach out to us to join this first pilot round.
 
 ## Future Vision (Long Term) 🚀
 (To be defined)

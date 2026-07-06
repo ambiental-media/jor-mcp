@@ -22,6 +22,15 @@ O estado atual de lançamento do `jor-mcp` é **Beta**.
 
 ---
 
+### 🚀 Participe do nosso Piloto de Replicação!
+
+Estamos nos preparando para testar a **replabilidade** do `jor-mcp`, instalando e adaptando-o na infraestrutura de outra **organização de jornalismo parceira**.
+*   **A Rodada Piloto:** Selecionaremos **um parceiro piloto** inicial para receber suporte prático e personalizado de implantação.
+*   **O Objetivo:** Esta primeira rodada servirá para refinar nossos manuais, gerando um **Playbook de Replicação** definitivo, além de templates de **Infraestrutura como Código (IaC)** e **Configuração como Código (CaC)** para facilitar a replicação autônoma para futuras organizações.
+*   **Quer participar?** Se a sua redação tem interesse em pilotar buscas seguras de IA sobre WordPress e GitHub, **entre em contato conosco** para manifestar interesse!
+
+---
+
 `jor-mcp` é um servidor [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) de código aberto projetado especificamente para organizações jornalísticas.
 
 Originalmente desenvolvido pela [Ambiental Media](https://ambiental.media/) com apoio de iniciativas globais de jornalismo, este servidor preenche a lacuna entre Grandes Modelos de Linguagem (LLMs) e a infraestrutura padrão das redações, permitindo que agentes de IA pesquisem, recuperem e analisem conteúdo com segurança em instâncias do WordPress e repositórios GitHub internos da sua organização.
