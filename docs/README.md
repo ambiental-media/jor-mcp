@@ -4,6 +4,13 @@ Welcome to the Jor-MCP documentation. Please choose your language and navigate a
 
 [Read in English](en/) | [Leia em Português](pt-br/)
 
+---
+
+### ⚠️ Release Status: Beta
+This project is currently in **Beta** phase. Key focus is to validate user experience (UX) with real users, perform controlled server load testing, and detect region-specific or config-specific challenges.
+
+---
+
 ## Documentation Structure
 
 - **1-technical**: Architecture, API contracts, and developer setup.

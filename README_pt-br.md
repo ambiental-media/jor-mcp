@@ -5,6 +5,23 @@
 [![License: TBD](https://img.shields.io/badge/License-TBD-lightgrey.svg)](#license)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](#installation-via-docker)
 
+---
+
+### ⚠️ Estado do Projeto: Beta
+
+O estado atual de lançamento do `jor-mcp` é **Beta**.
+*   **Características:**
+    *   Convites limitados e seletivos.
+    *   Requer cadastro e aprovação prévia dos usuários.
+    *   Muitas vezes com NDA (Acordo de Não Divulgação) em projetos comerciais.
+*   **Objetivo:**
+    *   Validar a experiência do usuário (UX) com pessoas reais.
+    *   Testar a carga do servidor com um número controlado de usuários simultâneos.
+    *   Detectar problemas específicos de contexto regional/configuração.
+*   **Vantagens sobre Alpha:** Maior diversidade de perfis de teste sem risco à marca pública.
+
+---
+
 `jor-mcp` é um servidor [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) de código aberto projetado especificamente para organizações jornalísticas.
 
 Originalmente desenvolvido pela [Ambiental Media](https://ambiental.media/) com apoio de iniciativas globais de jornalismo, este servidor preenche a lacuna entre Grandes Modelos de Linguagem (LLMs) e a infraestrutura padrão das redações, permitindo que agentes de IA pesquisem, recuperem e analisem conteúdo com segurança em instâncias do WordPress e repositórios GitHub internos da sua organização.
