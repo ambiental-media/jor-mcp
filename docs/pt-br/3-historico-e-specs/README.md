@@ -1,3 +1,8 @@
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right; vertical-align:middle" height="50em"><img src="/assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left; vertical-align:middle" height="50em">
+
+---
+
+
 # Jornada do Projeto
 
 O projeto `jor-mcp` nasceu de uma visão de fornecer às organizações de jornalismo investigativo uma infraestrutura segura, modular e replicável para dados jornalísticos estruturados.

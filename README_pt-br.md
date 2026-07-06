@@ -1,9 +1,42 @@
-# Jor-MCP
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right vertical-align:middle" height="50em">
+
+---
+
+<p align="center" height="120em"><img src="assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left vertical-align:middle" height="180em"></p>
+
+---
 
 [Read in English](README.md) | [Leia em Português](README_pt-br.md)
 
-[![License: TBD](https://img.shields.io/badge/License-TBD-lightgrey.svg)](#license)
-[![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](#installation-via-docker)
+---
+
+## Estado
+
+[![License: TBD](https://img.shields.io/badge/License-TBD-lightgrey.svg)](#license) [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](#installation-via-docker)
+
+### ⚠️ Estado do Projeto: Beta
+
+O estado atual de lançamento do `jor-mcp` é **Beta**.
+*   **Características:**
+    *   Convites limitados e seletivos.
+    *   Requer cadastro e aprovação prévia dos usuários.
+    *   Muitas vezes com NDA (Acordo de Não Divulgação) em projetos comerciais.
+*   **Objetivo:**
+    *   Validar a experiência do usuário (UX) com pessoas reais.
+    *   Testar a carga do servidor com um número controlado de usuários simultâneos.
+    *   Detectar problemas específicos de contexto regional/configuração.
+*   **Vantagens sobre Alpha:** Maior diversidade de perfis de teste sem risco à marca pública.
+
+### 🚀 Participe do nosso Piloto de Replicação!
+
+Estamos nos preparando para testar a **replabilidade** do `jor-mcp`, instalando e adaptando-o na infraestrutura de outra **organização de jornalismo parceira**.
+*   **A Rodada Piloto:** Selecionaremos **um parceiro piloto** inicial para receber suporte prático e personalizado de implantação.
+*   **O Objetivo:** Esta primeira rodada servirá para refinar nossos manuais, gerando um **Playbook de Replicação** definitivo, além de templates de **Infraestrutura como Código (IaC)** e **Configuração como Código (CaC)** para facilitar a replicação autônoma para futuras organizações.
+*   **Quer participar?** Se a sua redação tem interesse em pilotar buscas seguras de IA sobre WordPress e GitHub, **entre em contato conosco** para manifestar interesse!
+
+---
+
+## Sobre
 
 `jor-mcp` é um servidor [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) de código aberto projetado especificamente para organizações jornalísticas.
 

@@ -1,9 +1,42 @@
-# Jor-MCP
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right vertical-align:middle" height="50em">
+
+---
+
+<p align="center" height="120em"><img src="assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left vertical-align:middle" height="180em"></p>
+
+---
 
 [Read in English](README.md) | [Leia em Português](README_pt-br.md)
 
-[![License: TBD](https://img.shields.io/badge/License-TBD-lightgrey.svg)](#license)
-[![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](#installation-via-docker)
+---
+
+## Status
+
+[![License: TBD](https://img.shields.io/badge/License-TBD-lightgrey.svg)](#license) [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](#installation-via-docker)
+
+### ⚠️ Project Status: Beta
+
+The current release state of `jor-mcp` is **Beta**.
+*   **Characteristics:**
+    *   Limited and selective invitations.
+    *   Requires registration and prior user approval.
+    *   Often involves an NDA (Non-Disclosure Agreement) in commercial projects.
+*   **Objective:**
+    *   Validate user experience (UX) with real people.
+    *   Test server load with a controlled number of concurrent users.
+    *   Detect issues specific to regional context or configurations.
+*   **Advantages over Alpha:** Greater diversity of test profiles without risk to the public brand.
+
+### 🚀 Join our Replication Pilot!
+
+We are gearing up to test the **replicability** of `jor-mcp` by deploying and adapting it in the infrastructure of a **partner journalism organization**. 
+*   **The Pilot Round:** We will select **one pilot partner** first to receive hands-on setup support.
+*   **The Goal:** This round will be used to refine our setup guides, resulting in a comprehensive **Replication Playbook** along with standard **Infrastructure as Code (IaC)** and **Configuration as Code (CaC)** templates to make future self-service deployments extremely seamless.
+*   **Want to participate?** If your newsroom wants to pilot secure AI search over WordPress and GitHub, please **reach out to us** to express interest!
+
+---
+
+## About
 
 `jor-mcp` is an open-source [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server specifically designed for journalism organizations. 
 

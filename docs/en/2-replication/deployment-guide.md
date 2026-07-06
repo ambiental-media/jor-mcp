@@ -1,3 +1,8 @@
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right; vertical-align:middle" height="50em"><img src="/assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left; vertical-align:middle" height="50em">
+
+---
+
+
 # Infrastructure & Deployment
 
 This document outlines the deployment architecture for the Jor-MCP server on Google Cloud Platform (GCP).
@@ -39,37 +44,25 @@ We use a multi-stage `Dockerfile` to keep the production image secure and lightw
 1. **Builder Stage:** Uses the `uv` package manager to resolve and install dependencies into an isolated virtual environment (`.venv`).
 2. **Runtime Stage:** Copies only the `.venv` and the `src/` directory into a slim Python base image. It runs the application as a non-root user (`appuser`) to comply with container security best practices.
 
-## 4. CI/CD Pipeline
+## 4. Automating Deployment with GitHub Actions (Replication)
 
-The project uses three separate GitHub Actions workflows. Continuous Integration and release/versioning are fully automated; deployment to Cloud Run is a deliberate manual step.
+If your organization is replicating `jor-mcp` using a fork or a cloned repository, you can utilize the included GitHub Actions workflows (`.github/workflows/`) to automate building your Docker images and deploying them to Google Cloud Run.
 
-### 4.1 Continuous Integration — `.github/workflows/ci.yml`
+### 4.1 Configuring Repository Secrets
+To enable the deployment workflows in your repository, navigate to **Settings > Secrets and variables > Actions** in your GitHub repository and define the following secrets:
 
-Triggered on every Pull Request. It has three independent jobs:
+| Secret Name | Description | Example / Resource |
+| :--- | :--- | :--- |
+| `GCP_SA_KEY` | JSON key of a GCP Service Account with permissions to write to Artifact Registry and deploy to Cloud Run. | *(Required)* |
+| `GCP_PROJECT_ID` | Your Google Cloud project ID. | `my-mcp-project-123` |
+| `GCP_PROJECT_NUMBER` | Your Google Cloud project number (used in the Knative service annotations). | `959918358302` |
 
-1. **`check`** — Code quality and security gate. Runs lint (`ruff check`), format check (`ruff format --check`), type check (`mypy`), tests with 90% coverage enforcement (`pytest --cov-fail-under=90`), SAST (`bandit`), and dependency audit (`pip-audit`).
-2. **`build-and-push`** — Runs only after `check` passes. Builds the Docker image, scans it with Trivy (fails on `CRITICAL` and `HIGH` library vulnerabilities), and pushes it to Artifact Registry tagged `:pr-<PR_NUMBER>` (e.g. `:pr-44`).
-3. **`commitlint`** — Verifies that at least one commit in the PR follows the Conventional Commits format. This is what feeds the automated versioning at release time.
+### 4.2 Available Workflows
+Our repository contains pre-configured workflows that you can adapt:
+*   **`ci.yml`**: Compiles, runs tests, performs security scans, and builds/pushes the container to your own Google Artifact Registry.
+*   **`cd.yml`**: Triggers a manual deployment flow via GitHub's `workflow_dispatch` (allowing you to select exactly which image tag to deploy to Cloud Run without auto-deploying every merge).
 
-### 4.2 Release & Versioning — `.github/workflows/release.yml`
-
-Triggered when a Pull Request is **merged into `main`**. It runs [`python-semantic-release`](https://python-semantic-release.readthedocs.io/), which:
-
-1. Parses the Conventional Commits in the merged PR and computes the next [SemVer](https://semver.org/) version (`fix` → PATCH, `feat` → MINOR, `BREAKING CHANGE` → MAJOR).
-2. Bumps the `version` field in `pyproject.toml`, creates and pushes the `vX.Y.Z` git tag, and publishes a GitHub Release with auto-generated notes.
-3. If (and only if) a release was produced, **retags the existing image** — the `:pr-<N>` image built during CI is retagged in Artifact Registry to `:vX.Y.Z` and `:latest`. No rebuild happens; the same digest is promoted.
-
-This means a merged PR never rebuilds the image — the artifact tested in CI is the exact one promoted to a versioned release.
-
-### 4.3 Continuous Deployment — `.github/workflows/cd.yml`
-
-Deployment is **manual and intentional**, not triggered by merges. It runs via `workflow_dispatch` with a required `image_tag` input (e.g. `pr-44` or `v1.2.0`). The workflow:
-
-1. Verifies the requested tag actually exists in Artifact Registry (fails fast otherwise).
-2. Renders `service.yaml` with `envsubst`, substituting only an explicit allowlist of variables.
-3. Deploys the selected image to Cloud Run via `gcloud run services replace`.
-
-Because deployment consumes an existing image by tag, it is fully decoupled from versioning: you choose exactly which build reaches production, and the deploy step never changes the project version.
+For detailed documentation on the internal testing gates, versioning mechanisms, and detailed pipeline jobs, please refer to the **[Contributing Guide](../../../CONTRIBUTING.md#continuous-integration-ci)**.
 
 ## 5. Declarative Service Manifest
 

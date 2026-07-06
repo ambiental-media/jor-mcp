@@ -1,3 +1,7 @@
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right; vertical-align:middle" height="50em"><img src="/assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left; vertical-align:middle" height="50em">
+
+---
+
 # Contributing to jor-mcp
 
 First off, thank you for considering contributing to `jor-mcp`! It's people like you that make open-source tools for journalism better.
@@ -202,6 +206,13 @@ Versioning is fully automated and lives in a separate workflow, `.github/workflo
 3. Promote the image: the `:pr-<N>` image built during CI is retagged in Artifact Registry to `:vX.Y.Z` and `:latest` — no rebuild, the same digest is promoted.
 
 Deployment itself is **manual**: the `.github/workflows/cd.yml` workflow is triggered on demand (`workflow_dispatch`) with the image tag you want to roll out to Cloud Run. Merging a PR produces a versioned image but does **not** deploy it.
+
+The deployment workflow:
+1. Verifies the requested tag actually exists in Artifact Registry (fails fast otherwise).
+2. Renders `service.yaml` with `envsubst`, substituting only an explicit allowlist of variables.
+3. Deploys the selected image to Cloud Run via `gcloud run services replace`.
+
+Because deployment consumes an existing image by tag, it is fully decoupled from versioning: you choose exactly which build reaches production, and the deploy step never changes the project version.
 
 ### Required GitHub Secrets
 

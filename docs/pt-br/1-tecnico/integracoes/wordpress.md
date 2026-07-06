@@ -1,3 +1,8 @@
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right; vertical-align:middle" height="50em"><img src="/assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left; vertical-align:middle" height="50em">
+
+---
+
+
 # Integração WordPress
 
 *(Placeholder: Como a ferramenta WordPress busca, analisa e limpa dados. Estratégias de limitação de taxa e paginação).*

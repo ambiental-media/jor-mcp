@@ -1,8 +1,20 @@
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right; vertical-align:middle" height="50em"><img src="/assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left; vertical-align:middle" height="50em">
+
+---
+
+
 # Jor-MCP Documentation
 
 Welcome to the Jor-MCP documentation. Please choose your language and navigate according to your goals:
 
 [Read in English](en/) | [Leia em Português](pt-br/)
+
+---
+
+### ⚠️ Release Status: Beta
+This project is currently in **Beta** phase. Key focus is to validate user experience (UX) with real users, perform controlled server load testing, and detect region-specific or config-specific challenges.
+
+---
 
 ## Documentation Structure
 

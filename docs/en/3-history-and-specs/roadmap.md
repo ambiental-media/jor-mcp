@@ -1,3 +1,8 @@
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right; vertical-align:middle" height="50em"><img src="/assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left; vertical-align:middle" height="50em">
+
+---
+
+
 # Jor-MCP Project Roadmap
 
 This document outlines the high-level goals and upcoming features for the Jor-MCP project. It provides transparency into our current focus areas and what users can expect in the future.
@@ -10,7 +15,7 @@ This document outlines the high-level goals and upcoming features for the Jor-MC
 ## Next Up (Near Term) ⏳
 *   **Token-Based Rate Limiting & Weekly Quotas:** Migrate from request-based limits to token-consumption-based limits, moving from monthly to weekly reset cycles for tighter control and more precise billing metrics.
 *   **Firebase Authentication Expansion:** Exploring Firebase configuration to enable additional authentication methods such as Google, OpenID Connect (OIDC), SAML, Microsoft, and Apple.
-*   **Replication Validation:** Partner with a pilot media organization to deploy their own instance of Jor-MCP, provide hands-on support, and refine the definitive replication playbook and documentation.
+*   **Replication Validation (Pilot Program):** Select and collaborate with an initial pilot partner journalism organization to deploy `jor-mcp` in their infrastructure. We will provide dedicated hands-on support, using the lessons learned to generate a standardized **Replication Playbook**, **Infrastructure as Code (IaC)**, and **Configuration as Code (CaC)** blueprints to make future deployments friction-free. Interested partner organizations are invited to reach out to us to join this first pilot round.
 
 ## Future Vision (Long Term) 🚀
 (To be defined)

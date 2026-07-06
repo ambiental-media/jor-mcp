@@ -1,3 +1,8 @@
+<img src="/assets/ambiental-logo.png" alt="Logo Ambiental Media" style="float:right; vertical-align:middle" height="50em"><img src="/assets/jor-logo.png" alt="Logo Jor-MCP" style="float:left; vertical-align:middle" height="50em">
+
+---
+
+
 # Global Load Balancer Configuration
 
 ## 1. Overview
@@ -28,6 +33,7 @@ The core of the load balancer is the URL Map. Configure the Host and Path rules 
 | :--- | :--- | :--- |
 | `jormcp.ambiental.media` | `/mcp/*` | API (Serverless NEG) |
 | `jormcp.ambiental.media` | `/api/oauth/*` | API (Serverless NEG) |
+| `jormcp.ambiental.media` | `/.well-known/*` | API (Serverless NEG) |
 | `jormcp.ambiental.media` | `/*` (Default) | Frontend (Backend Bucket) |
 
 ## 4. Security Policies & CORS
