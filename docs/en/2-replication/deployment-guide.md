@@ -2,47 +2,43 @@
 
 ---
 
-
-# Infrastructure & Deployment
+# Infrastructure & Deployment Guide
 
 This document outlines the deployment architecture for the Jor-MCP server on Google Cloud Platform (GCP).
+
+---
 
 ## 1. GCP Architecture Overview
 
 The system is designed to be fully serverless, highly available, and stateless at the application layer.
 
-- **Entrypoint:** Global External Application Load Balancer (Handles custom domains, SSL, and SSE streaming). [See detailed configuration guide](load-balancer-config.md).
-- **Frontend Hosting:** Google Cloud Storage (GCS) Bucket configured as a Backend Bucket on the Load Balancer, with Cloud CDN enabled.
-- **Compute:** Google Cloud Run (Containerized, auto-scaling). Locked down to "Internal and Cloud Load Balancing traffic only."
-- **Database/State:** Google Cloud Firestore (Handles distributed rate-limiting via atomic increments).
-- **Identity:** Google Cloud Identity Platform / Firebase Auth (Validates JWTs).
-- **Observability:** Google Cloud Operations Suite (Cloud Logging and Cloud Trace via OpenTelemetry).
+*   **Entrypoint:** Global External Application Load Balancer (Handles custom domains, SSL, and SSE streaming). [See detailed configuration guide](load-balancer-config.md).
+*   **Frontend Hosting:** Google Cloud Storage (GCS) Bucket configured as a Backend Bucket on the Load Balancer, with Cloud CDN enabled.
+*   **Compute:** Google Cloud Run (Containerized, auto-scaling). Locked down to "Internal and Cloud Load Balancing traffic only."
+*   **Database/State:** Google Cloud Firestore (Handles distributed rate-limiting, OAuth DCR clients, and codes).
+*   **Identity:** Google Cloud Identity Platform / Firebase Auth (Validates JWTs).
+*   **Observability:** Google Cloud Operations Suite (Cloud Logging and Cloud Trace via OpenTelemetry).
 
-## 2. Environment Variables
+---
 
-The server relies strictly on environment variables for configuration. No secrets are hardcoded. In GCP, these should be injected via Google Secret Manager into Cloud Run.
+## 2. Environment Variables & Resources
 
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `PORT` | The port the ASGI server binds to. | `8080` |
-| `LOG_LEVEL` | Python logging level (`INFO`, `DEBUG`, `WARNING`). | `INFO` |
-| `FIREBASE_PROJECT_ID` | The GCP Project ID associated with Firebase Auth. | *(Required)* |
-| `GCP_PROJECT_ID` | GCP project ID used to emit `logging.googleapis.com/trace` in Cloud Logging format. Falls back to `GOOGLE_CLOUD_PROJECT` when omitted. | *(Optional in Cloud Run, recommended elsewhere)* |
-| `WORDPRESS_API_URL` | Base URL for the main WordPress REST API. | `https://ambiental.media/wp-json/wp/v2` |
-| `MCP_GITHUB_TOKEN` | Personal Access Token to read private Next.js repos. | *(Required)* |
-| `MCP_GITHUB_REPOS` | Comma-separated list of Next.js repos (e.g., `mata-nativa,rio60`). | *(Required)* |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`| OTLP endpoint for tracing. Empty means console export. | `""` |
+The server relies strictly on environment variables for configuration. No secrets are hardcoded. In GCP, these are injected securely via Google Secret Manager into Cloud Run.
 
-> **Note on Rate Limiting (Firestore):** The application relies on Google Cloud Firestore for its state. It automatically utilizes Google Application Default Credentials (ADC) bound to the Cloud Run service account. No explicit connection string or secret is required, but the service account *must* be granted the `roles/datastore.user` IAM role.
-> 
+For a comprehensive guide detailing every environment variable and resource configuration, please refer to the **[Configuration & Environment Guide](configuration-and-env.md)**.
+
 > **Note on Routing:** Ensure your Global Load Balancer is configured to route traffic destined for `/mcp/*` and `/api/oauth/*` to the Serverless NEG (Cloud Run service), and all other traffic (`/*`) to the Backend Bucket (GCS).
+
+---
 
 ## 3. Dockerization Strategy
 
-We use a multi-stage `Dockerfile` to keep the production image secure and lightweight.
+We use a multi-stage `Dockerfile` to keep the production image secure and lightweight:
 
-1. **Builder Stage:** Uses the `uv` package manager to resolve and install dependencies into an isolated virtual environment (`.venv`).
-2. **Runtime Stage:** Copies only the `.venv` and the `src/` directory into a slim Python base image. It runs the application as a non-root user (`appuser`) to comply with container security best practices.
+1.  **Builder Stage:** Uses the `uv` package manager to resolve and install dependencies into an isolated virtual environment (`.venv`).
+2.  **Runtime Stage:** Copies only the `.venv` and the `src/` directory into a slim Python base image. It runs the application as a non-root user (`appuser`) to comply with container security best practices.
+
+---
 
 ## 4. Automating Deployment with GitHub Actions (Replication)
 
@@ -64,11 +60,13 @@ Our repository contains pre-configured workflows that you can adapt:
 
 For detailed documentation on the internal testing gates, versioning mechanisms, and detailed pipeline jobs, please refer to the **[Contributing Guide](../../../CONTRIBUTING.md#continuous-integration-ci)**.
 
+---
+
 ## 5. Declarative Service Manifest
 
 The Cloud Run service is managed declaratively via a `service.yaml` file located at the root of the repository. This file is the single source of truth for the service configuration, including container resources, auto-scaling, ingress, and environment variables.
 
-Sensitive variables (for example `MCP_GITHUB_TOKEN`) are never hardcoded in the YAML. They are stored in GCP Secret Manager and injected directly into the container at runtime via `valueFrom: secretKeyRef`.
+Sensitive variables are never hardcoded in the YAML. They are stored in GCP Secret Manager and injected directly into the container at runtime via `valueFrom: secretKeyRef`.
 
 ### Applying the manifest locally
 

@@ -26,7 +26,8 @@ This document provides guidelines and instructions for contributing to this proj
 ---
 
 ## Code of Conduct
-*(Placeholder: Briefly describe the expected behavior of contributors or link to a CODE_OF_CONDUCT.md file.)*
+
+This project is dedicated to providing a welcoming, diverse, and secure community. Contributors are expected to act with integrity, respect, and professionalism. Let's make open-source tools for journalism better together!
 
 ---
 
@@ -42,7 +43,12 @@ Before contributing to `jor-mcp`, ensure you have the following installed on you
 ---
 
 ## Getting Started
-*(Placeholder: Step-by-step instructions on how to fork the repo, clone it, and set up environment variables.)*
+
+To begin contributing to `jor-mcp`:
+1.  **Fork and Clone:** Fork the repository on GitHub and clone it locally.
+2.  **Environment Setup:** Initialize dependencies using `uv sync` to set up your isolated Python virtual environment.
+3.  **Local Checks:** Run `make check` to ensure your local environment passes formatting, linting, typing, and testing.
+4.  **Local Run:** Set up your `.env` variables from `.env.example` and execute `make run` to spin up the local service.
 
 ---
 
@@ -274,4 +280,34 @@ Findings below these thresholds are reported in the logs for awareness but do no
 ---
 
 ## Reporting Bugs
-*(Placeholder: Instructions on how to submit issue tickets, what information to include, logs, etc.)*
+
+Please report any bugs, security vulnerabilities, or issue findings by opening an issue on GitHub. Include:
+*   A clear, descriptive title.
+*   Steps to reproduce the issue.
+*   The expected vs actual behavior.
+*   Relevant logs, terminal outputs, or screenshot references.
+
+---
+
+## Documentation Formatting Guidelines
+
+This section defines the strict rules that all human and AI contributors must follow when creating or modifying markdown files in the `jor-mcp` repository.
+
+### 1. File Naming and Structure
+*   **Kebab-case only:** All markdown files must be named using lowercase letters and hyphens (e.g., `api-contracts.md`).
+*   **Bilingual parity:** All files in `docs/en/` must have a corresponding translation in `docs/pt-br/`.
+*   **No spaces in paths:** Directory names must follow `kebab-case`.
+
+### 2. Markdown Formatting
+*   **Headings:** Start every file with a single `# Heading 1` (Title). Use `##` and `###` for subsequent sections.
+*   **Lists:** Always use hyphens (`-`) for unordered lists.
+*   **Code Blocks:** Always specify the language (e.g., `python`, `bash`, `json`, `http`). Use `mermaid` for all diagrams.
+*   **Diagrams:** Use Mermaid.js. Include `%%{init: {'theme': 'dark'}}%%` at the top.
+
+### 3. Language & Tone
+*   **Tone:** Professional, concise, and direct.
+*   **English First:** English is the source of truth for technical documentation. Technical terms (e.g., "Rate Limiting", "Middleware") must remain in English in both EN and PT-BR versions.
+*   **Voice:** Active voice preferred.
+
+### 4. Cross-Referencing
+*   **Relative Links:** Use only relative links (e.g., `[See Architecture](../1-technical/architecture.md)`). Never use absolute GitHub URLs.
