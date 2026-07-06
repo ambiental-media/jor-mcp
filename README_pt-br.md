@@ -12,7 +12,7 @@
 
 ## Estado
 
-[![License: TBD](https://img.shields.io/badge/License-TBD-lightgrey.svg)](#license) [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](#installation-via-docker)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE) [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](#installation-via-docker)[![codecov](https://codecov.io/github/ambiental-media/jor-mcp/graph/badge.svg?token=AHANHTFVR5)](https://codecov.io/github/ambiental-media/jor-mcp)
 
 ### ⚠️ Estado do Projeto: Beta
 
@@ -131,4 +131,4 @@ O desenvolvimento do `jor-mcp` foi possível graças ao apoio generoso de duas g
 
 ## Licença
 
-*(Placeholder: A licença de código aberto para este projeto ainda não foi determinada. Verifique mais tarde para detalhes de licenciamento.)*
+Este projeto está licenciado sob a Licença Apache 2.0 - consulte o arquivo [LICENSE](LICENSE) para obter detalhes.
