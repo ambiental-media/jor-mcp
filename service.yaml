@@ -50,6 +50,8 @@ spec:
               value: "${MCP_GITHUB_REPOS}"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "${OTEL_EXPORTER_OTLP_ENDPOINT}"
+            - name: FIREBASE_WEB_API_KEY
+              value: "${FIREBASE_WEB_API_KEY}"
 
             # ── Secrets via Secret Manager ───────────────────────────────────
             - name: MCP_GITHUB_TOKEN
