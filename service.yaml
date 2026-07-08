@@ -24,7 +24,7 @@ spec:
         run.googleapis.com/secrets: "mcp-github-token:projects/${GCP_PROJECT_NUMBER}/secrets/MCP_GITHUB_TOKEN,jwt-secret:projects/${GCP_PROJECT_NUMBER}/secrets/JWT_SECRET"
     spec:
       # ← Service account configured with the actual GCP value
-      serviceAccountName: github-actions-ci@jor-mcp.iam.gserviceaccount.com
+      serviceAccountName: 959918358302-compute@developer.gserviceaccount.com
 
       containers:
         - image: ${IMAGE_URL}
@@ -50,6 +50,8 @@ spec:
               value: "${MCP_GITHUB_REPOS}"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "${OTEL_EXPORTER_OTLP_ENDPOINT}"
+            - name: FIREBASE_WEB_API_KEY
+              value: "${FIREBASE_WEB_API_KEY}"
 
             # ── Secrets via Secret Manager ───────────────────────────────────
             - name: MCP_GITHUB_TOKEN
