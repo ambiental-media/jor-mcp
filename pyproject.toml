@@ -1,6 +1,6 @@
 [project]
 name = "jor-mcp"
-version = "0.7.0"
+version = "0.8.0"
 description = "Servidor MCP para a Ambiental Media"
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
