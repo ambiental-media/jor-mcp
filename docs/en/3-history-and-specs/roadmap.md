@@ -10,12 +10,14 @@ This document outlines the high-level goals and upcoming features for the Jor-MC
 ## Currently Under Development 🏗️
 *   **Native MCP OAuth 2.1 Integration:** Transitioning from static API keys to a fully interactive OAuth flow using PKCE for zero-configuration Claude Desktop connections.
 *   **Next.js Portal Development:** Building the `jor-mcp-site` to handle user consent and authentication via Google SSO.
+*   **Security & Infrastructure Hardening:** Audit and patch vulnerabilities in the frontend portal (XSS, Open Redirect), implement IP-based rate limiting on public backend routes, and apply the principle of least privilege (IAM) to the Cloud Run infrastructure.
 *   **Legal Framework:** Establish the legal foundation for the project, including defining the Open Source License, drafting Terms of Use for the public instance, and creating the Privacy Policy for user data handling.
 
 ## Next Up (Near Term) ⏳
 *   **Token-Based Rate Limiting & Weekly Quotas:** Migrate from request-based limits to token-consumption-based limits, moving from monthly to weekly reset cycles for tighter control and more precise billing metrics.
 *   **Firebase Authentication Expansion:** Exploring Firebase configuration to enable additional authentication methods such as Google, OpenID Connect (OIDC), SAML, Microsoft, and Apple.
 *   **Replication Validation (Pilot Program):** Select and collaborate with an initial pilot partner journalism organization to deploy `jor-mcp` in their infrastructure. We will provide dedicated hands-on support, using the lessons learned to generate a standardized **Replication Playbook**, **Infrastructure as Code (IaC)**, and **Configuration as Code (CaC)** blueprints to make future deployments friction-free. Interested partner organizations are invited to reach out to us to join this first pilot round.
+*   **Sustainability Models:** Exploration of sustainability and commercialization models for JOR-MCP, aiming to ensure its continuity and expand its potential impact.
 
 ## Future Vision (Long Term) 🚀
 (To be defined)
