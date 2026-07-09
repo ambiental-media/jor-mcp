@@ -12,7 +12,8 @@ jobs:
     name: Semantic Release
     runs-on: ubuntu-latest
     # only run when the PR was actually merged into main
-    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
+    # prevent loop, do not run for automated (bot) commits
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.actor != 'jor-mcp-gh-release[bot]'
 
     env:
       REGISTRY: us-central1-docker.pkg.dev
@@ -21,17 +22,30 @@ jobs:
       IMAGE: jor-mcp-server
 
     steps:
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
       - name: Checkout code
         uses: actions/checkout@v6.0.2
         with:
           ref: main
           fetch-depth: 0   # PSR needs the full history and tags
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "jor-mcp-gh-release[bot]"
+          git config user.email "jor-mcp-gh-release[bot]@users.noreply.github.com"
 
       - name: Python Semantic Release
         id: release
         uses: python-semantic-release/python-semantic-release@v10.5.3
         with:
-          github_token: ${{ secrets.PAT_GH_ACTION }}
+          github_token: ${{ steps.app-token.outputs.token }}
 
       - name: Decode credentials
         if: steps.release.outputs.released == 'true'
