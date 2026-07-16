@@ -18,6 +18,7 @@ Este documento descreve os objetivos de alto nível e as próximas funcionalidad
 *   **Expansão da Autenticação Firebase:** Explorar a configuração do Firebase para habilitar métodos de autenticação adicionais, como Google, OpenID Connect (OIDC), SAML, Microsoft e Apple.
 *   **Validação da Replicação (Programa Piloto):** Selecionar e colaborar com uma organização de jornalismo parceira piloto inicial para implantar o `jor-mcp` em sua infraestrutura. Ofereceremos suporte dedicado, usando as lições aprendidas para gerar um **Playbook de Replicação** padronizado, além de blueprints de **Infraestrutura como Código (IaC)** e **Configuração como Código (CaC)** para tornar implantações futuras livres de atritos. Organizações parceiras interessadas são convidadas a entrar em contato conosco para participar desta rodada piloto inicial.
 *   **Modelos de Sustentabilidade:** Exploração de modelos de sustentabilidade e comercialização para o JOR-MCP, visando garantir sua continuidade e ampliar seu potencial de impacto.
+*   **Sessões de Teste com Usuários:** Organizar e conduzir sessões de teste controladas com usuários selecionados para coletar feedback estruturado, identificar bugs e descobrir oportunidades de funcionalidades. Relatórios de teste serão gerados para orientar os próximos ciclos de iteração do projeto.
 
 ## Visão de Futuro (Longo Prazo) 🚀
 (A definir)
