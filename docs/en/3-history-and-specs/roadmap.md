@@ -18,6 +18,7 @@ This document outlines the high-level goals and upcoming features for the Jor-MC
 *   **Firebase Authentication Expansion:** Exploring Firebase configuration to enable additional authentication methods such as Google, OpenID Connect (OIDC), SAML, Microsoft, and Apple.
 *   **Replication Validation (Pilot Program):** Select and collaborate with an initial pilot partner journalism organization to deploy `jor-mcp` in their infrastructure. We will provide dedicated hands-on support, using the lessons learned to generate a standardized **Replication Playbook**, **Infrastructure as Code (IaC)**, and **Configuration as Code (CaC)** blueprints to make future deployments friction-free. Interested partner organizations are invited to reach out to us to join this first pilot round.
 *   **Sustainability Models:** Exploration of sustainability and commercialization models for JOR-MCP, aiming to ensure its continuity and expand its potential impact.
+*   **User Testing & Feedback Sessions:** Organize and conduct controlled testing sessions with selected users to collect structured feedback, identify bugs, and uncover feature opportunities. Testing reports will be generated to inform the project's next iteration cycles.
 
 ## Future Vision (Long Term) 🚀
 (To be defined)
