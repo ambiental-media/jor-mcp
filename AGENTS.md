@@ -116,3 +116,10 @@ Pytest is the gold standard. The approach emphasizes composition over inheritanc
 - **Descriptions:** Every tool must have a highly detailed `description` parameter string in its decorator. Explain exactly what it does, the parameters it accepts, and when an LLM should use it. Write these descriptions in Portuguese, as the target audience/domain is Brazilian journalism.
 
 
+
+<!-- lean-ctx -->
+## lean-ctx
+
+lean-ctx is active — the MCP tools replace native equivalents.
+Full rules: LEAN-CTX.md (open on demand — do not auto-load).
+<!-- /lean-ctx -->
