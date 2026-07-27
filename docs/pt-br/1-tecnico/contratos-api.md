@@ -102,14 +102,26 @@ Todos os endpoints OAuth seguem este esquema de erro padrão para respostas não
 ### Política de CORS
 Todas as rotas `/api/oauth/*` são servidas atrás de um middleware de CORS para que
 o portal de consentimento no navegador (`jor-mcp-site`) possa chamá-las via AJAX.
-Elas também ignoram a autenticação Firebase e o rate limiting — são o mecanismo
-pelo qual os clientes obtêm os tokens Firebase em primeiro lugar.
+Elas também ignoram a autenticação Firebase e a cota mensal por usuário — são o
+mecanismo pelo qual os clientes obtêm os tokens Firebase em primeiro lugar. Em
+lugar dela, aplica-se um limite por IP (veja abaixo).
 
 *   **Origens Permitidas:** configuradas pela variável de ambiente
     `CORS_ALLOWED_ORIGINS` (separadas por vírgula). Padrão: `http://localhost:3000`
     (portal de dev) e `https://jormcp.ambiental.media` (portal de prod).
 *   **Métodos Permitidos:** `GET`, `POST`, `OPTIONS`.
 *   **Cabeçalhos Permitidos:** `Authorization`, `Content-Type`.
+
+### Limitação de Taxa por IP (rotas não autenticadas)
+Como `/.well-known/*` e `/api/oauth/*` aceitam tráfego não autenticado, elas são
+medidas pelo IP do cliente em vez de por usuário. Sem isso, `POST /api/oauth/register`
+permitiria a qualquer pessoa inundar o Firestore com registros órfãos de clientes.
+
+*   **Escopo:** todas as rotas isentas de autenticação. `/health` e as rotas autenticadas não são afetadas.
+*   **Algoritmo:** janela fixa no Firestore (coleção `ip_rate_limits`), padrão de **60 requisições por 60 segundos por IP**, ajustável via `IP_RATE_LIMIT_REQUESTS` / `IP_RATE_LIMIT_WINDOW_SECONDS`.
+*   **IP do cliente:** lido do `X-Forwarded-For` contando a partir da direita (veja `IP_RATE_LIMIT_TRUSTED_PROXIES`), com fallback para o endereço do peer no escopo ASGI.
+*   **Rejeição:** `429 Too Many Requests` com cabeçalho `Retry-After` indicando os segundos restantes da janela, e corpo `{"detail": "Too Many Requests"}`.
+*   **Fail-open:** se o Firestore estiver indisponível, a requisição passa e um aviso é registrado.
 
 ### URLs Base
 As URLs absolutas anunciadas pelos metadados de discovery são montadas a partir de
