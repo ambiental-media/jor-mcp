@@ -102,14 +102,26 @@ All OAuth endpoints follow this standard error schema for non-2xx responses:
 ### CORS Policy
 All `/api/oauth/*` routes are served behind a CORS middleware so the browser-based
 consent portal (`jor-mcp-site`) can call them via AJAX. They also bypass Firebase
-authentication and rate limiting — they are the mechanism through which clients
-obtain Firebase tokens in the first place.
+authentication and the per-user monthly quota — they are the mechanism through which
+clients obtain Firebase tokens in the first place. In their place, a per-IP limit
+applies (see below).
 
 *   **Allowed Origins:** configured via the `CORS_ALLOWED_ORIGINS` environment
     variable (comma-separated). Defaults to `http://localhost:3000` (dev portal)
     and `https://jormcp.ambiental.media` (prod portal).
 *   **Allowed Methods:** `GET`, `POST`, `OPTIONS`.
 *   **Allowed Headers:** `Authorization`, `Content-Type`.
+
+### Per-IP Rate Limit (unauthenticated routes)
+Because `/.well-known/*` and `/api/oauth/*` accept unauthenticated traffic, they are
+metered by client IP instead of by user. Without it, `POST /api/oauth/register` would
+let anyone flood Firestore with orphan client documents.
+
+*   **Scope:** every auth-exempt route. `/health` and all authenticated routes are unaffected.
+*   **Algorithm:** Firestore fixed window (`ip_rate_limits` collection), default **60 requests per 60 seconds per IP**, tunable via `IP_RATE_LIMIT_REQUESTS` / `IP_RATE_LIMIT_WINDOW_SECONDS`.
+*   **Client IP:** read from `X-Forwarded-For` counting from the right (see `IP_RATE_LIMIT_TRUSTED_PROXIES`), falling back to the ASGI peer address.
+*   **Rejection:** `429 Too Many Requests` with a `Retry-After` header carrying the seconds left in the window, and body `{"detail": "Too Many Requests"}`.
+*   **Fail-open:** if Firestore is unreachable the request is allowed through and a warning is logged.
 
 ### Base URLs
 The absolute URLs advertised by the discovery metadata are built from two

@@ -26,6 +26,7 @@ from src.config import (
     HTTP_TIMEOUT,
 )
 from src.middleware.auth import AuthMiddleware
+from src.middleware.ip_rate_limit import IPRateLimitMiddleware
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.telemetry import instrument_asgi_app, setup_telemetry
 
@@ -132,6 +133,7 @@ _starlette_app = Starlette(
             allow_methods=["GET", "POST", "OPTIONS"],
             allow_headers=["Authorization", "Content-Type"],
         ),
+        Middleware(IPRateLimitMiddleware, firestore_factory=get_firestore_client),
         Middleware(AuthMiddleware),
         Middleware(RateLimitMiddleware, firestore_factory=get_firestore_client),
     ],
@@ -147,7 +149,7 @@ _starlette_app = Starlette(
 # forbids add_middleware() after startup.  OTel's ProxyTracer mechanism ensures
 # that spans are correlated with the real TracerProvider configured later inside
 # server_lifespan.  Final middleware order (outermost first):
-#   OTel → CORS → AuthMiddleware → RateLimitMiddleware → routes
+#   OTel → CORS → IPRateLimitMiddleware → AuthMiddleware → RateLimitMiddleware → routes
 instrument_asgi_app(_starlette_app)
 
 app = _starlette_app

@@ -24,6 +24,29 @@ RATE_LIMIT_PRO: int = int(os.environ.get("RATE_LIMIT_PRO_REQUESTS", "2000"))
 """Monthly request quota for 'pro' tier users."""
 
 # ---------------------------------------------------------------------------
+# IP Rate Limiting (unauthenticated routes)
+# ---------------------------------------------------------------------------
+
+IP_RATE_LIMIT_COLLECTION: str = os.environ.get("IP_RATE_LIMIT_COLLECTION", "ip_rate_limits")
+"""Firestore collection used to store short fixed-window counters keyed by client IP."""
+
+IP_RATE_LIMIT_REQUESTS: int = int(os.environ.get("IP_RATE_LIMIT_REQUESTS", "60"))
+"""Maximum requests a single IP may send to unauthenticated routes per window."""
+
+IP_RATE_LIMIT_WINDOW_SECONDS: int = int(os.environ.get("IP_RATE_LIMIT_WINDOW_SECONDS", "60"))
+"""Length in seconds of the fixed window applied to the per-IP counter."""
+
+IP_RATE_LIMIT_TRUSTED_PROXIES: int = int(os.environ.get("IP_RATE_LIMIT_TRUSTED_PROXIES", "1"))
+"""Number of trusted proxies appending to ``X-Forwarded-For`` at the right end.
+
+Google Cloud Load Balancing rewrites the header as
+``<supplied-value>, <client-ip>, <load-balancer-ip>``, so the real client IP is
+the entry ``IP_RATE_LIMIT_TRUSTED_PROXIES + 1`` positions from the right. Taking
+the left-most entry instead would let any caller spoof its identity and bypass
+the limiter. Set to ``0`` when the container is reached directly without a proxy.
+"""
+
+# ---------------------------------------------------------------------------
 # CORS (OAuth consent portal)
 # ---------------------------------------------------------------------------
 
