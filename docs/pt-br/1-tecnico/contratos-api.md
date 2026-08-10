@@ -40,6 +40,24 @@ O servidor Jor-MCP expõe sua interface Model Context Protocol (MCP) exclusivame
 ```
 *Nota: Se nenhum resultado for encontrado, a ferramenta lança um `ToolError` com uma dica semântica para o LLM tentar palavras-chave diferentes.*
 
+### Degradação Graciosa (falha parcial)
+As fontes são consultadas em paralelo dentro de um `asyncio.TaskGroup`, cada uma
+isolada em seu próprio wrapper: **nenhuma exceção de uma fonte cancela a outra**.
+
+*   **Uma fonte falha:** a resposta traz os resultados da fonte disponível mais uma
+    entrada de diagnóstico `{"error": "<motivo>", "source": "wordpress" | "github"}`.
+    Esta entrada não possui os campos `id`/`title`/`link` — consumidores devem tratá-la
+    como metadado, não como resultado.
+*   **Todas as fontes ativas falham:** `ToolError` orientando a verificar a conexão e
+    tentar novamente mais tarde.
+*   **Corpo não-JSON do WordPress** (site fora do ar, redirect, bloqueio de WAF —
+    o site é servido atrás do Cloudflare): convertido em `WordPressResponseError` e
+    tratado como falha daquela fonte apenas. O erro bruto de parsing
+    (`Expecting value: line 1 column 1 (char 0)`) nunca chega ao cliente MCP.
+*   **Item malformado:** entradas individuais que falham na validação são descartadas
+    com log de aviso. Se *todos* os itens da página falharem, a fonte é reportada como
+    em erro — nunca como "nenhum resultado", que faria o LLM recorrer à web aberta.
+
 ---
 
 ## 2. `get_full_article`
@@ -60,6 +78,17 @@ O servidor Jor-MCP expõe sua interface Model Context Protocol (MCP) exclusivame
   "content": "O corpo do artigo totalmente limpo e em texto simples, pronto para sumarização ou análise pelo LLM..."
 }
 ```
+
+### Erros
+Cada caso lança um `ToolError` com dica de recuperação distinta (ADR 002) — as
+mensagens são deliberadamente diferentes para que o LLM saiba se deve buscar outro
+identificador, tentar mais tarde, ou avisar o usuário:
+
+| Situação | Dica semântica devolvida ao LLM |
+| :--- | :--- |
+| Artigo inexistente (404 ou slug sem correspondência) | Cita o identificador recebido e orienta a usar `search_content` para localizar a matéria pelo título ou tema. |
+| Corpo não-JSON / payload inválido | Explica que o site respondeu conteúdo inválido (fora do ar, redirect ou bloqueio), manda informar o usuário, sugerir `search_content` e **não inventar o texto do artigo**. |
+| Erro de rede ou status não-2xx | Orienta a verificar a conexão e tentar novamente mais tarde. |
 
 ---
 
@@ -85,6 +114,19 @@ O servidor Jor-MCP expõe sua interface Model Context Protocol (MCP) exclusivame
   }
 ]
 ```
+
+### Erros
+Diferente de `search_content`, esta ferramenta consulta uma única fonte, então
+qualquer falha do WordPress é terminal — mas cada uma tem mensagem própria:
+
+| Situação | Dica semântica devolvida ao LLM |
+| :--- | :--- |
+| Nenhuma matéria retornada | Informa que o site pode estar sem publicações recentes. |
+| Corpo não-JSON / payload inválido | Explica que o site respondeu conteúdo inválido (fora do ar, redirect ou bloqueio), manda informar o usuário, sugerir `search_content` e **não inventar manchetes nem datas**. |
+| Erro de rede ou status não-2xx | Orienta a verificar a conexão e tentar novamente mais tarde. |
+
+O parâmetro `limit` também limita o processamento: mesmo que o WordPress ignore o
+`per_page` e devolva mais posts, apenas os `limit` primeiros são normalizados.
 
 ## 4. Endpoints do Proxy OAuth 2.1 (API Interna)
 
