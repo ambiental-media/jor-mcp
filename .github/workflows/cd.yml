@@ -87,3 +87,9 @@ jobs:
           gcloud run services replace service.rendered.yaml \
             --project "${{ env.PROJECT_ID }}" \
             --region "${{ env.REGION }}"
+
+      - name: Enforce no-auth (LB-only entry)
+        run: |
+          gcloud run services add-iam-policy-binding jor-mcp-server \
+            --member=allUsers --role=roles/run.invoker \
+            --region "${{ env.REGION }}" --project "${{ env.PROJECT_ID }}"
