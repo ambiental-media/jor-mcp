@@ -20,6 +20,7 @@ To route traffic correctly, you must create two distinct Backend Services in GCP
 *   **Target:** The `jor-mcp` Cloud Run service.
 *   **Protocol:** HTTP/2 (Recommended for SSE streaming).
 *   **Timeout:** Ensure the backend timeout is set high enough (e.g., 3600 seconds) so that Server-Sent Events (SSE) connections do not drop prematurely.
+*   **Authentication:** The Cloud Run target must allow unauthenticated invocations (IAM binding `roles/run.invoker` for `allUsers`) while keeping ingress restricted to "Internal and Cloud Load Balancing traffic only." Otherwise the Serverless NEG receives HTTP 401/403 before requests reach the application. Identity is enforced by the application itself (Firebase JWT + allow-list).
 
 ### 2.2 Backend Bucket: Frontend (GCS)
 *   **Type:** Backend Bucket.
