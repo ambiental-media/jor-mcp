@@ -9,7 +9,7 @@ from pydantic import BaseModel, ValidationError
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from src.api.oauth import is_oauth_path
-from src.config import OAUTH_SERVER_BASE_URL
+from src.config import OAUTH_SERVER_BASE_URL, TIER_QUOTAS
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +23,16 @@ _WWW_AUTHENTICATE = f'Bearer resource_metadata="{_RESOURCE_METADATA_URL}"'
 
 
 class DecodedToken(BaseModel):
-    """Pydantic model for runtime validation of the Firebase decoded JWT payload."""
+    """Pydantic model for runtime validation of the Firebase decoded JWT payload.
+
+    ``tier`` carries the user's role. It has no default: a token without it is a
+    token for a user who was never assigned a role in the console, and such a
+    user must not reach the server (see :class:`AuthMiddleware`).
+    """
 
     uid: str
     email: str | None = None
-    tier: str = "basic"
+    tier: str | None = None
 
 
 class AuthMiddleware:
@@ -37,6 +42,10 @@ class AuthMiddleware:
     requests under the OAuth proxy prefix (/api/oauth) or the discovery metadata
     (/.well-known) bypass it because they are the mechanism through which clients
     obtain Firebase tokens in the first place.
+
+    Authentication failures answer 401; an authenticated user carrying no role
+    (or an unknown one) answers 403 — the caller proved who they are, but no
+    quota can be applied to them, so the request must not proceed.
     On success, injects scope["user"] = {"uid": ..., "tier": ...} for downstream
     middleware (e.g. RateLimitMiddleware) to consume.
     """
@@ -77,6 +86,14 @@ class AuthMiddleware:
             await _send_unauthorized(send)
             return
 
+        if decoded_token.tier not in TIER_QUOTAS:
+            logger.warning(
+                "Authenticated user has no valid role assigned",
+                extra={"uid": decoded_token.uid, "tier": decoded_token.tier},
+            )
+            await _send_forbidden(send)
+            return
+
         scope["user"] = {
             "uid": decoded_token.uid,
             "tier": decoded_token.tier,
@@ -101,6 +118,29 @@ async def _send_unauthorized(send: Send) -> None:
         {
             "type": "http.response.body",
             "body": b'{"detail": "Unauthorized"}',
+            "more_body": False,
+        }
+    )
+
+
+async def _send_forbidden(send: Send) -> None:
+    """Send a standardized HTTP 403 Forbidden ASGI response.
+
+    No ``WWW-Authenticate`` header here: re-running the OAuth flow will not help
+    a user whose role was never assigned, and advertising the challenge would
+    push MCP clients into a pointless re-authentication loop.
+    """
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 403,
+            "headers": [(b"content-type", b"application/json")],
+        }
+    )
+    await send(
+        {
+            "type": "http.response.body",
+            "body": b'{"detail": "Forbidden"}',
             "more_body": False,
         }
     )

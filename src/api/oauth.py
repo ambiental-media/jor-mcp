@@ -39,6 +39,7 @@ from src.config import (
     OAUTH_PORTAL_BASE_URL,
     OAUTH_SERVER_BASE_URL,
     SECURE_TOKEN_BASE_URL,
+    TIER_QUOTAS,
 )
 from src.http_client import get_http_client
 
@@ -186,20 +187,45 @@ def _redirect_with_code(redirect_uri: str, code: str, state: str | None) -> str:
     return urlunsplit(parts._replace(query=urlencode(query)))
 
 
-async def _is_email_allowed(db: FirestoreAsyncClient, email: str | None) -> bool:
-    """Return True if *email* is whitelisted with ``status == "active"``.
+async def _resolve_user_role(db: FirestoreAsyncClient, email: str | None) -> str | None:
+    """Return the role assigned to *email*, or None when access must be denied.
 
-    The allow-list (``allowed_users``) is curated manually by Ambiental Media;
-    access is restricted to Google SSO accounts explicitly authorized there.
+    The allow-list (``allowed_users``) is curated manually by Ambiental Media and
+    is the source of truth for both access and role: a document grants access
+    only when it exists, its ``status`` is ``"active"`` and its ``tier`` names a
+    known role. A user who was never assigned a role is treated exactly like a
+    user who is not on the list.
+
+    Args:
+        db: An active async Firestore client.
+        email: The email claim from the verified Firebase token.
+
+    Returns:
+        The role name (a key of :data:`~src.config.TIER_QUOTAS`), or None.
     """
     if not email:
-        return False
+        return None
     normalized_email = email.strip().lower()
     snapshot = await db.collection(ALLOWED_USERS_COLLECTION).document(normalized_email).get()
     if not snapshot.exists:
-        return False
+        return None
     data = snapshot.to_dict() or {}
-    return data.get("status") == "active"
+    if data.get("status") != "active":
+        return None
+    role = data.get("tier")
+    return role if role in TIER_QUOTAS else None
+
+
+async def _sync_role_claim(uid: str, role: str) -> None:
+    """Persist *role* as the user's ``tier`` custom claim on their Firebase record.
+
+    Custom claims set this way are re-issued into every ID token Firebase mints
+    for the user, including refreshes, which is what lets AuthMiddleware read the
+    role straight from the validated JWT without a Firestore lookup per request.
+    """
+    # set_custom_user_claims replaces the whole claim set rather than merging:
+    # any future claim must be written here too, or this call will drop it.
+    await asyncio.to_thread(auth.set_custom_user_claims, uid, {"tier": role})
 
 
 async def oauth_health(request: Request) -> JSONResponse:
@@ -291,9 +317,11 @@ async def oauth_approve(request: Request) -> JSONResponse:
     """Consent approval endpoint: issue an authorization code bound to PKCE state.
 
     Requires a valid Firebase ID token (``Authorization: Bearer``) to prove the
-    user's identity. Validates the client and redirect URI, then persists a
-    short-lived authorization code plus the PKCE ``code_challenge`` and the user
-    ``uid`` under :data:`OAUTH_CODES_COLLECTION` for the later token exchange.
+    user's identity. Validates the client and redirect URI, resolves the user's
+    role from the allow-list and mirrors it into their ``tier`` custom claim, then
+    persists a short-lived authorization code plus the PKCE ``code_challenge`` and
+    the user ``uid`` under :data:`OAUTH_CODES_COLLECTION` for the later token
+    exchange.
     """
     token = _extract_bearer_token(request)
     if token is None:
@@ -339,11 +367,18 @@ async def oauth_approve(request: Request) -> JSONResponse:
             "invalid_request", "redirect_uri is not registered for this client", 400
         )
 
-    if not await _is_email_allowed(db, email):
-        logger.warning("User not on the allow-list", extra={"uid": uid})
+    role = await _resolve_user_role(db, email)
+    if role is None:
+        logger.warning("User not on the allow-list or without an assigned role", extra={"uid": uid})
         return _error_response(
             "access_denied", "User is not authorized to access this resource", 403
         )
+
+    try:
+        await _sync_role_claim(uid, role)
+    except firebase_admin.exceptions.FirebaseError:
+        logger.exception("Failed to sync the role claim", extra={"uid": uid})
+        return _error_response("server_error", "Could not assign the user role", 502)
 
     code = secrets.token_urlsafe(32)
     now = datetime.now(UTC)
