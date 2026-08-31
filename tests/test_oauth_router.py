@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import firebase_admin.exceptions
 import httpx
 from starlette.testclient import TestClient
 
@@ -37,6 +38,7 @@ def _fake_firestore_for_approve(
     client_exists: bool = True,
     user_allowed: bool = True,
     user_status: str = "active",
+    user_tier: str | None = "basic",
 ) -> tuple[MagicMock, MagicMock]:
     """Return (db, codes_doc) wiring the client, allow-list and oauth_codes access."""
     snapshot = MagicMock()
@@ -49,7 +51,7 @@ def _fake_firestore_for_approve(
 
     allowed_snapshot = MagicMock()
     allowed_snapshot.exists = user_allowed
-    allowed_snapshot.to_dict.return_value = {"status": user_status}
+    allowed_snapshot.to_dict.return_value = {"status": user_status, "tier": user_tier}
     allowed_doc = MagicMock()
     allowed_doc.get = AsyncMock(return_value=allowed_snapshot)
     allowed_collection = MagicMock()
@@ -399,12 +401,13 @@ def test_approve_unregistered_redirect_returns_400(
 
 
 @patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.set_custom_user_claims")
 @patch(
     "src.api.oauth.auth.verify_id_token",
     return_value={"uid": "user-123", "email": "user@ambiental.media"},
 )
 def test_approve_issues_code_and_persists_pkce_state(
-    _mock_verify: MagicMock, mock_get_db: MagicMock
+    _mock_verify: MagicMock, _mock_set_claims: MagicMock, mock_get_db: MagicMock
 ) -> None:
     """Acceptance criterion 3: valid request creates oauth_codes doc and returns code."""
     db, codes_doc = _fake_firestore_for_approve(["http://localhost:54321/callback"])
@@ -439,12 +442,13 @@ def test_approve_issues_code_and_persists_pkce_state(
 
 
 @patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.set_custom_user_claims")
 @patch(
     "src.api.oauth.auth.verify_id_token",
     return_value={"uid": "u", "email": "user@ambiental.media"},
 )
 def test_approve_falls_back_to_registered_redirect(
-    _mock_verify: MagicMock, mock_get_db: MagicMock
+    _mock_verify: MagicMock, _mock_set_claims: MagicMock, mock_get_db: MagicMock
 ) -> None:
     db, _ = _fake_firestore_for_approve(["http://localhost:9000/cb"])
     mock_get_db.return_value = db
@@ -528,6 +532,112 @@ def test_approve_rejects_token_without_email(
     )
     assert resp.status_code == 403
     assert resp.json()["error"] == "access_denied"
+
+
+# ---------------------------------------------------------------------------
+# Role assignment (SPEC-003)
+# ---------------------------------------------------------------------------
+
+
+@patch("src.server.get_firestore_client")
+@patch(
+    "src.api.oauth.auth.verify_id_token",
+    return_value={"uid": "u", "email": "noroleuser@ambiental.media"},
+)
+def test_approve_rejects_active_user_without_role(
+    _mock_verify: MagicMock, mock_get_db: MagicMock
+) -> None:
+    """An active allow-list entry with no tier assigned is denied consent."""
+    db, codes_doc = _fake_firestore_for_approve(["http://localhost:1/cb"], user_tier=None)
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "Bearer ok"},
+        json={
+            "client_id": "c",
+            "code_challenge": "ch",
+            "redirect_uri": "http://localhost:1/cb",
+        },
+    )
+    assert resp.status_code == 403
+    assert resp.json()["error"] == "access_denied"
+    codes_doc.set.assert_not_awaited()
+
+
+@patch("src.server.get_firestore_client")
+@patch(
+    "src.api.oauth.auth.verify_id_token",
+    return_value={"uid": "u", "email": "bogus@ambiental.media"},
+)
+def test_approve_rejects_unknown_role(_mock_verify: MagicMock, mock_get_db: MagicMock) -> None:
+    """A tier that is not in TIER_QUOTAS is denied rather than downgraded."""
+    db, _ = _fake_firestore_for_approve(["http://localhost:1/cb"], user_tier="enterprise")
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "Bearer ok"},
+        json={
+            "client_id": "c",
+            "code_challenge": "ch",
+            "redirect_uri": "http://localhost:1/cb",
+        },
+    )
+    assert resp.status_code == 403
+    assert resp.json()["error"] == "access_denied"
+
+
+@patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.set_custom_user_claims")
+@patch(
+    "src.api.oauth.auth.verify_id_token",
+    return_value={"uid": "user-123", "email": "pro@ambiental.media"},
+)
+def test_approve_mirrors_firestore_role_into_custom_claim(
+    _mock_verify: MagicMock, mock_set_claims: MagicMock, mock_get_db: MagicMock
+) -> None:
+    """The role curated in Firestore is what lands on the Firebase user record."""
+    db, _ = _fake_firestore_for_approve(["http://localhost:1/cb"], user_tier="pro")
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "Bearer ok"},
+        json={
+            "client_id": "c",
+            "code_challenge": "ch",
+            "redirect_uri": "http://localhost:1/cb",
+        },
+    )
+    assert resp.status_code == 200
+    mock_set_claims.assert_called_once_with("user-123", {"tier": "pro"})
+
+
+@patch("src.server.get_firestore_client")
+@patch(
+    "src.api.oauth.auth.set_custom_user_claims",
+    side_effect=firebase_admin.exceptions.UnknownError("signBlob denied"),
+)
+@patch(
+    "src.api.oauth.auth.verify_id_token",
+    return_value={"uid": "user-123", "email": "pro@ambiental.media"},
+)
+def test_approve_returns_502_when_claim_sync_fails(
+    _mock_verify: MagicMock, _mock_set_claims: MagicMock, mock_get_db: MagicMock
+) -> None:
+    """A Firebase failure yields a structured OAuth error, never a bare 500."""
+    db, codes_doc = _fake_firestore_for_approve(["http://localhost:1/cb"], user_tier="pro")
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "Bearer ok"},
+        json={
+            "client_id": "c",
+            "code_challenge": "ch",
+            "redirect_uri": "http://localhost:1/cb",
+        },
+    )
+    assert resp.status_code == 502
+    assert resp.json()["error"] == "server_error"
+    codes_doc.set.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------
@@ -780,11 +890,12 @@ def test_token_refresh_invalid_returns_400(mock_get_http: MagicMock) -> None:
 
 
 @patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.set_custom_user_claims")
 @patch(
     "src.api.oauth.auth.verify_id_token",
 )
 def test_approve_normalizes_email_case_insensitivity(
-    mock_verify: MagicMock, mock_get_db: MagicMock
+    mock_verify: MagicMock, _mock_set_claims: MagicMock, mock_get_db: MagicMock
 ) -> None:
     """POST /api/oauth/approve normalizes email case.
 
@@ -809,12 +920,13 @@ def test_approve_normalizes_email_case_insensitivity(
 
 
 @patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.set_custom_user_claims")
 @patch(
     "src.api.oauth.auth.verify_id_token",
     return_value={"uid": "u", "email": "user@ambiental.media"},
 )
 def test_approve_allows_case_insensitive_bearer_token(
-    mock_verify: MagicMock, mock_get_db: MagicMock
+    mock_verify: MagicMock, _mock_set_claims: MagicMock, mock_get_db: MagicMock
 ) -> None:
     """POST /api/oauth/approve accepts 'bearer' scheme with any casing."""
     db, codes_doc = _fake_firestore_for_approve(["http://localhost:1/cb"])

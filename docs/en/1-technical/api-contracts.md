@@ -40,6 +40,24 @@ The Jor-MCP server exposes its Model Context Protocol (MCP) interface exclusivel
 ```
 *Note: If no results are found, the tool throws a `ToolError` with a semantic hint for the LLM to try different keywords.*
 
+### Graceful Degradation (partial failure)
+Sources are queried in parallel inside an `asyncio.TaskGroup`, each isolated behind
+its own wrapper: **no exception from one source cancels the other**.
+
+*   **One source fails:** the response carries the available source's results plus a
+    diagnostic entry `{"error": "<reason>", "source": "wordpress" | "github"}`. That
+    entry has no `id`/`title`/`link` fields — consumers must treat it as metadata,
+    not as a result.
+*   **All active sources fail:** `ToolError` telling the caller to check the
+    connection and retry later.
+*   **Non-JSON WordPress body** (site down, redirect, WAF block — the site is served
+    behind Cloudflare): converted into `WordPressResponseError` and handled as a
+    failure of that source alone. The raw parsing error
+    (`Expecting value: line 1 column 1 (char 0)`) never reaches the MCP client.
+*   **Malformed item:** individual entries failing validation are dropped with a
+    warning log. If *every* item on the page fails, the source is reported as failed —
+    never as "no results", which would send the LLM to the open web.
+
 ---
 
 ## 2. `get_full_article`
@@ -60,6 +78,17 @@ The Jor-MCP server exposes its Model Context Protocol (MCP) interface exclusivel
   "content": "The fully cleaned, plain-text body of the article ready for LLM summarization or analysis..."
 }
 ```
+
+### Errors
+Each case raises a `ToolError` carrying a distinct recovery hint (ADR 002) — the
+messages differ on purpose so the LLM knows whether to look for another identifier,
+retry later, or tell the user:
+
+| Situation | Semantic hint returned to the LLM |
+| :--- | :--- |
+| Article does not exist (404 or unmatched slug) | Quotes the identifier received and directs the LLM to `search_content` to find the article by title or topic. |
+| Non-JSON body / invalid payload | Explains the site answered with invalid content (down, redirect or block), tells the LLM to inform the user, suggest `search_content`, and **not to invent the article text**. |
+| Network error or non-2xx status | Directs the caller to check the connection and retry later. |
 
 ---
 
@@ -86,6 +115,19 @@ The Jor-MCP server exposes its Model Context Protocol (MCP) interface exclusivel
 ]
 ```
 
+### Errors
+Unlike `search_content`, this tool queries a single source, so any WordPress failure
+is terminal — but each one carries its own message:
+
+| Situation | Semantic hint returned to the LLM |
+| :--- | :--- |
+| No articles returned | States the site may have no recent publications. |
+| Non-JSON body / invalid payload | Explains the site answered with invalid content (down, redirect or block), tells the LLM to inform the user, suggest `search_content`, and **not to invent headlines or dates**. |
+| Network error or non-2xx status | Directs the caller to check the connection and retry later. |
+
+The `limit` parameter also bounds processing: even if WordPress ignores `per_page`
+and returns more posts, only the first `limit` entries are normalised.
+
 ## 4. OAuth 2.1 Proxy Endpoints (Internal API)
 
 These endpoints are used internally to facilitate the Native MCP OAuth 2.1 flow between Claude Desktop, the `jor-mcp-site` Next.js portal, and the `jor-mcp` backend.
@@ -102,14 +144,26 @@ All OAuth endpoints follow this standard error schema for non-2xx responses:
 ### CORS Policy
 All `/api/oauth/*` routes are served behind a CORS middleware so the browser-based
 consent portal (`jor-mcp-site`) can call them via AJAX. They also bypass Firebase
-authentication and rate limiting — they are the mechanism through which clients
-obtain Firebase tokens in the first place.
+authentication and the per-user monthly quota — they are the mechanism through which
+clients obtain Firebase tokens in the first place. In their place, a per-IP limit
+applies (see below).
 
 *   **Allowed Origins:** configured via the `CORS_ALLOWED_ORIGINS` environment
     variable (comma-separated). Defaults to `http://localhost:3000` (dev portal)
     and `https://jormcp.ambiental.media` (prod portal).
 *   **Allowed Methods:** `GET`, `POST`, `OPTIONS`.
 *   **Allowed Headers:** `Authorization`, `Content-Type`.
+
+### Per-IP Rate Limit (unauthenticated routes)
+Because `/.well-known/*` and `/api/oauth/*` accept unauthenticated traffic, they are
+metered by client IP instead of by user. Without it, `POST /api/oauth/register` would
+let anyone flood Firestore with orphan client documents.
+
+*   **Scope:** every auth-exempt route. `/health` and all authenticated routes are unaffected.
+*   **Algorithm:** Firestore fixed window (`ip_rate_limits` collection), default **60 requests per 60 seconds per IP**, tunable via `IP_RATE_LIMIT_REQUESTS` / `IP_RATE_LIMIT_WINDOW_SECONDS`.
+*   **Client IP:** read from `X-Forwarded-For` counting from the right (see `IP_RATE_LIMIT_TRUSTED_PROXIES`), falling back to the ASGI peer address.
+*   **Rejection:** `429 Too Many Requests` with a `Retry-After` header carrying the seconds left in the window, and body `{"detail": "Too Many Requests"}`.
+*   **Fail-open:** if Firestore is unreachable the request is allowed through and a warning is logged.
 
 ### Base URLs
 The absolute URLs advertised by the discovery metadata are built from two
@@ -210,7 +264,8 @@ load balancer must route `/.well-known/*` to the backend NEG.
 *   `client_id` and `code_challenge` are required; only `code_challenge_method = "S256"` is accepted.
 *   The `client_id` must exist in `oauth_clients`, otherwise `400 invalid_client`.
 *   `redirect_uri` is optional: when present it is loopback-normalized and must match a registered URI (else `400 invalid_request`); when absent the client's first registered URI is used.
-*   **Allow-list:** the user's email (from the JWT) must exist in the `allowed_users` collection with `status == "active"`. A valid token whose email is missing/not whitelisted/not active returns `403 access_denied`. The list is curated manually by Ambiental Media (e.g. Firebase console); access is Google-SSO only.
+*   **Allow-list and role:** the user's email (from the JWT) must exist in the `allowed_users` collection with `status == "active"` **and** a valid `tier` (`"basic"` or `"pro"`). A valid token whose email is missing/not whitelisted/not active, or whose document carries no assigned role, returns `403 access_denied`. The list is curated manually by Ambiental Media (e.g. Firebase console); access is Google-SSO only.
+*   **Role sync:** on success the Firestore role is mirrored into the user's `tier` custom claim on Firebase Auth, which is where the middlewares read it from on every request.
 *   A random `authorization_code` is generated and stored in `oauth_codes` together with the `code_challenge`, `uid`, `redirect_uri` and a short expiry (`OAUTH_CODE_TTL_SECONDS`, default 600s).
 
 **Request Schema:**
