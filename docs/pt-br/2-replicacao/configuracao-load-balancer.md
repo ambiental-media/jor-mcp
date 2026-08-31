@@ -20,6 +20,7 @@ Para rotear o tráfego corretamente, você deve criar dois serviços de backend 
 *   **Alvo:** O serviço Cloud Run `jor-mcp`.
 *   **Protocolo:** HTTP/2 (Recomendado para streaming SSE).
 *   **Timeout:** Certifique-se de que o timeout do backend esteja configurado alto o suficiente (ex: 3600 segundos) para que as conexões Server-Sent Events (SSE) não caiam prematuramente.
+*   **Autenticação:** O serviço Cloud Run de destino deve permitir invocações não autenticadas (binding IAM `roles/run.invoker` para `allUsers`), mantendo o ingress restrito a "Tráfego interno e de Load Balancer apenas." Caso contrário, o Serverless NEG recebe HTTP 401/403 antes de a requisição chegar à aplicação. A identidade é validada pela própria aplicação (JWT do Firebase + allow-list).
 
 ### 2.2 Backend Bucket: Frontend (GCS)
 *   **Tipo:** Backend Bucket.
