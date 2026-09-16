@@ -14,7 +14,7 @@ The system is designed to be fully serverless, highly available, and stateless a
 
 *   **Entrypoint:** Global External Application Load Balancer (Handles custom domains, SSL, and SSE streaming). [See detailed configuration guide](load-balancer-config.md).
 *   **Frontend Hosting:** Google Cloud Storage (GCS) Bucket configured as a Backend Bucket on the Load Balancer, with Cloud CDN enabled.
-*   **Compute:** Google Cloud Run (Containerized, auto-scaling). Locked down to "Internal and Cloud Load Balancing traffic only."
+*   **Compute:** Google Cloud Run (Containerized, auto-scaling). Locked down to "Internal and Cloud Load Balancing traffic only." The service is set to **allow unauthenticated invocations** (IAM binding `roles/run.invoker` for `allUsers`), because the load balancer forwards plain HTTP to it; identity and authorization are enforced exclusively at the application layer (Firebase JWT + allow-list).
 *   **Database/State:** Google Cloud Firestore (Handles distributed rate-limiting, OAuth DCR clients, and codes).
 *   **Identity:** Google Cloud Identity Platform / Firebase Auth (Validates JWTs).
 *   **Observability:** Google Cloud Operations Suite (Cloud Logging and Cloud Trace via OpenTelemetry).
@@ -222,3 +222,5 @@ envsubst < service.yaml | gcloud run services replace - --region us-central1
 ### In the CD pipeline (GitHub Actions)
 
 The variables above are injected automatically as repository secrets and variables. The `envsubst` command is executed by the pipeline before calling `gcloud run services replace`, so no manual substitution is needed.
+
+After `gcloud run services replace`, the pipeline also enforces the `roles/run.invoker` binding for `allUsers`, guaranteeing the no-authentication state on every deploy.
