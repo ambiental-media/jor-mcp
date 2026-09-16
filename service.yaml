@@ -23,8 +23,8 @@ spec:
         # ── Secret Manager — lookup names → resource IDs ──────────────────────
         run.googleapis.com/secrets: "mcp-github-token:projects/${GCP_PROJECT_NUMBER}/secrets/MCP_GITHUB_TOKEN,jwt-secret:projects/${GCP_PROJECT_NUMBER}/secrets/JWT_SECRET"
     spec:
-      # ← Service account configured with the actual GCP value
-      serviceAccountName: 959918358302-compute@developer.gserviceaccount.com
+      # ← Dedicated least-privilege runtime service account
+      serviceAccountName: jor-mcp-runner@jor-mcp.iam.gserviceaccount.com
 
       containers:
         - image: ${IMAGE_URL}
