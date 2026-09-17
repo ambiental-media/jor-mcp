@@ -2,7 +2,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import firebase_admin.exceptions
 import httpx
+from google.api_core import exceptions as gcp_exceptions
 from starlette.testclient import TestClient
 
 DEV_ORIGIN = "http://localhost:3000"
@@ -37,6 +39,7 @@ def _fake_firestore_for_approve(
     client_exists: bool = True,
     user_allowed: bool = True,
     user_status: str = "active",
+    user_tier: str | None = "basic",
 ) -> tuple[MagicMock, MagicMock]:
     """Return (db, codes_doc) wiring the client, allow-list and oauth_codes access."""
     snapshot = MagicMock()
@@ -49,7 +52,7 @@ def _fake_firestore_for_approve(
 
     allowed_snapshot = MagicMock()
     allowed_snapshot.exists = user_allowed
-    allowed_snapshot.to_dict.return_value = {"status": user_status}
+    allowed_snapshot.to_dict.return_value = {"status": user_status, "tier": user_tier}
     allowed_doc = MagicMock()
     allowed_doc.get = AsyncMock(return_value=allowed_snapshot)
     allowed_collection = MagicMock()
@@ -399,12 +402,13 @@ def test_approve_unregistered_redirect_returns_400(
 
 
 @patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.set_custom_user_claims")
 @patch(
     "src.api.oauth.auth.verify_id_token",
     return_value={"uid": "user-123", "email": "user@ambiental.media"},
 )
 def test_approve_issues_code_and_persists_pkce_state(
-    _mock_verify: MagicMock, mock_get_db: MagicMock
+    _mock_verify: MagicMock, _mock_set_claims: MagicMock, mock_get_db: MagicMock
 ) -> None:
     """Acceptance criterion 3: valid request creates oauth_codes doc and returns code."""
     db, codes_doc = _fake_firestore_for_approve(["http://localhost:54321/callback"])
@@ -439,12 +443,13 @@ def test_approve_issues_code_and_persists_pkce_state(
 
 
 @patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.set_custom_user_claims")
 @patch(
     "src.api.oauth.auth.verify_id_token",
     return_value={"uid": "u", "email": "user@ambiental.media"},
 )
 def test_approve_falls_back_to_registered_redirect(
-    _mock_verify: MagicMock, mock_get_db: MagicMock
+    _mock_verify: MagicMock, _mock_set_claims: MagicMock, mock_get_db: MagicMock
 ) -> None:
     db, _ = _fake_firestore_for_approve(["http://localhost:9000/cb"])
     mock_get_db.return_value = db
@@ -528,6 +533,112 @@ def test_approve_rejects_token_without_email(
     )
     assert resp.status_code == 403
     assert resp.json()["error"] == "access_denied"
+
+
+# ---------------------------------------------------------------------------
+# Role assignment (SPEC-003)
+# ---------------------------------------------------------------------------
+
+
+@patch("src.server.get_firestore_client")
+@patch(
+    "src.api.oauth.auth.verify_id_token",
+    return_value={"uid": "u", "email": "noroleuser@ambiental.media"},
+)
+def test_approve_rejects_active_user_without_role(
+    _mock_verify: MagicMock, mock_get_db: MagicMock
+) -> None:
+    """An active allow-list entry with no tier assigned is denied consent."""
+    db, codes_doc = _fake_firestore_for_approve(["http://localhost:1/cb"], user_tier=None)
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "Bearer ok"},
+        json={
+            "client_id": "c",
+            "code_challenge": "ch",
+            "redirect_uri": "http://localhost:1/cb",
+        },
+    )
+    assert resp.status_code == 403
+    assert resp.json()["error"] == "access_denied"
+    codes_doc.set.assert_not_awaited()
+
+
+@patch("src.server.get_firestore_client")
+@patch(
+    "src.api.oauth.auth.verify_id_token",
+    return_value={"uid": "u", "email": "bogus@ambiental.media"},
+)
+def test_approve_rejects_unknown_role(_mock_verify: MagicMock, mock_get_db: MagicMock) -> None:
+    """A tier that is not in TIER_QUOTAS is denied rather than downgraded."""
+    db, _ = _fake_firestore_for_approve(["http://localhost:1/cb"], user_tier="enterprise")
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "Bearer ok"},
+        json={
+            "client_id": "c",
+            "code_challenge": "ch",
+            "redirect_uri": "http://localhost:1/cb",
+        },
+    )
+    assert resp.status_code == 403
+    assert resp.json()["error"] == "access_denied"
+
+
+@patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.set_custom_user_claims")
+@patch(
+    "src.api.oauth.auth.verify_id_token",
+    return_value={"uid": "user-123", "email": "pro@ambiental.media"},
+)
+def test_approve_mirrors_firestore_role_into_custom_claim(
+    _mock_verify: MagicMock, mock_set_claims: MagicMock, mock_get_db: MagicMock
+) -> None:
+    """The role curated in Firestore is what lands on the Firebase user record."""
+    db, _ = _fake_firestore_for_approve(["http://localhost:1/cb"], user_tier="pro")
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "Bearer ok"},
+        json={
+            "client_id": "c",
+            "code_challenge": "ch",
+            "redirect_uri": "http://localhost:1/cb",
+        },
+    )
+    assert resp.status_code == 200
+    mock_set_claims.assert_called_once_with("user-123", {"tier": "pro"})
+
+
+@patch("src.server.get_firestore_client")
+@patch(
+    "src.api.oauth.auth.set_custom_user_claims",
+    side_effect=firebase_admin.exceptions.UnknownError("signBlob denied"),
+)
+@patch(
+    "src.api.oauth.auth.verify_id_token",
+    return_value={"uid": "user-123", "email": "pro@ambiental.media"},
+)
+def test_approve_returns_502_when_claim_sync_fails(
+    _mock_verify: MagicMock, _mock_set_claims: MagicMock, mock_get_db: MagicMock
+) -> None:
+    """A Firebase failure yields a structured OAuth error, never a bare 500."""
+    db, codes_doc = _fake_firestore_for_approve(["http://localhost:1/cb"], user_tier="pro")
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "Bearer ok"},
+        json={
+            "client_id": "c",
+            "code_challenge": "ch",
+            "redirect_uri": "http://localhost:1/cb",
+        },
+    )
+    assert resp.status_code == 502
+    assert resp.json()["error"] == "server_error"
+    codes_doc.set.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------
@@ -745,11 +856,45 @@ def test_token_minting_failure_returns_502(
     assert resp.json()["error"] == "server_error"
 
 
+REFRESH_PAYLOAD = {
+    "id_token": "new-id",
+    "refresh_token": "new-refr",
+    "expires_in": "3600",
+    "user_id": "user-1",
+}
+
+
+def _fake_firestore_for_refresh(tier: str | None, *, exists: bool = True) -> MagicMock:
+    """Return a db whose allow-list lookup yields *tier* for the refreshing user."""
+    snapshot = MagicMock()
+    snapshot.exists = exists
+    snapshot.to_dict.return_value = {"status": "active", "tier": tier}
+    doc = MagicMock()
+    doc.get = AsyncMock(return_value=snapshot)
+    collection = MagicMock()
+    collection.document.return_value = doc
+    db = MagicMock()
+    db.collection.return_value = collection
+    return db
+
+
+def _fake_user_record(claims: dict[str, Any] | None) -> MagicMock:
+    record = MagicMock()
+    record.email = "user@ambiental.media"
+    record.custom_claims = claims
+    return record
+
+
+@patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.get_user", return_value=_fake_user_record({"tier": "pro"}))
 @patch("src.api.oauth.get_http_client")
-def test_token_refresh_grant_success(mock_get_http: MagicMock) -> None:
-    mock_get_http.return_value = _mock_http_client(
-        {"id_token": "new-id", "refresh_token": "new-refr", "expires_in": "3600"}
-    )
+def test_token_refresh_grant_success(
+    mock_get_http: MagicMock, _mock_get_user: MagicMock, mock_get_db: MagicMock
+) -> None:
+    """A still-authorized user with an up-to-date role renews without re-minting."""
+    client = _mock_http_client(REFRESH_PAYLOAD)
+    mock_get_http.return_value = client
+    mock_get_db.return_value = _fake_firestore_for_refresh("pro")
     resp = _client().post(
         "/api/oauth/token",
         data={"grant_type": "refresh_token", "refresh_token": "old-refr"},
@@ -758,6 +903,170 @@ def test_token_refresh_grant_success(mock_get_http: MagicMock) -> None:
     body = resp.json()
     assert body["access_token"] == "new-id"
     assert body["refresh_token"] == "new-refr"
+    assert client.post.await_count == 1
+
+
+@patch("src.api.oauth.auth.revoke_refresh_tokens")
+@patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.get_user", return_value=_fake_user_record({"tier": "pro"}))
+@patch("src.api.oauth.get_http_client")
+def test_token_refresh_revokes_user_removed_from_allow_list(
+    mock_get_http: MagicMock,
+    _mock_get_user: MagicMock,
+    mock_get_db: MagicMock,
+    mock_revoke: MagicMock,
+) -> None:
+    """Losing the allow-list entry ends the refresh chain, not just this request."""
+    mock_get_http.return_value = _mock_http_client(REFRESH_PAYLOAD)
+    mock_get_db.return_value = _fake_firestore_for_refresh(None, exists=False)
+    resp = _client().post(
+        "/api/oauth/token",
+        data={"grant_type": "refresh_token", "refresh_token": "old-refr"},
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_grant"
+    mock_revoke.assert_called_once_with("user-1")
+
+
+@patch("src.api.oauth.auth.revoke_refresh_tokens")
+@patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.get_user", return_value=_fake_user_record({"tier": "pro"}))
+@patch("src.api.oauth.get_http_client")
+def test_token_refresh_revokes_user_without_role(
+    mock_get_http: MagicMock,
+    _mock_get_user: MagicMock,
+    mock_get_db: MagicMock,
+    mock_revoke: MagicMock,
+) -> None:
+    """Clearing tier in the console revokes access on the next renewal."""
+    mock_get_http.return_value = _mock_http_client(REFRESH_PAYLOAD)
+    mock_get_db.return_value = _fake_firestore_for_refresh(None)
+    resp = _client().post(
+        "/api/oauth/token",
+        data={"grant_type": "refresh_token", "refresh_token": "old-refr"},
+    )
+    assert resp.status_code == 400
+    mock_revoke.assert_called_once_with("user-1")
+
+
+@patch("src.api.oauth.auth.set_custom_user_claims")
+@patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.get_user", return_value=_fake_user_record({"tier": "basic"}))
+@patch("src.api.oauth.get_http_client")
+def test_token_refresh_resyncs_drifted_role(
+    mock_get_http: MagicMock,
+    _mock_get_user: MagicMock,
+    mock_get_db: MagicMock,
+    mock_set_claims: MagicMock,
+) -> None:
+    """A console promotion reaches the user on renewal, without a new consent."""
+    client = _mock_http_client(REFRESH_PAYLOAD)
+    mock_get_http.return_value = client
+    mock_get_db.return_value = _fake_firestore_for_refresh("pro")
+    resp = _client().post(
+        "/api/oauth/token",
+        data={"grant_type": "refresh_token", "refresh_token": "old-refr"},
+    )
+    assert resp.status_code == 200
+    mock_set_claims.assert_called_once_with("user-1", {"tier": "pro"})
+    # Re-minted so the caller leaves with the new role already in the token.
+    assert client.post.await_count == 2
+
+
+@patch("src.api.oauth.auth.set_custom_user_claims")
+@patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.get_user", return_value=_fake_user_record({"tier": "basic"}))
+@patch("src.api.oauth.get_http_client")
+def test_token_refresh_remint_failure_returns_400(
+    mock_get_http: MagicMock,
+    _mock_get_user: MagicMock,
+    mock_get_db: MagicMock,
+    _mock_set_claims: MagicMock,
+) -> None:
+    """A re-mint that fails after the role sync yields invalid_grant, not a 500."""
+    ok = MagicMock()
+    ok.raise_for_status = MagicMock()
+    ok.json.return_value = REFRESH_PAYLOAD
+    client = MagicMock()
+    client.post = AsyncMock(side_effect=[ok, httpx.HTTPError("boom")])
+    mock_get_http.return_value = client
+    mock_get_db.return_value = _fake_firestore_for_refresh("pro")
+    resp = _client().post(
+        "/api/oauth/token",
+        data={"grant_type": "refresh_token", "refresh_token": "old-refr"},
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_grant"
+
+
+@patch("src.api.oauth.auth.set_custom_user_claims")
+@patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.get_user", return_value=_fake_user_record({"tier": "pro"}))
+@patch("src.api.oauth.get_http_client")
+def test_token_refresh_unchanged_role_skips_sync(
+    mock_get_http: MagicMock,
+    _mock_get_user: MagicMock,
+    mock_get_db: MagicMock,
+    mock_set_claims: MagicMock,
+) -> None:
+    """An unchanged role must not spend a write on every renewal."""
+    mock_get_http.return_value = _mock_http_client(REFRESH_PAYLOAD)
+    mock_get_db.return_value = _fake_firestore_for_refresh("pro")
+    resp = _client().post(
+        "/api/oauth/token",
+        data={"grant_type": "refresh_token", "refresh_token": "old-refr"},
+    )
+    assert resp.status_code == 200
+    mock_set_claims.assert_not_called()
+
+
+@patch("src.api.oauth.auth.revoke_refresh_tokens")
+@patch("src.server.get_firestore_client")
+@patch(
+    "src.api.oauth.auth.get_user",
+    side_effect=firebase_admin.exceptions.UnknownError("firebase down"),
+)
+@patch("src.api.oauth.get_http_client")
+def test_token_refresh_outage_denies_without_revoking(
+    mock_get_http: MagicMock,
+    _mock_get_user: MagicMock,
+    _mock_get_db: MagicMock,
+    mock_revoke: MagicMock,
+) -> None:
+    """An outage denies the renewal but must never revoke: it is not a revocation."""
+    mock_get_http.return_value = _mock_http_client(REFRESH_PAYLOAD)
+    resp = _client().post(
+        "/api/oauth/token",
+        data={"grant_type": "refresh_token", "refresh_token": "old-refr"},
+    )
+    assert resp.status_code == 502
+    assert resp.json()["error"] == "server_error"
+    mock_revoke.assert_not_called()
+
+
+@patch("src.api.oauth.auth.revoke_refresh_tokens")
+@patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.get_user", return_value=_fake_user_record({"tier": "pro"}))
+@patch("src.api.oauth.get_http_client")
+def test_token_refresh_firestore_outage_denies_without_revoking(
+    mock_get_http: MagicMock,
+    _mock_get_user: MagicMock,
+    mock_get_db: MagicMock,
+    mock_revoke: MagicMock,
+) -> None:
+    """A Firestore failure is treated the same way as a Firebase one."""
+    mock_get_http.return_value = _mock_http_client(REFRESH_PAYLOAD)
+    db = MagicMock()
+    db.collection.side_effect = gcp_exceptions.ServiceUnavailable(  # type: ignore[no-untyped-call]
+        "firestore down"
+    )
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/token",
+        data={"grant_type": "refresh_token", "refresh_token": "old-refr"},
+    )
+    assert resp.status_code == 502
+    mock_revoke.assert_not_called()
 
 
 def test_token_refresh_missing_token_returns_400() -> None:
@@ -780,11 +1089,12 @@ def test_token_refresh_invalid_returns_400(mock_get_http: MagicMock) -> None:
 
 
 @patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.set_custom_user_claims")
 @patch(
     "src.api.oauth.auth.verify_id_token",
 )
 def test_approve_normalizes_email_case_insensitivity(
-    mock_verify: MagicMock, mock_get_db: MagicMock
+    mock_verify: MagicMock, _mock_set_claims: MagicMock, mock_get_db: MagicMock
 ) -> None:
     """POST /api/oauth/approve normalizes email case.
 
@@ -809,12 +1119,13 @@ def test_approve_normalizes_email_case_insensitivity(
 
 
 @patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.set_custom_user_claims")
 @patch(
     "src.api.oauth.auth.verify_id_token",
     return_value={"uid": "u", "email": "user@ambiental.media"},
 )
 def test_approve_allows_case_insensitive_bearer_token(
-    mock_verify: MagicMock, mock_get_db: MagicMock
+    mock_verify: MagicMock, _mock_set_claims: MagicMock, mock_get_db: MagicMock
 ) -> None:
     """POST /api/oauth/approve accepts 'bearer' scheme with any casing."""
     db, codes_doc = _fake_firestore_for_approve(["http://localhost:1/cb"])

@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 
 import httpx
 from bs4 import BeautifulSoup
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from src.config import WP_API_BASE_URL
 from src.http_client import get_http_client
@@ -35,6 +35,17 @@ _SHORTCODE_RE: re.Pattern[str] = re.compile(r"\[/?[a-zA-Z_\-]+[^\]]*\]")
 
 class WordPressPostNotFoundError(Exception):
     """Raised when a requested WordPress post does not exist (HTTP 404)."""
+
+
+class WordPressResponseError(Exception):
+    """Raised when WordPress answers 2xx with a body that is not valid post JSON.
+
+    A site that is down, redirecting, behind a WAF challenge, or whose REST route
+    changed still answers with a 2xx HTML or empty body, so ``raise_for_status``
+    lets it through and only ``response.json()`` fails. Converting that into a
+    typed error keeps the raw ``json.JSONDecodeError`` ("Expecting value: line 1
+    column 1") from reaching MCP clients.
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +125,69 @@ def _strip_html(html: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Response decoding
+# ---------------------------------------------------------------------------
+
+
+def decode_json_body(response: httpx.Response, **context: Any) -> Any:
+    """Decode a WordPress REST response body as JSON.
+
+    Args:
+        response: An already status-checked WordPress REST response.
+        **context: Extra key/value pairs attached to the warning log record.
+
+    Returns:
+        The decoded JSON payload.
+
+    Raises:
+        WordPressResponseError: If the body is empty, HTML, or otherwise not JSON.
+    """
+    try:
+        return response.json()
+    except ValueError as exc:
+        content_type = response.headers.get("content-type", "")
+        logger.warning(
+            "WordPress returned a non-JSON body",
+            extra={
+                **context,
+                "content_type": content_type,
+                # Slice the raw bytes: a WAF challenge page or an error dump can be
+                # arbitrarily large, and response.text would decode all of it.
+                "body_preview": response.content[:200].decode("utf-8", errors="replace"),
+            },
+        )
+        raise WordPressResponseError(
+            f"WordPress REST API returned a non-JSON response (content-type: {content_type})"
+        ) from exc
+
+
+def require_post_list(payload: Any, **context: Any) -> list[Any]:
+    """Return *payload* when it is a list of posts, else raise.
+
+    The list endpoints answer with a JSON array; anything else (typically a
+    ``{"code": "rest_no_route"}`` object served with a 2xx status) would make the
+    caller iterate over dict keys and fail deep inside validation.
+
+    Args:
+        payload: A decoded WordPress REST payload.
+        **context: Extra key/value pairs attached to the warning log record.
+
+    Returns:
+        The payload as a list.
+
+    Raises:
+        WordPressResponseError: If the payload is not a list.
+    """
+    if isinstance(payload, list):
+        return payload
+    logger.warning(
+        "WordPress returned an unexpected payload shape",
+        extra={**context, "payload_type": type(payload).__name__},
+    )
+    raise WordPressResponseError("WordPress REST API returned an unexpected payload shape")
+
+
+# ---------------------------------------------------------------------------
 # Identifier parsing
 # ---------------------------------------------------------------------------
 
@@ -162,6 +236,7 @@ async def _fetch_post_by_id(post_id: int) -> WordPressPost:
 
     Raises:
         WordPressPostNotFoundError: If the post returns HTTP 404.
+        WordPressResponseError: If the body is not a valid post object.
         httpx.HTTPStatusError: For other non-2xx HTTP responses.
     """
     client = get_http_client()
@@ -180,7 +255,15 @@ async def _fetch_post_by_id(post_id: int) -> WordPressPost:
             raise WordPressPostNotFoundError(f"Post with id={post_id} not found") from exc
         raise
 
-    return WordPressPost.model_validate(response.json())
+    payload = decode_json_body(response, post_id=post_id)
+    try:
+        return WordPressPost.model_validate(payload)
+    except ValidationError as exc:
+        logger.warning(
+            "WordPress post payload failed validation",
+            extra={"post_id": post_id, "error": str(exc)},
+        )
+        raise WordPressResponseError(f"Unexpected payload for post id={post_id}") from exc
 
 
 async def _fetch_post_by_slug(slug: str) -> WordPressPost:
@@ -197,6 +280,7 @@ async def _fetch_post_by_slug(slug: str) -> WordPressPost:
 
     Raises:
         WordPressPostNotFoundError: If no post matches the given slug.
+        WordPressResponseError: If the body is not a valid list of posts.
         httpx.HTTPStatusError: For non-2xx HTTP responses.
     """
     client = get_http_client()
@@ -206,7 +290,7 @@ async def _fetch_post_by_slug(slug: str) -> WordPressPost:
     response = await client.get(url, params=params)
     response.raise_for_status()
 
-    posts: list[Any] = response.json()
+    posts: list[Any] = require_post_list(decode_json_body(response, slug=slug), slug=slug)
     if not posts:
         logger.warning(
             "WordPress post not found by slug",
@@ -214,7 +298,14 @@ async def _fetch_post_by_slug(slug: str) -> WordPressPost:
         )
         raise WordPressPostNotFoundError(f"Post with slug='{slug}' not found")
 
-    return WordPressPost.model_validate(posts[0])
+    try:
+        return WordPressPost.model_validate(posts[0])
+    except ValidationError as exc:
+        logger.warning(
+            "WordPress post payload failed validation",
+            extra={"slug": slug, "error": str(exc)},
+        )
+        raise WordPressResponseError(f"Unexpected payload for slug='{slug}'") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +367,7 @@ async def fetch_latest_posts(limit: int) -> list[dict[str, Any]]:
         ``link``, and ``source``.
 
     Raises:
+        WordPressResponseError: If the body is not a valid list of posts.
         httpx.HTTPStatusError: If the WordPress API returns a non-2xx status.
         httpx.RequestError: If a network error occurs.
     """
@@ -294,9 +386,22 @@ async def fetch_latest_posts(limit: int) -> list[dict[str, Any]]:
     response = await client.get(url, params=params)
     response.raise_for_status()
 
+    payload = require_post_list(decode_json_body(response, limit=limit), limit=limit)
+    # Honour the requested page size even if the upstream ignores per_page: the
+    # cost of _strip_html must be bounded by our own parameter, not by WordPress.
+    page = payload[:limit]
+
     results: list[dict[str, Any]] = []
-    for raw_post in response.json():
-        post = _WpLatestPost.model_validate(raw_post)
+    for raw_post in page:
+        try:
+            post = _WpLatestPost.model_validate(raw_post)
+        except ValidationError as exc:
+            # One malformed entry must not cost the caller the whole listing.
+            logger.warning(
+                "Skipping malformed WordPress post",
+                extra={"error": str(exc)},
+            )
+            continue
         results.append(
             {
                 "id": str(post.id),
@@ -306,6 +411,13 @@ async def fetch_latest_posts(limit: int) -> list[dict[str, Any]]:
                 "link": post.link,
                 "source": "wordpress",
             }
+        )
+
+    if page and not results:
+        # Every entry was malformed: reporting "no recent posts" here would blame
+        # the newsroom for what is a broken payload.
+        raise WordPressResponseError(
+            f"All {len(page)} posts returned by WordPress failed validation"
         )
 
     logger.info(
