@@ -1057,7 +1057,9 @@ def test_token_refresh_firestore_outage_denies_without_revoking(
     """A Firestore failure is treated the same way as a Firebase one."""
     mock_get_http.return_value = _mock_http_client(REFRESH_PAYLOAD)
     db = MagicMock()
-    db.collection.side_effect = gcp_exceptions.ServiceUnavailable("firestore down")
+    db.collection.side_effect = gcp_exceptions.ServiceUnavailable(  # type: ignore[no-untyped-call]
+        "firestore down"
+    )
     mock_get_db.return_value = db
     resp = _client().post(
         "/api/oauth/token",
