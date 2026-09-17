@@ -94,6 +94,11 @@ class AuthMiddleware:
             await _send_forbidden(send)
             return
 
+        logger.info(
+            "Authenticated request",
+            extra={"uid": decoded_token.uid, "tier": decoded_token.tier},
+        )
+
         scope["user"] = {
             "uid": decoded_token.uid,
             "tier": decoded_token.tier,

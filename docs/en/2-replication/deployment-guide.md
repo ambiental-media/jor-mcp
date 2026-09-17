@@ -83,6 +83,8 @@ Add a document under the `allowed_users` collection with the following specifica
     *   `status` (String): Must be set to `"active"` to permit access. If set to `"disabled"` or any other value, authorization will be rejected.
     *   `tier` (String, **Required**): The user's role. Must be `"basic"` or `"pro"` — it dictates the monthly request limit applied to this user. **A user with no `tier` (or a value outside those two) cannot complete consent and receives `403` on every call to the MCP server.** Assigning the role is manual and part of onboarding.
 
+> **Propagation and revocation:** the role is mirrored into the user's `tier` custom claim on Firebase Auth at consent time and re-checked on every token renewal. Changing `tier`, setting `status: "disabled"` or deleting the document takes effect within one hour — the lifetime of the issued ID token — with no action required from the user. A user who loses authorization has their refresh tokens revoked on the next renewal, which ends their access rather than merely denying that one request.
+
 ---
 
 ## 6. Environment Variables & Resources

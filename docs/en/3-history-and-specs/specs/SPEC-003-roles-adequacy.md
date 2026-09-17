@@ -25,6 +25,10 @@ Make the role assigned manually by the administrator in the console actually gov
 
 **Blocking point:** `AuthMiddleware`. It already decodes the token and is the only place where rejection can happen before any quota is consumed. `tier` loses its `"basic"` default and becomes required, validated against the set of known roles; a missing or invalid value yields `403 Forbidden` (not `401`: the user is authenticated but not authorized).
 
+**Propagation window:** the claim is written at consent time and re-checked on every renewal, so a role changed in the console reaches an already-connected user within one hour — the ID token lifetime — without a new consent.
+
+**Revocation:** the `refresh_token` grant re-checks the allow-list before renewing and calls `revoke_refresh_tokens` for a disabled or role-less user. Revoking rather than only denying matters because the exchange has already handed a fresh refresh token back to the caller.
+
 **Failure policy:** the role check is fail-closed — unlike the rate limiters, which stay fail-open because they protect cost, not access. Since the role travels in the already-validated JWT, a Firestore outage does not affect requests from users holding a valid token.
 
 ## 3. Scope of Changes
@@ -32,6 +36,7 @@ Make the role assigned manually by the administrator in the console actually gov
 ### `src/api/oauth.py`
 - `_is_email_allowed()` also returns the role from the document (or `None`) instead of a bare boolean.
 - `oauth_approve()` rejects with `access_denied` when the user has no valid role, and calls `set_custom_user_claims(uid, {"tier": <role>})` before issuing the authorization code.
+- `_handle_refresh_token()` re-checks the allow-list and re-syncs the claim before renewing; rejects with `invalid_grant` and revokes the refresh tokens when the user has been disabled or lost their role. A failed lookup (Firestore/Firebase unavailable) denies the renewal without revoking — an outage is not a revocation.
 
 ### `src/middleware/auth.py`
 - `DecodedToken.tier` loses the `"basic"` default and becomes required, validated against the known roles.
@@ -52,7 +57,7 @@ Make the role assigned manually by the administrator in the console actually gov
 
 - `tests/test_auth_middleware.py`: token without `tier` → 403; token with an unknown role → 403; token with `basic`/`pro` → scope populated correctly.
 - `tests/test_rate_limit_middleware.py`: the `pro` quota is actually enforced (`test_unknown_tier_falls_back_to_basic_limit` no longer makes sense and is replaced by the `AuthMiddleware` rejection scenario).
-- `tests/test_oauth_router.py`: approve without a role → 403; approve with an unknown role → 403; approve with a role → `set_custom_user_claims` called with the correct value.
+- `tests/test_oauth_router.py`: approve without a role → 403; approve with an unknown role → 403; approve with a role → `set_custom_user_claims` called with the correct value; refresh for a disabled user → `invalid_grant` plus revocation; refresh with a drifted role → claim re-synced and token re-minted; Firestore or Firebase unavailable → `502` without revoking.
 - `firebase_admin` stays mocked; no test touches the network.
 
 ## 5. Boundaries

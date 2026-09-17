@@ -25,6 +25,10 @@ Fazer com que a role atribuída manualmente pelo administrador no console passe 
 
 **Ponto de bloqueio:** `AuthMiddleware`. Ele já decodifica o token e é o único lugar onde a rejeição pode ocorrer antes de qualquer consumo de cota. `tier` deixa de ter default `"basic"` e passa a ser obrigatório e validado contra o conjunto de roles conhecidas; ausência ou valor inválido resulta em `403 Forbidden` (não `401`: o usuário está autenticado, mas não autorizado).
 
+**Janela de propagação:** a claim é gravada no consentimento e reconferida em toda renovação, então uma role alterada no console alcança quem já está conectado em até uma hora — o tempo de vida do ID token — sem novo consentimento.
+
+**Revogação:** o grant `refresh_token` reconsulta a allow-list antes de renovar e chama `revoke_refresh_tokens` para um usuário desativado ou sem role. Revogar, e não apenas negar, importa porque a troca já devolveu um refresh token novo ao chamador.
+
 **Política de falha:** a verificação de role é *fail-closed* — ao contrário dos rate limiters, que permanecem *fail-open* por serem uma proteção de custo, não de acesso. Como a role vem do JWT já validado, uma indisponibilidade do Firestore não afeta requisições de usuários com token válido.
 
 ## 3. Escopo das Alterações
@@ -32,6 +36,7 @@ Fazer com que a role atribuída manualmente pelo administrador no console passe 
 ### `src/api/oauth.py`
 - `_is_email_allowed()` passa a retornar também a role do documento (ou `None`), em vez de apenas um booleano.
 - `oauth_approve()` rejeita com `access_denied` quando o usuário não tem role válida, e chama `set_custom_user_claims(uid, {"tier": <role>})` antes de emitir o código de autorização.
+- `_handle_refresh_token()` reconsulta a allow-list e ressincroniza a claim antes de renovar; rejeita com `invalid_grant` e revoga os refresh tokens quando o usuário foi desativado ou perdeu a role. Falha ao consultar (Firestore/Firebase indisponível) nega a renovação sem revogar — indisponibilidade não é revogação.
 
 ### `src/middleware/auth.py`
 - `DecodedToken.tier` perde o default `"basic"` e passa a ser obrigatório, validado contra as roles conhecidas.
@@ -52,7 +57,7 @@ Fazer com que a role atribuída manualmente pelo administrador no console passe 
 
 - `tests/test_auth_middleware.py`: token sem `tier` → 403; token com role desconhecida → 403; token com `basic`/`pro` → escopo populado corretamente.
 - `tests/test_rate_limit_middleware.py`: cota de `pro` aplicada de fato (o teste `test_unknown_tier_falls_back_to_basic_limit` deixa de fazer sentido e é substituído pelo cenário de rejeição no `AuthMiddleware`).
-- `tests/test_oauth_router.py`: approve sem role → 403; approve com role desconhecida → 403; approve com role → `set_custom_user_claims` chamado com o valor correto.
+- `tests/test_oauth_router.py`: approve sem role → 403; approve com role desconhecida → 403; approve com role → `set_custom_user_claims` chamado com o valor correto; refresh de usuário desativado → `invalid_grant` com revogação; refresh com role divergente → claim ressincronizada e token reemitido; Firestore ou Firebase indisponível → `502` sem revogar.
 - `firebase_admin` permanece mockado; nenhum teste toca a rede.
 
 ## 5. Limites (Boundaries)

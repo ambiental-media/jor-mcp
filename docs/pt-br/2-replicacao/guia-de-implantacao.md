@@ -83,6 +83,8 @@ Adicione um documento na coleção `allowed_users` respeitando os seguintes camp
     *   `status` (String): Deve ser definido como `"active"` para permitir o acesso. Caso seja definido como `"disabled"` ou qualquer outro valor, o acesso será rejeitado.
     *   `tier` (String, **Obrigatório**): A role do usuário. Deve ser `"basic"` ou `"pro"` — determina a cota de limite de taxa mensal. **Um usuário sem `tier` (ou com um valor fora desses dois) não consegue concluir o consentimento e recebe `403` em todas as chamadas ao servidor MCP.** A atribuição da role é manual e faz parte do cadastro.
 
+> **Propagação e revogação:** a role é espelhada na custom claim `tier` do usuário no Firebase Auth no momento do consentimento e reconferida a cada renovação de token. Alterar o `tier`, definir `status: "disabled"` ou remover o documento passa a valer em até uma hora — o tempo de vida do ID token emitido — sem qualquer ação do usuário. Quem perde a autorização tem os refresh tokens revogados na renovação seguinte, o que encerra o acesso em vez de apenas negar aquela requisição.
+
 ---
 
 ## 6. Variáveis de Ambiente e Recursos
