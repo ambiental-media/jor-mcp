@@ -25,13 +25,19 @@ Fazer com que a role atribuída manualmente pelo administrador no console passe 
 
 **Ponto de bloqueio:** `AuthMiddleware`. Ele já decodifica o token e é o único lugar onde a rejeição pode ocorrer antes de qualquer consumo de cota. `tier` deixa de ter default `"basic"` e passa a ser obrigatório e validado contra o conjunto de roles conhecidas; ausência ou valor inválido resulta em `403 Forbidden` (não `401`: o usuário está autenticado, mas não autorizado).
 
+<<<<<<< HEAD
 <<<<<<<
 =======
+=======
+>>>>>>> 38efb64 (feat: revalidate allow-list and role on token renewal)
 **Janela de propagação:** a claim é gravada no consentimento e reconferida em toda renovação, então uma role alterada no console alcança quem já está conectado em até uma hora — o tempo de vida do ID token — sem novo consentimento.
 
 **Revogação:** o grant `refresh_token` reconsulta a allow-list antes de renovar e chama `revoke_refresh_tokens` para um usuário desativado ou sem role. Revogar, e não apenas negar, importa porque a troca já devolveu um refresh token novo ao chamador.
 
+<<<<<<< HEAD
 >>>>>>>
+=======
+>>>>>>> 38efb64 (feat: revalidate allow-list and role on token renewal)
 **Política de falha:** a verificação de role é *fail-closed* — ao contrário dos rate limiters, que permanecem *fail-open* por serem uma proteção de custo, não de acesso. Como a role vem do JWT já validado, uma indisponibilidade do Firestore não afeta requisições de usuários com token válido.
 
 ## 3. Escopo das Alterações
@@ -39,10 +45,14 @@ Fazer com que a role atribuída manualmente pelo administrador no console passe 
 ### `src/api/oauth.py`
 - `_is_email_allowed()` passa a retornar também a role do documento (ou `None`), em vez de apenas um booleano.
 - `oauth_approve()` rejeita com `access_denied` quando o usuário não tem role válida, e chama `set_custom_user_claims(uid, {"tier": <role>})` antes de emitir o código de autorização.
+<<<<<<< HEAD
 <<<<<<<
 =======
 - `_handle_refresh_token()` reconsulta a allow-list e ressincroniza a claim antes de renovar; rejeita com `invalid_grant` e revoga os refresh tokens quando o usuário foi desativado ou perdeu a role. Falha ao consultar (Firestore/Firebase indisponível) nega a renovação sem revogar — indisponibilidade não é revogação.
 >>>>>>>
+=======
+- `_handle_refresh_token()` reconsulta a allow-list e ressincroniza a claim antes de renovar; rejeita com `invalid_grant` e revoga os refresh tokens quando o usuário foi desativado ou perdeu a role. Falha ao consultar (Firestore/Firebase indisponível) nega a renovação sem revogar — indisponibilidade não é revogação.
+>>>>>>> 38efb64 (feat: revalidate allow-list and role on token renewal)
 
 ### `src/middleware/auth.py`
 - `DecodedToken.tier` perde o default `"basic"` e passa a ser obrigatório, validado contra as roles conhecidas.
