@@ -101,3 +101,17 @@ async def test_server_lifespan_skips_init_when_firebase_already_present(
     fake_http_client.aclose.assert_awaited_once()
     fake_firestore.close.assert_called_once()
     _mock_setup.assert_called_once()
+
+
+@patch("src.server.setup_telemetry")
+def test_get_firestore_client_returns_the_active_client(_mock_setup: MagicMock) -> None:
+    """get_firestore_client() hands back the client stored during startup."""
+    import src.server as server_mod
+
+    fake_firestore = _make_fake_firestore()
+    original = server_mod._firestore_client
+    server_mod._firestore_client = fake_firestore
+    try:
+        assert server_mod.get_firestore_client() is fake_firestore
+    finally:
+        server_mod._firestore_client = original

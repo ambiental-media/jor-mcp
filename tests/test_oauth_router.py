@@ -1141,3 +1141,21 @@ def test_approve_allows_case_insensitive_bearer_token(
         },
     )
     assert resp.status_code == 200
+
+
+def test_client_registration_rejects_uri_without_host() -> None:
+    """A redirect URI carrying only a scheme is not a usable callback."""
+    import pytest
+    from pydantic import ValidationError
+
+    from src.api.oauth import ClientRegistrationRequest
+
+    with pytest.raises(ValidationError, match="must include a host"):
+        ClientRegistrationRequest(redirect_uris=["http://"])
+
+
+def test_is_expired_returns_false_for_missing_expiry() -> None:
+    """Firestore documents written before the TTL field existed have no expiry."""
+    from src.api.oauth import _is_expired
+
+    assert _is_expired(None) is False

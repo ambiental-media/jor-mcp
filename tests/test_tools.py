@@ -159,6 +159,16 @@ class TestCollectStrings:
         assert len(result) == 1
         assert "amazonia" in result[0]
 
+    def test_stops_scanning_a_list_once_the_limit_is_reached(self) -> None:
+        data = ["amazonia um", "amazonia dois", "amazonia tres"]
+        result = _collect_strings(data, "amazonia", limit=1)
+        assert result == ["amazonia um"]
+
+    def test_stops_scanning_a_dict_once_the_limit_is_reached(self) -> None:
+        data = {"a": "amazonia um", "b": "amazonia dois"}
+        result = _collect_strings(data, "amazonia", limit=1)
+        assert result == ["amazonia um"]
+
     def test_match_in_nested_dict(self) -> None:
         data = {"outer": {"inner": "desmatamento na amazonia"}}
         result = _collect_strings(data, "desmatamento")

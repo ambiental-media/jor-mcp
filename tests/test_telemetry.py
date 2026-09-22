@@ -160,6 +160,21 @@ class TestJsonFormatter:
         assert "ValueError: boom" in parsed["message"]
         assert "Traceback (most recent call last)" in parsed["message"]
 
+    def test_stack_info_is_appended_to_message(self) -> None:
+        import json
+
+        record = logging.LogRecord("mylogger", logging.WARNING, "", 0, "where am i", (), None)
+        record.__dict__["trace_id"] = ""
+        record.__dict__["span_id"] = ""
+        record.stack_info = 'Stack (most recent call last):\n  File "x.py", line 1'
+
+        output = telemetry_mod._JsonFormatter().format(record)
+        parsed = json.loads(output)
+
+        assert "\n" not in output
+        assert parsed["message"].startswith("where am i\n")
+        assert "Stack (most recent call last)" in parsed["message"]
+
     def test_time_is_rfc3339(self) -> None:
         import json
         from datetime import datetime
@@ -414,6 +429,17 @@ def restore_logging() -> Generator[None, None, None]:
             lib_logger.propagate = propagate
         for name, level in levels.items():
             logging.getLogger(name).setLevel(level)
+
+
+class TestSingleLineSpan:
+    def test_serialises_a_span_onto_one_line(self) -> None:
+        span = MagicMock()
+        span.to_json.return_value = '{"name": "GET /mcp"}'
+
+        output = telemetry_mod._single_line_span(span)
+
+        assert output == '{"name": "GET /mcp"}\n'
+        span.to_json.assert_called_once_with(indent=None)
 
 
 class TestResolveGcpProjectId:

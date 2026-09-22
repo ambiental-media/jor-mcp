@@ -270,6 +270,12 @@ class TestFetchPostBySlug:
         with pytest.raises(httpx.HTTPStatusError):
             await _fetch_post_by_slug("qualquer-slug")
 
+    async def test_invalid_post_payload_raises_response_error(self, mock_client: AsyncMock) -> None:
+        mock_client.get.return_value = _make_response(200, [{"id": "not-an-int"}])
+
+        with pytest.raises(WordPressResponseError, match="slug='materia-quebrada'"):
+            await _fetch_post_by_slug("materia-quebrada")
+
     async def test_uses_slug_and_fields_params(self, mock_client: AsyncMock) -> None:
         mock_client.get.return_value = _make_response(200, [_BASE_POST])
         await _fetch_post_by_slug("minha-materia")
