@@ -26,17 +26,11 @@ from google.cloud import firestore
 from google.cloud.firestore_v1 import AsyncClient
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from src.config import RATE_LIMIT_BASIC, RATE_LIMIT_COLLECTION, RATE_LIMIT_PRO
+from src.config import RATE_LIMIT_COLLECTION, TIER_QUOTAS
 
 logger = logging.getLogger(__name__)
 
 _HEALTH_PATH = "/health"
-
-_TIER_QUOTAS: dict[str, int] = {
-    "basic": RATE_LIMIT_BASIC,
-    "pro": RATE_LIMIT_PRO,
-}
-"""Map of tier name -> max_requests_per_month."""
 
 
 class RateLimitMiddleware:
@@ -72,9 +66,10 @@ class RateLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
+        # AuthMiddleware rejects any token whose tier is missing or unknown, so
+        # both lookups are guaranteed to resolve here.
         uid: str = user["uid"]
-        tier: str = user.get("tier", "basic")
-        max_requests: int = _TIER_QUOTAS.get(tier, RATE_LIMIT_BASIC)
+        max_requests: int = TIER_QUOTAS[user["tier"]]
 
         try:
             firestore_client = self._firestore_factory()
@@ -88,7 +83,7 @@ class RateLimitMiddleware:
             return
 
         if not allowed:
-            await _send_too_many_requests(send, retry_after)
+            await send_too_many_requests(send, retry_after)
             return
 
         await self.app(scope, receive, send)
@@ -160,8 +155,11 @@ async def _check_fixed_window(
     return True, 0
 
 
-async def _send_too_many_requests(send: Send, retry_after: int) -> None:
+async def send_too_many_requests(send: Send, retry_after: int) -> None:
     """Emit an HTTP 429 Too Many Requests ASGI response.
+
+    Shared with :mod:`src.middleware.ip_rate_limit` so both limiters answer
+    rejected callers with an identical payload and ``Retry-After`` contract.
 
     Args:
         send: The ASGI send callable.

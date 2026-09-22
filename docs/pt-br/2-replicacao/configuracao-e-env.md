@@ -31,6 +31,15 @@ Configure estas variáveis nas configurações de ambiente do seu serviço Cloud
 *   `RATE_LIMIT_BASIC_REQUESTS` (Padrão: `"500"`): Cota mensal para usuários do nível `basic`.
 *   `RATE_LIMIT_PRO_REQUESTS` (Padrão: `"2000"`): Cota mensal para usuários do nível `pro`.
 
+#### Limite por IP nas rotas não autenticadas
+Aplica-se somente à superfície isenta de autenticação (`/.well-known/*` e `/api/oauth/*`), que
+de outra forma permitiria a qualquer pessoa inundar o Firestore via `POST /api/oauth/register`.
+
+*   `IP_RATE_LIMIT_COLLECTION` (Padrão: `"ip_rate_limits"`): Coleção do Firestore com as janelas curtas por IP. Os documentos gravam um campo `expires_at` — configure uma política de TTL do Firestore sobre ele para que janelas expiradas sejam removidas automaticamente.
+*   `IP_RATE_LIMIT_REQUESTS` (Padrão: `"60"`): Requisições permitidas por IP em cada janela.
+*   `IP_RATE_LIMIT_WINDOW_SECONDS` (Padrão: `"60"`): Duração da janela em segundos.
+*   `IP_RATE_LIMIT_TRUSTED_PROXIES` (Padrão: `"1"`): Quantos proxies acrescentam entradas ao final do `X-Forwarded-For`. O Google Cloud Load Balancing reescreve o cabeçalho como `<valor-enviado>, <ip-do-cliente>, <ip-do-load-balancer>`, então o IP do cliente é lido essa quantidade de posições a partir da direita — ler a primeira entrada permitiria que qualquer chamador forjasse sua identidade. Use `"0"` quando o contêiner for acessado diretamente.
+
 ### 2.2 Segurança e Proxy OAuth 2.1
 *   `CORS_ALLOWED_ORIGINS` (Padrão: `"http://localhost:3000,https://jormcp.ambiental.media"`): Lista de origens permitidas (CORS) separadas por vírgula.
 *   `OAUTH_SERVER_BASE_URL` (Padrão: `"https://jormcp.ambiental.media"`): URL pública deste servidor. Utilizado para metadados de descoberta.
@@ -49,9 +58,11 @@ Configure estas variáveis nas configurações de ambiente do seu serviço Cloud
 
 ### 2.4 Diagnóstico e Telemetria
 *   `HTTP_TIMEOUT` (Padrão: `"10.0"`): Limite de tempo de solicitações HTTP de saída em segundos.
-*   `OTEL_EXPORTER_OTLP_ENDPOINT` (Opcional): Endpoint do coletor para rastreamentos OTLP.
+*   `LOG_LEVEL` (Padrão: `"INFO"`): Nível mínimo do logger raiz.
+*   `OTEL_TRACES_EXPORTER` (Padrão: `"none"`): Exportador de spans — `otlp`, `console` ou `none`. A exportação é opcional por escolha explícita: definir apenas `OTEL_EXPORTER_OTLP_ENDPOINT` não surte efeito, esta variável também precisa ser definida como `otlp`. Um endpoint que recusa conexões faz cada lote tentar e falhar, inundando o log com erros transitórios — por isso o silêncio é o padrão. Os spans continuam sendo criados de qualquer forma; é deles que vem o `trace_id` presente em cada registro de log.
+*   `OTEL_EXPORTER_OTLP_ENDPOINT` (Opcional): Endpoint do coletor usado quando `OTEL_TRACES_EXPORTER=otlp`.
 *   `OTEL_SERVICE_NAME` (Padrão: `"jor-mcp"`): Nome do serviço registrado nos rastreamentos.
-*   `GCP_PROJECT_ID` (Obrigatório para integração de rastreamento): ID do projeto GCP para vincular rastreamentos ao Cloud Logging.
+*   `GCP_PROJECT_ID` (Opcional no Cloud Run, obrigatório fora dele): ID do projeto GCP usado para vincular as entradas de log aos rastreamentos no Cloud Logging. No Cloud Run, é lido das credenciais do ambiente quando ausente. Em qualquer outro lugar precisa ser informado, caso contrário os campos de correlação são omitidos de todas as entradas de log.
 
 ---
 

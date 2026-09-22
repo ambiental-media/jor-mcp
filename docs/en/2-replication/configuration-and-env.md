@@ -31,6 +31,15 @@ Configure these variables in your Cloud Run service environment settings or loca
 *   `RATE_LIMIT_BASIC_REQUESTS` (Default: `"500"`): Monthly quota for `basic` tier users.
 *   `RATE_LIMIT_PRO_REQUESTS` (Default: `"2000"`): Monthly quota for `pro` tier users.
 
+#### Per-IP limit on unauthenticated routes
+Applies only to the auth-exempt surface (`/.well-known/*` and `/api/oauth/*`), which would
+otherwise let anyone flood Firestore through `POST /api/oauth/register`.
+
+*   `IP_RATE_LIMIT_COLLECTION` (Default: `"ip_rate_limits"`): Firestore collection holding the short per-IP fixed windows. Documents carry an `expires_at` field — configure a Firestore TTL policy on it so expired windows are reclaimed automatically.
+*   `IP_RATE_LIMIT_REQUESTS` (Default: `"60"`): Requests allowed per IP per window.
+*   `IP_RATE_LIMIT_WINDOW_SECONDS` (Default: `"60"`): Window length in seconds.
+*   `IP_RATE_LIMIT_TRUSTED_PROXIES` (Default: `"1"`): How many proxies append to `X-Forwarded-For` at the right end. Google Cloud Load Balancing rewrites the header as `<supplied-value>, <client-ip>, <load-balancer-ip>`, so the client IP is read that many positions from the right — reading the left-most entry instead would let any caller spoof its identity. Set to `"0"` when the container is reached directly.
+
 ### 2.2 Security & OAuth 2.1 Proxy
 *   `CORS_ALLOWED_ORIGINS` (Default: `"http://localhost:3000,https://jormcp.ambiental.media"`): Comma-separated list of origins allowed to call the server.
 *   `OAUTH_SERVER_BASE_URL` (Default: `"https://jormcp.ambiental.media"`): Public URL of this server. Used for discovery metadata.
@@ -49,9 +58,11 @@ Configure these variables in your Cloud Run service environment settings or loca
 
 ### 2.4 Diagnostics & Telemetry
 *   `HTTP_TIMEOUT` (Default: `"10.0"`): Outbound HTTP request timeout in seconds.
-*   `OTEL_EXPORTER_OTLP_ENDPOINT` (Optional): Collector endpoint for OTLP traces.
+*   `LOG_LEVEL` (Default: `"INFO"`): Minimum level of the root logger.
+*   `OTEL_TRACES_EXPORTER` (Default: `"none"`): Span exporter — `otlp`, `console` or `none`. Export is opt-in: setting `OTEL_EXPORTER_OTLP_ENDPOINT` alone changes nothing, this variable must be set to `otlp` as well. An endpoint that refuses connections makes every batch retry and fail, flooding the log with transient errors, so silence is the default. Spans are still created either way — that is where the `trace_id` on each log record comes from.
+*   `OTEL_EXPORTER_OTLP_ENDPOINT` (Optional): Collector endpoint used when `OTEL_TRACES_EXPORTER=otlp`.
 *   `OTEL_SERVICE_NAME` (Default: `"jor-mcp"`): Registered service name in spans.
-*   `GCP_PROJECT_ID` (Required for trace integration): GCP Project ID to link traces with Cloud Logging.
+*   `GCP_PROJECT_ID` (Optional on Cloud Run, required elsewhere): GCP Project ID used to link log entries with Cloud Logging traces. On Cloud Run it is read from the ambient credentials when unset. Anywhere else it must be provided, otherwise the trace correlation fields are omitted from every log entry.
 
 ---
 
