@@ -119,8 +119,7 @@ async def server_lifespan(app: Starlette) -> AsyncGenerator[None, None]:
                 await _http_client_mod._http_client.aclose()
         _http_client_mod._http_client = None
         if _firestore_client is not None:
-            with contextlib.suppress(RuntimeError):
-                await _firestore_client.close()  # type: ignore[no-untyped-call]
+            _firestore_client.close()  # type: ignore[no-untyped-call]
         _firestore_client = None
 
 

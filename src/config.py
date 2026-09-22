@@ -192,16 +192,43 @@ Environment variable: ``MCP_GITHUB_API_BASE_URL``.
 OTEL_EXPORTER_OTLP_ENDPOINT: str | None = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
 """OTLP/HTTP collector endpoint for exporting traces (e.g. http://localhost:4318).
 
-When absent the SDK falls back to :class:`ConsoleSpanExporter` which writes
-spans to stdout – useful for local development.
+Only read when ``OTEL_TRACES_EXPORTER`` is ``otlp``; on its own it exports
+nothing.
 """
 
 OTEL_SERVICE_NAME: str = os.environ.get("OTEL_SERVICE_NAME", "jor-mcp")
 """Logical service name embedded in every exported span's resource attributes."""
+
+OTEL_TRACES_EXPORTER: str = os.environ.get("OTEL_TRACES_EXPORTER", "none").lower()
+"""Span exporter to use: ``otlp``, ``console`` or ``none`` (the default).
+
+Exporting is opt-in: setting ``OTEL_EXPORTER_OTLP_ENDPOINT`` alone changes
+nothing, this variable must be set to ``otlp`` as well. Silence is the safe
+default because an endpoint that refuses connections makes every batch retry,
+fail, and flood the log with transient errors — which is what a stale
+development endpoint did in production. Use ``console`` to inspect spans
+locally; it prints one line per span.
+"""
 
 GCP_PROJECT_ID: str = os.environ.get("GCP_PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT", "")
 """Google Cloud project ID used to build Cloud Logging trace correlation fields.
 
 When set, log records include ``logging.googleapis.com/trace`` in the
 ``projects/<project-id>/traces/<trace-id>`` format required by Cloud Logging.
+Cloud Run does not inject this value, so :mod:`src.telemetry` falls back to the
+project bound to the ambient credentials when this variable is empty.
+"""
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+
+LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO").upper()
+"""Minimum level of the root logger configured by :mod:`src.telemetry`."""
+
+CLOUD_RUN_SERVICE: str = os.environ.get("K_SERVICE", "")
+"""Cloud Run service name, injected by the platform. Empty anywhere else.
+
+Used only to tell whether the GCP metadata server is reachable before querying
+it for the project ID.
 """

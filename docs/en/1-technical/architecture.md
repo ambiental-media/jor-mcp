@@ -89,7 +89,7 @@ sequenceDiagram
 - **Framework:** `fastmcp` (ASGI server powered by `uvicorn`).
 - **HTTP Client:** `httpx` (Asynchronous connection pooling).
 - **Security:** `firebase-admin` (JWT validation) and `google-cloud-firestore` (Rate limiting).
-- **Telemetry:** OpenTelemetry (`opentelemetry-sdk`, `opentelemetry-instrumentation-fastapi`).
+- **Telemetry:** OpenTelemetry (`opentelemetry-sdk`, `opentelemetry-instrumentation-starlette`, `opentelemetry-instrumentation-httpx`).
 
 ## 4. Key Architectural Patterns
 
@@ -97,6 +97,8 @@ sequenceDiagram
 All external data ingress (API responses from WordPress/GitHub, environment variables, client requests) must pass through a **Pydantic v2** validation layer. This ensures that the core application logic, which is statically checked by Mypy, only ever operates on guaranteed, type-safe structures.
 
 ### 4.2 Telemetry & Observability
-The application relies strictly on **OpenTelemetry Auto-Instrumentation**. Traces, metrics, and logs are automatically collected from the ASGI layer (FastMCP/Starlette), HTTP clients (`httpx`), and standard Python `logging`.
+Tracing relies on **OpenTelemetry Auto-Instrumentation**: spans are collected from the ASGI layer (FastMCP/Starlette) and from HTTP clients (`httpx`). Logs take a separate path — they are **not** exported through OTLP.
 - **No Manual Tracing:** Developers should avoid importing `opentelemetry` SDK components into business logic.
-- **Logging:** Use the standard Python `logging` module. All logs are automatically intercepted, enriched with trace contexts, and exported via OTLP to the configured observability backend.
+- **Logging:** Use the standard Python `logging` module. `src/telemetry.py` owns the process-wide configuration: a single handler writes every record to stdout as one line of JSON in the schema Cloud Logging expects, and the runtime collects it from the container's output. A logging filter reads the active span and attaches the trace context to each record, which is what correlates a log entry with its request.
+- **Third-Party Handlers:** Libraries that install their own handlers (uvicorn, FastMCP, MCP) have them stripped at startup so their records reach the same JSON handler. Without that, a multi-line traceback written as plain text is ingested as one log entry per line.
+- **Span Export:** Opt-in through `OTEL_TRACES_EXPORTER`, which defaults to `none`. Spans are always created — that is where the trace context on each log record comes from — but reach a backend only when export is explicitly enabled.

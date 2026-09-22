@@ -58,9 +58,11 @@ otherwise let anyone flood Firestore through `POST /api/oauth/register`.
 
 ### 2.4 Diagnostics & Telemetry
 *   `HTTP_TIMEOUT` (Default: `"10.0"`): Outbound HTTP request timeout in seconds.
-*   `OTEL_EXPORTER_OTLP_ENDPOINT` (Optional): Collector endpoint for OTLP traces.
+*   `LOG_LEVEL` (Default: `"INFO"`): Minimum level of the root logger.
+*   `OTEL_TRACES_EXPORTER` (Default: `"none"`): Span exporter — `otlp`, `console` or `none`. Export is opt-in: setting `OTEL_EXPORTER_OTLP_ENDPOINT` alone changes nothing, this variable must be set to `otlp` as well. An endpoint that refuses connections makes every batch retry and fail, flooding the log with transient errors, so silence is the default. Spans are still created either way — that is where the `trace_id` on each log record comes from.
+*   `OTEL_EXPORTER_OTLP_ENDPOINT` (Optional): Collector endpoint used when `OTEL_TRACES_EXPORTER=otlp`.
 *   `OTEL_SERVICE_NAME` (Default: `"jor-mcp"`): Registered service name in spans.
-*   `GCP_PROJECT_ID` (Required for trace integration): GCP Project ID to link traces with Cloud Logging.
+*   `GCP_PROJECT_ID` (Optional on Cloud Run, required elsewhere): GCP Project ID used to link log entries with Cloud Logging traces. On Cloud Run it is read from the ambient credentials when unset. Anywhere else it must be provided, otherwise the trace correlation fields are omitted from every log entry.
 
 ---
 

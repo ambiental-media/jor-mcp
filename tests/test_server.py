@@ -5,9 +5,14 @@ from starlette.testclient import TestClient
 
 
 def _make_fake_firestore() -> MagicMock:
-    """Return a MagicMock that satisfies the Firestore async interface."""
+    """Return a MagicMock that satisfies the Firestore async interface.
+
+    ``close()`` is deliberately synchronous: AsyncClient inherits the plain
+    ``google.cloud.client.Client.close()``, and an AsyncMock here would accept an
+    ``await`` that raises TypeError against the real client.
+    """
     fake_firestore = MagicMock()
-    fake_firestore.close = AsyncMock()
+    fake_firestore.close = MagicMock(return_value=None)
     return fake_firestore
 
 
@@ -58,7 +63,7 @@ async def test_server_lifespan_initializes_firebase_when_not_present(
 
     mock_init.assert_called_once()
     fake_http_client.aclose.assert_awaited_once()
-    fake_firestore.close.assert_awaited_once()
+    fake_firestore.close.assert_called_once()
     _mock_setup.assert_called_once()
 
 
@@ -94,5 +99,5 @@ async def test_server_lifespan_skips_init_when_firebase_already_present(
 
     mock_init.assert_not_called()
     fake_http_client.aclose.assert_awaited_once()
-    fake_firestore.close.assert_awaited_once()
+    fake_firestore.close.assert_called_once()
     _mock_setup.assert_called_once()
