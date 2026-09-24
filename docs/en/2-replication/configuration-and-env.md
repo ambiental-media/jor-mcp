@@ -38,7 +38,7 @@ otherwise let anyone flood Firestore through `POST /api/oauth/register`.
 *   `IP_RATE_LIMIT_COLLECTION` (Default: `"ip_rate_limits"`): Firestore collection holding the short per-IP fixed windows. Documents carry an `expires_at` field — configure a Firestore TTL policy on it so expired windows are reclaimed automatically.
 *   `IP_RATE_LIMIT_REQUESTS` (Default: `"60"`): Requests allowed per IP per window.
 *   `IP_RATE_LIMIT_WINDOW_SECONDS` (Default: `"60"`): Window length in seconds.
-*   `IP_RATE_LIMIT_TRUSTED_PROXIES` (Default: `"1"`): How many proxies append to `X-Forwarded-For` at the right end. Google Cloud Load Balancing rewrites the header as `<supplied-value>, <client-ip>, <load-balancer-ip>`, so the client IP is read that many positions from the right — reading the left-most entry instead would let any caller spoof its identity. Set to `"0"` when the container is reached directly.
+*   `IP_RATE_LIMIT_TRUSTED_PROXIES` (Default: `"1"`): Number of trusted proxy layers appending to `X-Forwarded-For` at the right end. Google Cloud Load Balancing rewrites the header as `<supplied-value>, <client-ip>, <load-balancer-ip>`, so the real client IP is the entry `IP_RATE_LIMIT_TRUSTED_PROXIES + 1` positions from the right (i.e. second from the right, immediately preceding the load balancer IP). Taking the left-most entry instead would let any caller spoof its identity. Set to `"0"` when the container is reached directly without a proxy.
 
 ### 2.2 Security & OAuth 2.1 Proxy
 *   `CORS_ALLOWED_ORIGINS` (Default: `"http://localhost:3000,https://jormcp.ambiental.media"`): Comma-separated list of origins allowed to call the server.

@@ -132,6 +132,7 @@ _starlette_app = Starlette(
             allow_origins=CORS_ALLOWED_ORIGINS,
             allow_methods=["GET", "POST", "OPTIONS"],
             allow_headers=["Authorization", "Content-Type"],
+            expose_headers=["Retry-After"],
         ),
         Middleware(IPRateLimitMiddleware, firestore_factory=get_firestore_client),
         Middleware(AuthMiddleware),

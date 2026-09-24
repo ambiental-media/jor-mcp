@@ -71,7 +71,7 @@ def _spy_app(state: dict[str, bool]) -> Any:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("path", ["/health", "/mcp/", "/", "/api/other"])
+@pytest.mark.parametrize("path", ["/health", "/api/oauth/health", "/mcp/", "/", "/api/other"])
 async def test_authenticated_and_health_paths_bypass_ip_limit(path: str) -> None:
     """Only auth-exempt OAuth paths are metered; everything else passes through."""
     from src.middleware.ip_rate_limit import IPRateLimitMiddleware
@@ -159,6 +159,26 @@ async def test_forwarded_for_is_read_from_the_right() -> None:
         )
 
     collection_ref.document.assert_called_once_with("198-51-100-9_1700000000")
+
+
+async def test_forwarded_for_gclb_standard_two_hop() -> None:
+    """Standard GCLB header (<client-ip>, <lb-ip>) resolves to client-ip."""
+    from src.middleware.ip_rate_limit import IPRateLimitMiddleware
+
+    firestore_client, collection_ref, _doc_ref = _make_firestore_mock(count=1)
+
+    middleware = IPRateLimitMiddleware(AsyncMock(), lambda: firestore_client)
+    with (
+        patch("src.middleware.ip_rate_limit.IP_RATE_LIMIT_TRUSTED_PROXIES", 1),
+        _fixed_window(),
+    ):
+        await middleware(
+            _make_scope(forwarded_for="188.241.177.235, 34.96.77.111"),
+            _noop_receive,
+            AsyncMock(),
+        )
+
+    collection_ref.document.assert_called_once_with("188-241-177-235_1700000000")
 
 
 async def test_forwarded_for_without_proxies_uses_last_entry() -> None:
@@ -390,3 +410,28 @@ async def test_firestore_factory_exception_fails_open() -> None:
 
     assert called["app"] is True
     mock_logger.warning.assert_called_once()
+
+
+def test_cors_exposes_retry_after_header_on_429() -> None:
+    """Cross-origin clients receive Access-Control-Expose-Headers containing Retry-After."""
+    from starlette.testclient import TestClient
+
+    import src.server
+    from src.server import app
+
+    firestore_mock, _, _ = _make_firestore_mock(count=61)
+
+    with (
+        patch.object(src.server, "_firestore_client", firestore_mock),
+        patch("src.middleware.ip_rate_limit.IP_RATE_LIMIT_REQUESTS", 60),
+    ):
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.post(
+            "/api/oauth/register",
+            headers={"Origin": "http://localhost:3000"},
+            json={"redirect_uris": ["https://example.com/callback"]},
+        )
+
+    assert response.status_code == 429
+    exposed = response.headers.get("access-control-expose-headers", "")
+    assert "retry-after" in exposed.lower()

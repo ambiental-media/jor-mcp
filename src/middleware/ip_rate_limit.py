@@ -43,6 +43,7 @@ from src.middleware.rate_limit import send_too_many_requests
 logger = logging.getLogger(__name__)
 
 _HEALTH_PATH = "/health"
+_OAUTH_HEALTH_PATH = "/api/oauth/health"
 
 _UNKNOWN_IP = "unknown"
 """Bucket used when no usable client IP can be derived from the request."""
@@ -53,7 +54,7 @@ class IPRateLimitMiddleware:
 
     Only paths that :func:`src.api.oauth.is_oauth_path` reports as auth-exempt are
     metered — authenticated traffic is already covered by the per-user monthly
-    quota, and ``/health`` stays open for Cloud Run probes.
+    quota, and health routes (``/health``, ``/api/oauth/health``) stay open for probes.
 
     On Firestore failure the middleware is fail-open: a warning is logged and the
     request is forwarded to the next layer unchanged.
@@ -69,7 +70,7 @@ class IPRateLimitMiddleware:
             return
 
         path: str = scope.get("path", "")
-        if path == _HEALTH_PATH or not is_oauth_path(path):
+        if path in (_HEALTH_PATH, _OAUTH_HEALTH_PATH) or not is_oauth_path(path):
             await self.app(scope, receive, send)
             return
 
@@ -170,8 +171,9 @@ def _window_bounds(now: datetime) -> tuple[int, int]:
         A tuple of (window_start_epoch, window_end_epoch) in seconds.
     """
     epoch_seconds = int(now.timestamp())
-    window_start = epoch_seconds - (epoch_seconds % IP_RATE_LIMIT_WINDOW_SECONDS)
-    return window_start, window_start + IP_RATE_LIMIT_WINDOW_SECONDS
+    window_seconds = max(1, IP_RATE_LIMIT_WINDOW_SECONDS)
+    window_start = epoch_seconds - (epoch_seconds % window_seconds)
+    return window_start, window_start + window_seconds
 
 
 async def _check_ip_fixed_window(
