@@ -88,7 +88,7 @@ class RateLimitMiddleware:
             return
 
         if not allowed:
-            await _send_too_many_requests(send, retry_after)
+            await send_too_many_requests(send, retry_after)
             return
 
         await self.app(scope, receive, send)
@@ -160,8 +160,11 @@ async def _check_fixed_window(
     return True, 0
 
 
-async def _send_too_many_requests(send: Send, retry_after: int) -> None:
+async def send_too_many_requests(send: Send, retry_after: int) -> None:
     """Emit an HTTP 429 Too Many Requests ASGI response.
+
+    Shared with :mod:`src.middleware.ip_rate_limit` so both limiters answer
+    rejected callers with an identical payload and ``Retry-After`` contract.
 
     Args:
         send: The ASGI send callable.
