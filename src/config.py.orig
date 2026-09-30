@@ -35,6 +35,7 @@ quota from the same mapping. Roles are assigned manually by Ambiental Media on
 the ``allowed_users`` Firestore documents.
 """
 
+<<<<<<< HEAD
 # ---------------------------------------------------------------------------
 # IP Rate Limiting (unauthenticated routes)
 # ---------------------------------------------------------------------------
@@ -58,6 +59,8 @@ the left-most entry instead would let any caller spoof its identity and bypass
 the limiter. Set to ``0`` when the container is reached directly without a proxy.
 """
 
+=======
+>>>>>>> fab4832 (fix: role based rate limiting)
 # ---------------------------------------------------------------------------
 # IP Rate Limiting (unauthenticated routes)
 # ---------------------------------------------------------------------------
