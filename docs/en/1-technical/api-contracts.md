@@ -40,6 +40,24 @@ The Jor-MCP server exposes its Model Context Protocol (MCP) interface exclusivel
 ```
 *Note: If no results are found, the tool throws a `ToolError` with a semantic hint for the LLM to try different keywords.*
 
+### Graceful Degradation (partial failure)
+Sources are queried in parallel inside an `asyncio.TaskGroup`, each isolated behind
+its own wrapper: **no exception from one source cancels the other**.
+
+*   **One source fails:** the response carries the available source's results plus a
+    diagnostic entry `{"error": "<reason>", "source": "wordpress" | "github"}`. That
+    entry has no `id`/`title`/`link` fields — consumers must treat it as metadata,
+    not as a result.
+*   **All active sources fail:** `ToolError` telling the caller to check the
+    connection and retry later.
+*   **Non-JSON WordPress body** (site down, redirect, WAF block — the site is served
+    behind Cloudflare): converted into `WordPressResponseError` and handled as a
+    failure of that source alone. The raw parsing error
+    (`Expecting value: line 1 column 1 (char 0)`) never reaches the MCP client.
+*   **Malformed item:** individual entries failing validation are dropped with a
+    warning log. If *every* item on the page fails, the source is reported as failed —
+    never as "no results", which would send the LLM to the open web.
+
 ---
 
 ## 2. `get_full_article`
@@ -60,6 +78,17 @@ The Jor-MCP server exposes its Model Context Protocol (MCP) interface exclusivel
   "content": "The fully cleaned, plain-text body of the article ready for LLM summarization or analysis..."
 }
 ```
+
+### Errors
+Each case raises a `ToolError` carrying a distinct recovery hint (ADR 002) — the
+messages differ on purpose so the LLM knows whether to look for another identifier,
+retry later, or tell the user:
+
+| Situation | Semantic hint returned to the LLM |
+| :--- | :--- |
+| Article does not exist (404 or unmatched slug) | Quotes the identifier received and directs the LLM to `search_content` to find the article by title or topic. |
+| Non-JSON body / invalid payload | Explains the site answered with invalid content (down, redirect or block), tells the LLM to inform the user, suggest `search_content`, and **not to invent the article text**. |
+| Network error or non-2xx status | Directs the caller to check the connection and retry later. |
 
 ---
 
@@ -85,6 +114,19 @@ The Jor-MCP server exposes its Model Context Protocol (MCP) interface exclusivel
   }
 ]
 ```
+
+### Errors
+Unlike `search_content`, this tool queries a single source, so any WordPress failure
+is terminal — but each one carries its own message:
+
+| Situation | Semantic hint returned to the LLM |
+| :--- | :--- |
+| No articles returned | States the site may have no recent publications. |
+| Non-JSON body / invalid payload | Explains the site answered with invalid content (down, redirect or block), tells the LLM to inform the user, suggest `search_content`, and **not to invent headlines or dates**. |
+| Network error or non-2xx status | Directs the caller to check the connection and retry later. |
+
+The `limit` parameter also bounds processing: even if WordPress ignores `per_page`
+and returns more posts, only the first `limit` entries are normalised.
 
 ## 4. OAuth 2.1 Proxy Endpoints (Internal API)
 

@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 from fastmcp.exceptions import ToolError
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from src.config import GITHUB_REPOS, WP_API_BASE_URL
 from src.http_client import get_http_client
@@ -15,9 +15,12 @@ from src.server import mcp
 from src.services.github import fetch_github_i18n_content
 from src.services.wordpress import (
     WordPressPostNotFoundError,
+    WordPressResponseError,
     _strip_html,
+    decode_json_body,
     fetch_full_article,
     fetch_latest_posts,
+    require_post_list,
 )
 
 logger = logging.getLogger(__name__)
@@ -129,6 +132,7 @@ async def _search_wp(query: str) -> list[dict[str, Any]]:
         ``date``, ``link``, ``source``.
 
     Raises:
+        WordPressResponseError: If the body is not a valid list of posts.
         httpx.HTTPStatusError: If the WordPress API returns a non-2xx status.
         httpx.RequestError: If a network error occurs.
     """
@@ -143,9 +147,22 @@ async def _search_wp(query: str) -> list[dict[str, Any]]:
     response = await client.get(url, params=params)
     response.raise_for_status()
 
+    payload = require_post_list(decode_json_body(response, query=query), query=query)
+    # Honour the requested page size even if the upstream ignores per_page: the
+    # cost of _strip_html must be bounded by our own parameter, not by WordPress.
+    page = payload[:_WP_SEARCH_PER_PAGE]
+
     results: list[dict[str, Any]] = []
-    for raw_post in response.json():
-        post = _WpSearchPost.model_validate(raw_post)
+    for raw_post in page:
+        try:
+            post = _WpSearchPost.model_validate(raw_post)
+        except ValidationError as exc:
+            # One malformed entry must not cost the caller the whole result set.
+            logger.warning(
+                "Skipping malformed WordPress search result",
+                extra={"query": query, "error": str(exc)},
+            )
+            continue
         results.append(
             {
                 "id": str(post.id),
@@ -156,6 +173,11 @@ async def _search_wp(query: str) -> list[dict[str, Any]]:
                 "source": "wordpress",
             }
         )
+
+    if page and not results:
+        # Every entry was malformed: returning [] here would be reported to the
+        # LLM as "no results for this query", sending it to search the open web.
+        raise WordPressResponseError(f"All {len(page)} WordPress search results failed validation")
 
     logger.info(
         "WordPress search completed",
@@ -208,7 +230,13 @@ async def _search_github(query: str) -> list[dict[str, Any]]:
 async def _safe_search_wp(
     query: str,
 ) -> tuple[list[dict[str, Any]], Exception | None]:
-    """Run :func:`_search_wp` and capture any raised HTTP or network exception.
+    """Run :func:`_search_wp` and capture any exception.
+
+    Catches ``Exception`` rather than a fixed tuple: any escaping exception would
+    make the ``asyncio.TaskGroup`` in :func:`search_content` cancel the GitHub
+    task and surface an ``ExceptionGroup`` ("unhandled errors in a TaskGroup") to
+    the MCP client, which is exactly the graceful degradation this tool promises
+    to provide. ``BaseException`` (task cancellation) still propagates.
 
     Args:
         query: The search query string.
@@ -218,9 +246,16 @@ async def _safe_search_wp(
     """
     try:
         return await _search_wp(query), None
-    except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+    except (httpx.HTTPStatusError, httpx.RequestError, WordPressResponseError) as exc:
         logger.warning(
             "WordPress search failed",
+            extra={"query": query, "error": str(exc)},
+        )
+        return [], exc
+    except Exception as exc:
+        # Unexpected here means a defect on our side, so keep the traceback.
+        logger.exception(
+            "WordPress search failed unexpectedly",
             extra={"query": query, "error": str(exc)},
         )
         return [], exc
@@ -233,7 +268,7 @@ async def _safe_search_github(
 
     Wraps all exceptions so that a GitHub failure never causes the
     ``asyncio.TaskGroup`` in :func:`search_content` to panic and cancel
-    the WordPress task.
+    the WordPress task. ``BaseException`` (task cancellation) still propagates.
 
     Args:
         query: The search query string.
@@ -243,15 +278,7 @@ async def _safe_search_github(
     """
     try:
         return await _search_github(query), None
-    except (
-        httpx.RequestError,
-        httpx.HTTPStatusError,
-        ValueError,
-        TypeError,
-        KeyError,
-        AttributeError,
-        RuntimeError,
-    ) as exc:
+    except Exception as exc:
         logger.exception(
             "GitHub search failed",
             extra={"query": query, "error": str(exc)},
@@ -406,6 +433,18 @@ async def list_latest_news(limit: int = _LATEST_NEWS_DEFAULT_LIMIT) -> list[dict
 
     try:
         results = await fetch_latest_posts(safe_limit)
+    except WordPressResponseError as exc:
+        logger.warning(
+            "WordPress returned an invalid body for the latest posts",
+            extra={"limit": safe_limit, "error": str(exc)},
+        )
+        raise ToolError(
+            "O site WordPress respondeu com um conteúdo inválido (não-JSON) na API REST, "
+            "então a lista de matérias recentes não pôde ser lida. O site pode estar fora "
+            "do ar, redirecionando ou bloqueando a requisição. Informe isso ao usuário e "
+            "use 'search_content' para consultar as demais fontes; não invente manchetes "
+            "nem datas de publicação."
+        ) from exc
     except (httpx.HTTPStatusError, httpx.RequestError) as exc:
         logger.warning(
             "Failed to fetch latest WordPress posts",
@@ -480,6 +519,18 @@ async def get_full_article(url_or_id: str) -> dict[str, Any]:
         raise ToolError(
             f"Artigo não encontrado: '{url_or_id}'. "
             "Utilize a ferramenta 'search_content' para encontrar matérias pelo título ou tema."
+        ) from exc
+    except WordPressResponseError as exc:
+        logger.warning(
+            "WordPress returned an invalid body for the article",
+            extra={"url_or_id": url_or_id, "error": str(exc)},
+        )
+        raise ToolError(
+            "O site WordPress respondeu com um conteúdo inválido (não-JSON) na API REST, "
+            "então não foi possível ler este artigo. O site pode estar fora do ar, "
+            "redirecionando ou bloqueando a requisição. Informe isso ao usuário e use "
+            "'search_content' para recuperar o trecho já indexado deste conteúdo; "
+            "não invente o texto do artigo."
         ) from exc
     except (httpx.HTTPStatusError, httpx.RequestError) as exc:
         logger.warning(

@@ -1,5 +1,6 @@
 """Tests for src.services.wordpress."""
 
+import json
 from collections.abc import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -9,6 +10,7 @@ import pytest
 from src.services.wordpress import (
     WordPressPost,
     WordPressPostNotFoundError,
+    WordPressResponseError,
     _extract_slug,
     _fetch_post_by_id,
     _fetch_post_by_slug,
@@ -43,6 +45,19 @@ def _make_response(status_code: int = 200, json_body: object = None) -> MagicMoc
         )
     else:
         mock.raise_for_status.return_value = None
+    return mock
+
+
+def _make_non_json_response(body: str = "<html><body>503</body></html>") -> MagicMock:
+    """Build a mock 200 response whose body is HTML instead of JSON.
+
+    Reproduces a site that is down, redirecting, or behind a WAF: the status is
+    2xx so ``raise_for_status`` passes and only ``response.json()`` blows up.
+    """
+    mock = _make_response(200)
+    mock.json.side_effect = json.JSONDecodeError("Expecting value", body, 0)
+    mock.content = body.encode("utf-8")
+    mock.headers = httpx.Headers({"content-type": "text/html; charset=UTF-8"})
     return mock
 
 
@@ -452,3 +467,79 @@ class TestFetchLatestPosts:
 
         assert results[0]["date"] == "2024-08-01"
         assert "T" not in results[0]["date"]
+
+    async def test_non_json_body_raises_response_error(self, mock_client: AsyncMock) -> None:
+        """A 200 HTML body surfaces as WordPressResponseError, not JSONDecodeError."""
+        mock_client.get.return_value = _make_non_json_response()
+
+        with pytest.raises(WordPressResponseError):
+            await fetch_latest_posts(5)
+
+    async def test_non_list_payload_raises_response_error(self, mock_client: AsyncMock) -> None:
+        """A WP error object served with a 2xx status is rejected before iteration."""
+        mock_client.get.return_value = _make_response(200, {"code": "rest_no_route"})
+
+        with pytest.raises(WordPressResponseError):
+            await fetch_latest_posts(5)
+
+    async def test_malformed_post_is_skipped(self, mock_client: AsyncMock) -> None:
+        """One invalid entry does not discard the valid ones."""
+        mock_client.get.return_value = _make_response(
+            200, [_SAMPLE_WP_SUMMARY_POST, {"id": "not-an-int"}]
+        )
+
+        results = await fetch_latest_posts(5)
+
+        assert len(results) == 1
+        assert results[0]["id"] == "10"
+
+    async def test_all_posts_malformed_raises_response_error(self, mock_client: AsyncMock) -> None:
+        """A fully broken payload is an upstream error, not 'no recent posts'."""
+        mock_client.get.return_value = _make_response(200, [{"id": "a"}, {"id": "b"}])
+
+        with pytest.raises(WordPressResponseError):
+            await fetch_latest_posts(5)
+
+    async def test_extra_posts_beyond_limit_are_dropped(self, mock_client: AsyncMock) -> None:
+        """An upstream ignoring per_page cannot inflate the work done per call."""
+        posts = [{**_SAMPLE_WP_SUMMARY_POST, "id": i} for i in range(50)]
+        mock_client.get.return_value = _make_response(200, posts)
+
+        results = await fetch_latest_posts(5)
+
+        assert len(results) == 5
+
+
+# ---------------------------------------------------------------------------
+# Non-JSON handling on the single-post endpoints
+# ---------------------------------------------------------------------------
+
+
+class TestNonJsonPostResponses:
+    async def test_fetch_post_by_id_raises_response_error(self, mock_client: AsyncMock) -> None:
+        mock_client.get.return_value = _make_non_json_response()
+
+        with pytest.raises(WordPressResponseError):
+            await _fetch_post_by_id(42)
+
+    async def test_fetch_post_by_id_invalid_shape_raises_response_error(
+        self, mock_client: AsyncMock
+    ) -> None:
+        mock_client.get.return_value = _make_response(200, {"code": "rest_post_invalid_id"})
+
+        with pytest.raises(WordPressResponseError):
+            await _fetch_post_by_id(42)
+
+    async def test_fetch_post_by_slug_raises_response_error(self, mock_client: AsyncMock) -> None:
+        mock_client.get.return_value = _make_non_json_response()
+
+        with pytest.raises(WordPressResponseError):
+            await _fetch_post_by_slug("amazonia-em-chamas")
+
+    async def test_fetch_post_by_slug_non_list_raises_response_error(
+        self, mock_client: AsyncMock
+    ) -> None:
+        mock_client.get.return_value = _make_response(200, {"code": "rest_no_route"})
+
+        with pytest.raises(WordPressResponseError):
+            await _fetch_post_by_slug("amazonia-em-chamas")
