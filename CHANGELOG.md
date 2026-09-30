@@ -2,6 +2,38 @@
 
 <!-- version list -->
 
+## v0.9.0 (2026-09-30)
+
+### Bug Fixes
+
+- Bump pyjwt to patch known CVEs ([#66](https://github.com/ambiental-media/jor-mcp/pull/66),
+  [`14586e3`](https://github.com/ambiental-media/jor-mcp/commit/14586e39a137ccc092912c7e045ebb71d4239780))
+
+- Drop system pip from the runtime image to clear vendored CVEs
+  ([#66](https://github.com/ambiental-media/jor-mcp/pull/66),
+  [`14586e3`](https://github.com/ambiental-media/jor-mcp/commit/14586e39a137ccc092912c7e045ebb71d4239780))
+
+- Small improvements ([#66](https://github.com/ambiental-media/jor-mcp/pull/66),
+  [`14586e3`](https://github.com/ambiental-media/jor-mcp/commit/14586e39a137ccc092912c7e045ebb71d4239780))
+
+- **deps**: Bump anyio and soupsieve to patch known CVEs
+  ([#66](https://github.com/ambiental-media/jor-mcp/pull/66),
+  [`14586e3`](https://github.com/ambiental-media/jor-mcp/commit/14586e39a137ccc092912c7e045ebb71d4239780))
+
+- **deps**: Bump deps versions and remove unnecessary deps
+  ([#66](https://github.com/ambiental-media/jor-mcp/pull/66),
+  [`14586e3`](https://github.com/ambiental-media/jor-mcp/commit/14586e39a137ccc092912c7e045ebb71d4239780))
+
+### Features
+
+- Bump mcp, pyasn1 and fastmcp to patch known CVEs
+  ([#66](https://github.com/ambiental-media/jor-mcp/pull/66),
+  [`14586e3`](https://github.com/ambiental-media/jor-mcp/commit/14586e39a137ccc092912c7e045ebb71d4239780))
+
+- Implement ip based rate limiting ([#66](https://github.com/ambiental-media/jor-mcp/pull/66),
+  [`14586e3`](https://github.com/ambiental-media/jor-mcp/commit/14586e39a137ccc092912c7e045ebb71d4239780))
+
+
 ## v0.8.1 (2026-09-30)
 
 ### Bug Fixes
