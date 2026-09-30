@@ -2,6 +2,31 @@
 
 <!-- version list -->
 
+## v0.10.0 (2026-09-30)
+
+### Bug Fixes
+
+- Bump cryptography and h2 to patch known CVEs
+  ([#69](https://github.com/ambiental-media/jor-mcp/pull/69),
+  [`07d875a`](https://github.com/ambiental-media/jor-mcp/commit/07d875ac41bcf1f612d589bbd8b402d31db0ecde))
+
+- Isolate WordPress failures inside the search_content
+  ([#69](https://github.com/ambiental-media/jor-mcp/pull/69),
+  [`07d875a`](https://github.com/ambiental-media/jor-mcp/commit/07d875ac41bcf1f612d589bbd8b402d31db0ecde))
+
+- **deps**: Bump deps versions ([#69](https://github.com/ambiental-media/jor-mcp/pull/69),
+  [`07d875a`](https://github.com/ambiental-media/jor-mcp/commit/07d875ac41bcf1f612d589bbd8b402d31db0ecde))
+
+### Features
+
+- Bump mcp, pyasn1 and fastmcp to patch known CVEs
+  ([#69](https://github.com/ambiental-media/jor-mcp/pull/69),
+  [`07d875a`](https://github.com/ambiental-media/jor-mcp/commit/07d875ac41bcf1f612d589bbd8b402d31db0ecde))
+
+- Implement ip based rate limiting ([#69](https://github.com/ambiental-media/jor-mcp/pull/69),
+  [`07d875a`](https://github.com/ambiental-media/jor-mcp/commit/07d875ac41bcf1f612d589bbd8b402d31db0ecde))
+
+
 ## v0.9.0 (2026-09-30)
 
 ### Bug Fixes
