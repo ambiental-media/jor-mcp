@@ -38,7 +38,7 @@ de outra forma permitiria a qualquer pessoa inundar o Firestore via `POST /api/o
 *   `IP_RATE_LIMIT_COLLECTION` (Padrão: `"ip_rate_limits"`): Coleção do Firestore com as janelas curtas por IP. Os documentos gravam um campo `expires_at` — configure uma política de TTL do Firestore sobre ele para que janelas expiradas sejam removidas automaticamente.
 *   `IP_RATE_LIMIT_REQUESTS` (Padrão: `"60"`): Requisições permitidas por IP em cada janela.
 *   `IP_RATE_LIMIT_WINDOW_SECONDS` (Padrão: `"60"`): Duração da janela em segundos.
-*   `IP_RATE_LIMIT_TRUSTED_PROXIES` (Padrão: `"1"`): Quantos proxies acrescentam entradas ao final do `X-Forwarded-For`. O Google Cloud Load Balancing reescreve o cabeçalho como `<valor-enviado>, <ip-do-cliente>, <ip-do-load-balancer>`, então o IP do cliente é lido essa quantidade de posições a partir da direita — ler a primeira entrada permitiria que qualquer chamador forjasse sua identidade. Use `"0"` quando o contêiner for acessado diretamente.
+*   `IP_RATE_LIMIT_TRUSTED_PROXIES` (Padrão: `"1"`): Número de camadas de proxy confiáveis acrescentando entradas ao final de `X-Forwarded-For`. O Google Cloud Load Balancing reescreve o cabeçalho como `<valor-enviado>, <ip-do-cliente>, <ip-do-load-balancer>`, portanto o IP real do cliente é a entrada `IP_RATE_LIMIT_TRUSTED_PROXIES + 1` posições a partir da direita (isto é, a penúltima entrada, imediatamente antes do IP do load balancer). Ler a primeira entrada permitiria que qualquer chamador forjasse sua identidade. Use `"0"` quando o contêiner for acessado diretamente sem proxy.
 
 ### 2.2 Segurança e Proxy OAuth 2.1
 *   `CORS_ALLOWED_ORIGINS` (Padrão: `"http://localhost:3000,https://jormcp.ambiental.media"`): Lista de origens permitidas (CORS) separadas por vírgula.
