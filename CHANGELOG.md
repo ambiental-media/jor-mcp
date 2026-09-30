@@ -2,6 +2,40 @@
 
 <!-- version list -->
 
+## v0.8.1 (2026-09-30)
+
+### Bug Fixes
+
+- Bump pyjwt to patch known CVEs ([#78](https://github.com/ambiental-media/jor-mcp/pull/78),
+  [`01e2bdd`](https://github.com/ambiental-media/jor-mcp/commit/01e2bdd78c3c1ea452b632cbc8d10719862de108))
+
+- Cd pipeline enforce the networkpolicy required by the LB connectivity
+  ([#71](https://github.com/ambiental-media/jor-mcp/pull/71),
+  [`65e0c75`](https://github.com/ambiental-media/jor-mcp/commit/65e0c757bbd47e0005e344eb0ca745ed8d759c19))
+
+- Drop system pip from the runtime image to clear vendored CVEs
+  ([#78](https://github.com/ambiental-media/jor-mcp/pull/78),
+  [`01e2bdd`](https://github.com/ambiental-media/jor-mcp/commit/01e2bdd78c3c1ea452b632cbc8d10719862de108))
+
+- Patch dependencies ([#71](https://github.com/ambiental-media/jor-mcp/pull/71),
+  [`65e0c75`](https://github.com/ambiental-media/jor-mcp/commit/65e0c757bbd47e0005e344eb0ca745ed8d759c19))
+
+- **deps**: Bump anyio and soupsieve to patch known CVEs
+  ([#78](https://github.com/ambiental-media/jor-mcp/pull/78),
+  [`01e2bdd`](https://github.com/ambiental-media/jor-mcp/commit/01e2bdd78c3c1ea452b632cbc8d10719862de108))
+
+### Chores
+
+- AI assisted rules ([#63](https://github.com/ambiental-media/jor-mcp/pull/63),
+  [`ec06eeb`](https://github.com/ambiental-media/jor-mcp/commit/ec06eeb39e187cb344de27e46dc07e099662b24f))
+
+### Documentation
+
+- Roadmap updated with user testing activity (next)
+  ([#63](https://github.com/ambiental-media/jor-mcp/pull/63),
+  [`ec06eeb`](https://github.com/ambiental-media/jor-mcp/commit/ec06eeb39e187cb344de27e46dc07e099662b24f))
+
+
 ## v0.8.0 (2026-07-09)
 
 ### Chores
