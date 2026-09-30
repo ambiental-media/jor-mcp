@@ -18,6 +18,11 @@ FROM python:3.13-slim AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
+    
+RUN rm -rf /usr/local/lib/python3.13/site-packages/pip* \
+    /usr/local/lib/python3.13/site-packages/setuptools* \
+    /usr/local/lib/python3.13/site-packages/pkg_resources \
+    /usr/local/bin/pip*
 
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
