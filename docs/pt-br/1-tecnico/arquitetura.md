@@ -89,7 +89,7 @@ sequenceDiagram
 - **Framework:** `fastmcp` (Servidor ASGI impulsionado pelo `uvicorn`).
 - **Cliente HTTP:** `httpx` (Pool de conexões assíncronas).
 - **Segurança:** `firebase-admin` (validação de JWT) e `google-cloud-firestore` (limitação de taxa).
-- **Telemetria:** OpenTelemetry (`opentelemetry-sdk`, `opentelemetry-instrumentation-fastapi`).
+- **Telemetria:** OpenTelemetry (`opentelemetry-sdk`, `opentelemetry-instrumentation-starlette`, `opentelemetry-instrumentation-httpx`).
 
 ## 4. Padrões de Arquitetura Chave
 
@@ -97,6 +97,8 @@ sequenceDiagram
 Toda entrada de dados externos (respostas de API do WordPress/GitHub, variáveis de ambiente, solicitações de clientes) deve passar por uma camada de validação do **Pydantic v2**. Isso garante que a lógica principal da aplicação, verificada estaticamente pelo Mypy, opere apenas em estruturas garantidas e seguras quanto ao tipo (type-safe).
 
 ### 4.2 Telemetria e Observabilidade
-A aplicação depende estritamente da **Auto-Instrumentação do OpenTelemetry**. Rastreamentos (traces), métricas e logs são coletados automaticamente a partir da camada ASGI (FastMCP/Starlette), clientes HTTP (`httpx`) e do módulo padrão `logging` do Python.
+O rastreamento depende da **Auto-Instrumentação do OpenTelemetry**: os spans são coletados a partir da camada ASGI (FastMCP/Starlette) e dos clientes HTTP (`httpx`). Os logs seguem um caminho separado — eles **não** são exportados via OTLP.
 - **Sem Rastreamento Manual:** Os desenvolvedores devem evitar a importação de componentes do SDK do `opentelemetry` na lógica de negócios.
-- **Registro de Logs:** Use o módulo padrão `logging` do Python. Todos os logs são automaticamente interceptados, enriquecidos com contextos de rastreamento e exportados via OTLP para o backend de observabilidade configurado.
+- **Registro de Logs:** Use o módulo padrão `logging` do Python. O `src/telemetry.py` é o dono da configuração de todo o processo: um único handler escreve cada registro no stdout como uma linha de JSON no esquema esperado pelo Cloud Logging, e o runtime o coleta da saída do contêiner. Um filtro de logging lê o span ativo e anexa o contexto de rastreamento a cada registro, o que é o que correlaciona uma entrada de log à sua requisição.
+- **Handlers de Terceiros:** Bibliotecas que instalam os próprios handlers (uvicorn, FastMCP, MCP) têm esses handlers removidos na inicialização, para que seus registros cheguem ao mesmo handler JSON. Sem isso, um traceback de várias linhas escrito em texto puro é ingerido como uma entrada de log por linha.
+- **Exportação de Spans:** Opcional por escolha explícita, via `OTEL_TRACES_EXPORTER`, cujo padrão é `none`. Os spans são sempre criados — é deles que vem o contexto de rastreamento em cada registro de log — mas só chegam a um backend quando a exportação é habilitada explicitamente.

@@ -341,3 +341,22 @@ def test_get_firestore_client_raises_before_lifespan() -> None:
             get_firestore_client()
     finally:
         server_module._firestore_client = original
+
+
+class TestSecondsUntilNextMonth:
+    def test_rolls_into_january_from_december(self) -> None:
+        """December must wrap to the next year instead of month 13."""
+        from datetime import UTC, datetime
+
+        from src.middleware.rate_limit import _seconds_until_next_month
+
+        now = datetime(2026, 12, 31, 23, 59, 30, tzinfo=UTC)
+        assert _seconds_until_next_month(now) == 30
+
+    def test_rolls_into_the_next_month(self) -> None:
+        from datetime import UTC, datetime
+
+        from src.middleware.rate_limit import _seconds_until_next_month
+
+        now = datetime(2026, 3, 31, 23, 59, 0, tzinfo=UTC)
+        assert _seconds_until_next_month(now) == 60
