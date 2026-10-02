@@ -1,5 +1,6 @@
 """Tests for src.tools."""
 
+import json
 from collections.abc import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -7,6 +8,7 @@ import httpx
 import pytest
 from fastmcp.exceptions import ToolError
 
+from src.services.wordpress import WordPressResponseError
 from src.tools import (
     _collect_strings,
     _normalize,
@@ -55,6 +57,19 @@ def _make_response(status_code: int = 200, json_body: object = None) -> MagicMoc
         )
     else:
         mock.raise_for_status.return_value = None
+    return mock
+
+
+def _make_non_json_response(body: str = "<html><body>503</body></html>") -> MagicMock:
+    """Build a mock 200 response whose body is HTML instead of JSON.
+
+    Reproduces a site that is down, redirecting, or behind a WAF: the status is
+    2xx so ``raise_for_status`` passes and only ``response.json()`` blows up.
+    """
+    mock = _make_response(200)
+    mock.json.side_effect = json.JSONDecodeError("Expecting value", body, 0)
+    mock.content = body.encode("utf-8")
+    mock.headers = httpx.Headers({"content-type": "text/html; charset=UTF-8"})
     return mock
 
 
@@ -143,6 +158,16 @@ class TestCollectStrings:
         result = _collect_strings(data, "amazonia")
         assert len(result) == 1
         assert "amazonia" in result[0]
+
+    def test_stops_scanning_a_list_once_the_limit_is_reached(self) -> None:
+        data = ["amazonia um", "amazonia dois", "amazonia tres"]
+        result = _collect_strings(data, "amazonia", limit=1)
+        assert result == ["amazonia um"]
+
+    def test_stops_scanning_a_dict_once_the_limit_is_reached(self) -> None:
+        data = {"a": "amazonia um", "b": "amazonia dois"}
+        result = _collect_strings(data, "amazonia", limit=1)
+        assert result == ["amazonia um"]
 
     def test_match_in_nested_dict(self) -> None:
         data = {"outer": {"inner": "desmatamento na amazonia"}}
@@ -242,6 +267,52 @@ class TestSearchWp:
         assert len(results) == 2
         assert results[1]["id"] == "8"
 
+    async def test_raises_response_error_on_non_json_body(self, mock_wp_client: AsyncMock) -> None:
+        """A 200 HTML body surfaces as WordPressResponseError, not JSONDecodeError."""
+        mock_wp_client.get.return_value = _make_non_json_response()
+
+        with pytest.raises(WordPressResponseError):
+            await _search_wp("amazonia")
+
+    async def test_raises_response_error_on_non_list_payload(
+        self, mock_wp_client: AsyncMock
+    ) -> None:
+        mock_wp_client.get.return_value = _make_response(200, {"code": "rest_no_route"})
+
+        with pytest.raises(WordPressResponseError):
+            await _search_wp("amazonia")
+
+    async def test_malformed_result_is_skipped(self, mock_wp_client: AsyncMock) -> None:
+        """One invalid entry does not discard the valid ones."""
+        mock_wp_client.get.return_value = _make_response(
+            200, [_SAMPLE_WP_POST, {"id": "not-an-int"}]
+        )
+
+        results = await _search_wp("amazonia")
+
+        assert len(results) == 1
+        assert results[0]["id"] == "7"
+
+    async def test_all_results_malformed_raises_response_error(
+        self, mock_wp_client: AsyncMock
+    ) -> None:
+        """A fully broken payload must not be reported to the LLM as 'no results'."""
+        mock_wp_client.get.return_value = _make_response(200, [{"id": "a"}, {"id": "b"}])
+
+        with pytest.raises(WordPressResponseError):
+            await _search_wp("amazonia")
+
+    async def test_extra_results_beyond_page_size_are_dropped(
+        self, mock_wp_client: AsyncMock
+    ) -> None:
+        """An upstream ignoring per_page cannot inflate the work done per call."""
+        posts = [{**_SAMPLE_WP_POST, "id": i} for i in range(50)]
+        mock_wp_client.get.return_value = _make_response(200, posts)
+
+        results = await _search_wp("amazonia")
+
+        assert len(results) == 10
+
 
 # ---------------------------------------------------------------------------
 # _search_github
@@ -333,6 +404,24 @@ class TestSafeSearchWp:
 
         assert results == []
         assert isinstance(err, httpx.RequestError)
+
+    async def test_captures_non_json_body(self, mock_wp_client: AsyncMock) -> None:
+        """A non-JSON WordPress body is captured instead of escaping to the TaskGroup."""
+        mock_wp_client.get.return_value = _make_non_json_response()
+
+        results, err = await _safe_search_wp("cerrado")
+
+        assert results == []
+        assert isinstance(err, WordPressResponseError)
+
+    async def test_captures_unexpected_error(self, mock_wp_client: AsyncMock) -> None:
+        """Any exception is captured, so the TaskGroup never sees one escape."""
+        mock_wp_client.get.side_effect = RuntimeError("unexpected")
+
+        results, err = await _safe_search_wp("cerrado")
+
+        assert results == []
+        assert isinstance(err, RuntimeError)
 
 
 # ---------------------------------------------------------------------------
@@ -451,6 +540,34 @@ class TestSearchAmbiental:
         with pytest.raises(ToolError, match="WordPress"):
             await search_content("amazonia")
 
+    async def test_non_json_wordpress_body_does_not_kill_the_taskgroup(
+        self, mock_wp_client: AsyncMock, mock_fetch_github_i18n_content: AsyncMock
+    ) -> None:
+        """Regression: a non-JSON WordPress body used to escape as an ExceptionGroup.
+
+        ``response.json()`` raises ``JSONDecodeError`` when the site answers 200
+        with HTML or an empty body; that exception was not caught by the safe
+        wrapper, so the TaskGroup cancelled the GitHub task and the client saw
+        "unhandled errors in a TaskGroup (1 sub-exception)" instead of results.
+        """
+        mock_wp_client.get.return_value = _make_non_json_response()
+        with patch("src.tools.GITHUB_REPOS", "ambiental-media/microsite-amazonia"):
+            results = await search_content("amazonia")
+
+        sources = {r["source"] for r in results}
+        assert any(s.startswith("github:") for s in sources)
+        error_dicts = [r for r in results if "error" in r]
+        assert len(error_dicts) == 1
+        assert error_dicts[0]["source"] == "wordpress"
+
+    async def test_non_json_wordpress_body_alone_raises_tool_error(
+        self, mock_wp_client: AsyncMock, mock_fetch_github_i18n_content: AsyncMock
+    ) -> None:
+        """With GitHub unconfigured, the same failure is a clean ToolError."""
+        mock_wp_client.get.return_value = _make_non_json_response()
+        with patch("src.tools.GITHUB_REPOS", ""), pytest.raises(ToolError, match="WordPress"):
+            await search_content("cerrado")
+
 
 # ---------------------------------------------------------------------------
 # get_full_article (the MCP tool)
@@ -511,6 +628,14 @@ class TestGetFullArticle:
     ) -> None:
         mock_fetch_full_article.side_effect = httpx.RequestError("timeout")
         with pytest.raises(ToolError):
+            await get_full_article("42")
+
+    async def test_non_json_body_raises_tool_error_with_clear_message(
+        self, mock_fetch_full_article: AsyncMock
+    ) -> None:
+        """The raw 'Expecting value: line 1 column 1' never reaches the client."""
+        mock_fetch_full_article.side_effect = WordPressResponseError("non-JSON")
+        with pytest.raises(ToolError, match="não-JSON"):
             await get_full_article("42")
 
 
@@ -583,6 +708,14 @@ class TestListLatestNews:
     ) -> None:
         mock_fetch_latest_posts.return_value = []
         with pytest.raises(ToolError, match="Nenhuma matéria"):
+            await list_latest_news()
+
+    async def test_non_json_body_raises_tool_error_with_clear_message(
+        self, mock_fetch_latest_posts: AsyncMock
+    ) -> None:
+        """Regression: the client used to receive 'Expecting value: line 1 column 1 (char 0)'."""
+        mock_fetch_latest_posts.side_effect = WordPressResponseError("non-JSON")
+        with pytest.raises(ToolError, match="não-JSON"):
             await list_latest_news()
 
     async def test_respects_valid_limit(self, mock_fetch_latest_posts: AsyncMock) -> None:

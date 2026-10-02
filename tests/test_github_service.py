@@ -381,3 +381,25 @@ async def test_fetch_github_i18n_content_whitespace_repos(
     with patch("src.services.github.GITHUB_REPOS", "  ,  "):
         result = await fetch_github_i18n_content()
     assert result == []
+
+
+@pytest.mark.asyncio
+async def test_fetch_github_i18n_content_survives_unexpected_task_error(
+    mock_client: AsyncMock,
+) -> None:
+    """The TaskGroup boundary guard keeps one broken task from killing ingestion.
+
+    ``_fetch_repo_files`` traps every httpx and validation error internally, so
+    only a programming bug or a cancellation can escape it. This forces that
+    path to confirm the pipeline logs and returns instead of propagating.
+    """
+    with (
+        patch("src.services.github.GITHUB_REPOS", _REPO),
+        patch(
+            "src.services.github._fetch_repo_files",
+            new=AsyncMock(side_effect=RuntimeError("boom")),
+        ),
+    ):
+        result = await fetch_github_i18n_content()
+
+    assert result == []
