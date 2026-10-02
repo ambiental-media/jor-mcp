@@ -81,7 +81,7 @@ Add a document under the `allowed_users` collection with the following specifica
 *   **Document ID:** Must be the user's Google email address in **lowercase** (e.g., `user@domain.com`). This ensures lookups are case-insensitive.
 *   **Document Fields:**
     *   `status` (String): Must be set to `"active"` to permit access. If set to `"disabled"` or any other value, authorization will be rejected.
-    *   `tier` (String, Optional): Can be `"basic"` or `"pro"`. Dictates the monthly request/token limit applied to this user. Defaults to `"basic"` if omitted.
+    *   `tier` (String, **Required**): The user's role. Must be `"basic"` or `"pro"` — it dictates the monthly request limit applied to this user. **A user with no `tier` (or a value outside those two) cannot complete consent and receives `403` on every call to the MCP server.** Assigning the role is manual and part of onboarding.
 
 ---
 

@@ -23,6 +23,18 @@ RATE_LIMIT_BASIC: int = int(os.environ.get("RATE_LIMIT_BASIC_REQUESTS", "500"))
 RATE_LIMIT_PRO: int = int(os.environ.get("RATE_LIMIT_PRO_REQUESTS", "2000"))
 """Monthly request quota for 'pro' tier users."""
 
+TIER_QUOTAS: dict[str, int] = {
+    "basic": RATE_LIMIT_BASIC,
+    "pro": RATE_LIMIT_PRO,
+}
+"""Map of tier (role) name -> monthly request quota.
+
+Single definition of which roles exist: the authentication middleware rejects
+any token whose ``tier`` claim is not a key here, and the rate limiter reads the
+quota from the same mapping. Roles are assigned manually by Ambiental Media on
+the ``allowed_users`` Firestore documents.
+"""
+
 # ---------------------------------------------------------------------------
 # IP Rate Limiting (unauthenticated routes)
 # ---------------------------------------------------------------------------

@@ -133,14 +133,13 @@ async def test_user_scope_injection_with_tier() -> None:
     assert captured["user"] == {"uid": "uid-abc", "tier": "pro"}
 
 
-async def test_user_scope_defaults_tier_to_basic() -> None:
-    """When token has no 'tier' claim, scope['user']['tier'] defaults to 'basic'."""
-    captured: dict[str, Any] = {}
+async def test_token_without_tier_claim_is_rejected() -> None:
+    """A user who was never assigned a role never reaches the application."""
+    called = {"app": False}
+    responses: list[dict[str, Any]] = []
 
     async def spy_app(scope: Any, receive: Any, send: Any) -> None:
-        captured["user"] = scope.get("user")
-        await send({"type": "http.response.start", "status": 200, "headers": []})
-        await send({"type": "http.response.body", "body": b"", "more_body": False})
+        called["app"] = True
 
     from src.middleware.auth import AuthMiddleware
 
@@ -155,13 +154,14 @@ async def test_user_scope_defaults_tier_to_basic() -> None:
         return {"type": "http.request", "body": b"", "more_body": False}
 
     async def send(message: Any) -> None:
-        pass
+        responses.append(dict(message))
 
     decoded: dict[str, Any] = {"uid": "uid-xyz"}  # no tier claim
     with patch("firebase_admin.auth.verify_id_token", return_value=decoded):
         await middleware(scope, receive, send)
 
-    assert captured["user"] == {"uid": "uid-xyz", "tier": "basic"}
+    assert called["app"] is False
+    assert responses[0]["status"] == 403
 
 
 async def test_non_http_scope_passes_through_without_auth() -> None:
@@ -183,6 +183,29 @@ async def test_non_http_scope_passes_through_without_auth() -> None:
 
     await middleware({"type": "lifespan"}, receive, send)
     assert called["app"] is True
+
+
+def test_token_without_tier_returns_403(client: TestClient) -> None:
+    """A valid token with no role claim is authenticated but not authorized."""
+    with patch("firebase_admin.auth.verify_id_token", return_value={"uid": "user-123"}):
+        resp = client.get("/mcp/", headers={"Authorization": "Bearer valid.jwt.token"})
+    assert resp.status_code == 403
+    assert resp.json() == {"detail": "Forbidden"}
+
+
+def test_403_does_not_advertise_resource_metadata(client: TestClient) -> None:
+    """The 403 must not trigger an OAuth re-authentication loop in MCP clients."""
+    with patch("firebase_admin.auth.verify_id_token", return_value={"uid": "user-123"}):
+        resp = client.get("/mcp/", headers={"Authorization": "Bearer valid.jwt.token"})
+    assert "www-authenticate" not in resp.headers
+
+
+def test_unknown_tier_returns_403(client: TestClient) -> None:
+    """A role that is not in TIER_QUOTAS is rejected instead of downgraded."""
+    decoded: dict[str, Any] = {"uid": "user-123", "tier": "enterprise"}
+    with patch("firebase_admin.auth.verify_id_token", return_value=decoded):
+        resp = client.get("/mcp/", headers={"Authorization": "Bearer valid.jwt.token"})
+    assert resp.status_code == 403
 
 
 def test_validation_error_on_token_returns_401(client: TestClient) -> None:

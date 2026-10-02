@@ -129,7 +129,7 @@ async def test_request_within_limit_is_allowed() -> None:
         called["app"] = True
 
     middleware = RateLimitMiddleware(inner_app, lambda: firestore_client)
-    with patch.dict("src.middleware.rate_limit._TIER_QUOTAS", {"basic": 500}):
+    with patch.dict("src.middleware.rate_limit.TIER_QUOTAS", {"basic": 500}):
         await middleware(_make_scope(tier="basic"), _noop_receive, AsyncMock())
 
     assert called["app"] is True
@@ -240,12 +240,29 @@ async def test_429_response_includes_retry_after_header() -> None:
     assert retry_after_value >= 1
 
 
-async def test_unknown_tier_falls_back_to_basic_limit() -> None:
-    """An unrecognised tier string defaults to basic-tier monthly quota."""
+async def test_pro_tier_gets_the_larger_quota() -> None:
+    """A 'pro' user is still served past the basic quota, up to the pro one."""
     from src.config import RATE_LIMIT_BASIC
     from src.middleware.rate_limit import RateLimitMiddleware
 
     firestore_client, _doc_ref = _make_firestore_mock(count=RATE_LIMIT_BASIC + 1)
+    called = {"app": False}
+
+    async def inner_app(scope: Any, receive: Any, send: Any) -> None:
+        called["app"] = True
+
+    middleware = RateLimitMiddleware(inner_app, lambda: firestore_client)
+    await middleware(_make_scope(tier="pro"), _noop_receive, AsyncMock())
+
+    assert called["app"] is True
+
+
+async def test_pro_tier_over_its_own_quota_returns_429() -> None:
+    """The pro quota is enforced too — it is a larger limit, not an exemption."""
+    from src.config import RATE_LIMIT_PRO
+    from src.middleware.rate_limit import RateLimitMiddleware
+
+    firestore_client, _doc_ref = _make_firestore_mock(count=RATE_LIMIT_PRO + 1)
 
     responses: list[dict[str, Any]] = []
 
@@ -253,7 +270,7 @@ async def test_unknown_tier_falls_back_to_basic_limit() -> None:
         responses.append(dict(message))
 
     middleware = RateLimitMiddleware(MagicMock(), lambda: firestore_client)
-    await middleware(_make_scope(tier="enterprise"), _noop_receive, capture_send)
+    await middleware(_make_scope(tier="pro"), _noop_receive, capture_send)
 
     assert responses[0]["status"] == 429
 
