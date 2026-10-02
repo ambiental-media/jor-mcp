@@ -52,7 +52,7 @@ Fazer com que a role atribuída manualmente pelo administrador no console passe 
 
 - `tests/test_auth_middleware.py`: token sem `tier` → 403; token com role desconhecida → 403; token com `basic`/`pro` → escopo populado corretamente.
 - `tests/test_rate_limit_middleware.py`: cota de `pro` aplicada de fato (o teste `test_unknown_tier_falls_back_to_basic_limit` deixa de fazer sentido e é substituído pelo cenário de rejeição no `AuthMiddleware`).
-- `tests/test_oauth_router.py`: approve sem role → 403; approve com role desconhecida → 403; approve com role → `set_custom_user_claims` chamado com o valor correto.
+- `tests/test_oauth_router.py`: approve sem role → 403; approve com role desconhecida → 403; approve com role → `set_custom_user_claims` chamado com o valor correto; refresh de usuário desativado → `invalid_grant` com revogação; refresh com role divergente → claim ressincronizada e token reemitido; Firestore ou Firebase indisponível → `502` sem revogar.
 - `firebase_admin` permanece mockado; nenhum teste toca a rede.
 
 ## 5. Limites (Boundaries)

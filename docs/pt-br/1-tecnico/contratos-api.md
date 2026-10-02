@@ -296,7 +296,7 @@ então o load balancer deve rotear `/.well-known/*` para o NEG do backend.
 
 **Comportamento no servidor:**
 *   **Grant `authorization_code`:** busca o `code` em `oauth_codes`, **exclui imediatamente** (anti-replay), e então valida expiração, `client_id`, `redirect_uri` (normalizado loopback) e a transformação PKCE: `BASE64URL(SHA256(ASCII(code_verifier)))` deve ser igual ao `code_challenge` salvo (comparação em tempo constante). No sucesso, gera um custom token Firebase (`firebase-admin`) e o troca por um ID + refresh token reais via a API REST do Identity Toolkit.
-*   **Grant `refresh_token`:** troca um refresh token por um ID token novo via a API REST do Secure Token.
+*   **Grant `refresh_token`:** troca um refresh token por um ID token novo via a API REST do Secure Token e reconsulta a allow-list antes de devolvê-lo. Um usuário desativado, removido ou sem role recebe `400 invalid_grant` e tem os refresh tokens revogados, encerrando a cadeia. Uma role alterada no console é ressincronizada na custom claim `tier` e o token é reemitido, de modo que o chamador sai com a role vigente. Se a allow-list não puder ser lida (Firestore ou Firebase indisponível), a renovação é negada com `502` e **nada é revogado** — indisponibilidade não é revogação.
 *   Códigos inválidos/usados, expirados, divergências ou PKCE inválido retornam `400 invalid_grant`; `grant_type` desconhecido retorna `400 unsupported_grant_type`.
 *   Requer a env var `FIREBASE_WEB_API_KEY` (mesmo valor do `NEXT_PUBLIC_FIREBASE_API_KEY` do portal).
 

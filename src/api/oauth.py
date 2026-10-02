@@ -22,6 +22,7 @@ from urllib.parse import SplitResult, parse_qsl, urlencode, urlsplit, urlunsplit
 import firebase_admin.exceptions
 import httpx
 from firebase_admin import auth
+from google.api_core import exceptions as gcp_exceptions
 from google.cloud import firestore
 from google.cloud.firestore_v1 import AsyncClient as FirestoreAsyncClient
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -453,14 +454,29 @@ async def _mint_firebase_tokens(uid: str) -> dict[str, Any]:
 
 
 async def _refresh_firebase_tokens(refresh_token: str) -> dict[str, Any]:
-    """Exchange a Firebase refresh token for a fresh ID token via Secure Token."""
+    """Exchange a Firebase refresh token for a fresh ID token via Secure Token.
+
+    Returns the raw Identity Platform payload rather than an OAuth response body:
+    the caller needs the ``user_id`` field to re-check the user's authorization
+    before handing the tokens back.
+
+    Args:
+        refresh_token: The refresh token issued by a previous grant.
+
+    Returns:
+        The decoded Secure Token API response.
+    """
     response = await get_http_client().post(
         f"{SECURE_TOKEN_BASE_URL}/token",
         params={"key": FIREBASE_WEB_API_KEY},
         data={"grant_type": "refresh_token", "refresh_token": refresh_token},
     )
     response.raise_for_status()
-    data = response.json()
+    return dict(response.json())
+
+
+def _oauth_tokens_from_refresh(data: dict[str, Any]) -> dict[str, Any]:
+    """Map a Secure Token API payload onto the OAuth token response body."""
     return {
         "access_token": data["id_token"],
         "token_type": "Bearer",  # nosec B105
@@ -540,14 +556,52 @@ async def _handle_authorization_code(token_request: TokenRequest) -> JSONRespons
 
 
 async def _handle_refresh_token(token_request: TokenRequest) -> JSONResponse:
-    """Exchange a refresh token for a fresh ID token (refresh_token grant)."""
+    """Exchange a refresh token for a fresh ID token (refresh_token grant).
+
+    The allow-list is re-checked on every renewal. Without it the consent-time
+    check would be the only one for the whole life of the grant, letting a user
+    who was later disabled in the console keep renewing indefinitely.
+    """
     if not token_request.refresh_token:
         return _error_response("invalid_request", "Missing refresh_token", 400)
     try:
-        tokens = await _refresh_firebase_tokens(token_request.refresh_token)
+        data = await _refresh_firebase_tokens(token_request.refresh_token)
+        uid: str = data["user_id"]
+        tokens = _oauth_tokens_from_refresh(data)
     except (httpx.HTTPError, KeyError, ValueError):
         logger.exception("Failed to refresh Firebase token")
         return _error_response("invalid_grant", "Invalid refresh token", 400)
+
+    # Lazy import: avoids the circular import described in oauth_register.
+    from src.server import get_firestore_client
+
+    try:
+        user_record = await asyncio.to_thread(auth.get_user, uid)
+        role = await _resolve_user_role(get_firestore_client(), user_record.email)
+    except (firebase_admin.exceptions.FirebaseError, gcp_exceptions.GoogleAPICallError):
+        # Fail closed, but do not revoke: an outage is not a revocation.
+        logger.exception("Could not verify authorization during refresh", extra={"uid": uid})
+        return _error_response("server_error", "Could not verify user authorization", 502)
+
+    if role is None:
+        logger.warning("Refusing token refresh for unauthorized user", extra={"uid": uid})
+        # Break the refresh chain so the bearer cannot retry with the token the
+        # exchange above already handed back.
+        await asyncio.to_thread(auth.revoke_refresh_tokens, uid)
+        return _error_response("invalid_grant", "User is no longer authorized", 400)
+
+    if (user_record.custom_claims or {}).get("tier") != role:
+        # The console is the source of truth: re-mint so the caller leaves with a
+        # token carrying the current role instead of the stale one.
+        await _sync_role_claim(uid, role)
+        try:
+            tokens = _oauth_tokens_from_refresh(
+                await _refresh_firebase_tokens(data["refresh_token"])
+            )
+        except (httpx.HTTPError, KeyError, ValueError):
+            logger.exception("Failed to re-issue token after role sync", extra={"uid": uid})
+            return _error_response("invalid_grant", "Invalid refresh token", 400)
+
     return JSONResponse(tokens)
 
 

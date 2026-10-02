@@ -52,7 +52,7 @@ Make the role assigned manually by the administrator in the console actually gov
 
 - `tests/test_auth_middleware.py`: token without `tier` → 403; token with an unknown role → 403; token with `basic`/`pro` → scope populated correctly.
 - `tests/test_rate_limit_middleware.py`: the `pro` quota is actually enforced (`test_unknown_tier_falls_back_to_basic_limit` no longer makes sense and is replaced by the `AuthMiddleware` rejection scenario).
-- `tests/test_oauth_router.py`: approve without a role → 403; approve with an unknown role → 403; approve with a role → `set_custom_user_claims` called with the correct value.
+- `tests/test_oauth_router.py`: approve without a role → 403; approve with an unknown role → 403; approve with a role → `set_custom_user_claims` called with the correct value; refresh for a disabled user → `invalid_grant` plus revocation; refresh with a drifted role → claim re-synced and token re-minted; Firestore or Firebase unavailable → `502` without revoking.
 - `firebase_admin` stays mocked; no test touches the network.
 
 ## 5. Boundaries
