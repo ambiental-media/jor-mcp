@@ -28,7 +28,7 @@ Para executar o `jor-mcp` de forma segura, você deve criar uma Conta de Serviç
 ### Funções IAM Necessárias
 Atribua as seguintes permissões granulares para a conta de serviço do Cloud Run:
 
-1.  **Usuário do Cloud Datastore (`roles/datastore.user`):** Necessário para permitir que a aplicação leia e grave os registros de limites de taxa, clientes OAuth e códigos temporários no Firestore.
+1.  **Usuário do Cloud Datastore (`roles/datastore.user`):** Necessário para permitir que a aplicação leia e grave os registros de limites de taxa, clientes OAuth e códigos temporários no Firestore. Apesar do nome, esta é a função IAM padrão também para o Firestore em modo nativo; ela não indica que o banco deva usar o modo Datastore (veja [Configuração e Variáveis de Ambiente](configuracao-e-env.md)).
 2.  **Acessor de Segredos do Secret Manager (`roles/secretmanager.secretAccessor`):** Necessário para injetar variáveis de ambiente confidenciais (como `FIREBASE_WEB_API_KEY` e `MCP_GITHUB_TOKEN`) diretamente no container durante a inicialização.
 3.  **Agente do Cloud Trace (`roles/cloudtrace.agent`):** Necessário para permitir que a auto-instrumentação do OpenTelemetry envie rastreamentos de latência para o GCP Cloud Trace.
 4.  **Gravador de Logs (`roles/logging.logWriter`):** Necessário para enviar os registros de log da aplicação diretamente para o GCP Cloud Logging.

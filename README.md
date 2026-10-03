@@ -48,7 +48,7 @@ By deploying your own instance of `jor-mcp`, your newsroom can empower AI workfl
 
 *   **WordPress Integration:** Search published articles, retrieve full content, and analyze metadata directly from your newsroom's CMS.
 *   **GitHub Integration:** Query internal repositories, research data, and codebases associated with your journalistic investigations.
-*   **Secure Access:** Token-based authentication (JWT) ensures only authorized AI agents or internal systems can access your data.
+*   **Secure Access:** Native MCP OAuth 2.1 login backed by Firebase Auth (Google SSO) and an email allow-list ensures only authorized users can access your data.
 *   **Containerized:** Easy to deploy anywhere using Docker.
 *   **Easily Forkable:** Designed to be easily cloned, configured via environment variables, and deployed on standard cloud infrastructure.
 
@@ -64,7 +64,7 @@ Comprehensive documentation for all audiences is available in the [`docs/`](docs
 
 ### Prerequisites
 
-To run your own instance of `jor-mcp`, you only need a container runtime:
+To run your own instance of `jor-mcp`, you need a Google Cloud project (see [Google Cloud Requirements](#google-cloud-requirements)) and a container runtime:
 *   [Docker](https://www.docker.com/) (or open-source alternatives like [Colima](https://github.com/abiosoft/colima) or [Podman](https://podman.io/)).
 
 ### Installation via Docker (Recommended)
@@ -77,11 +77,23 @@ The easiest way to get `jor-mcp` running is via Docker.
 2.  **Configure Environment Variables:**
     Create a `.env` file to configure your newsroom's specific access points:
     ```env
+    # Content sources
     WORDPRESS_API_URL=https://yoursite.com/wp-json/wp/v2
-    MCP_GITHUB_TOKEN=your_github_personal_access_token
-    JWT_SECRET=your_secure_random_string_for_auth
+    MCP_GITHUB_REPOS=your-org/repo-one,your-org/repo-two
+    MCP_GITHUB_TOKEN=your_github_personal_access_token   # optional for public repos
+
+    # Google Cloud (see "Google Cloud Requirements" below)
+    GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+    FIREBASE_WEB_API_KEY=your_firebase_web_api_key
+
+    # Local runs only (production values default to the public URLs)
+    OAUTH_SERVER_BASE_URL=http://localhost:8080
+    OAUTH_PORTAL_BASE_URL=http://localhost:3000
+    IP_RATE_LIMIT_TRUSTED_PROXIES=0
+
     PORT=8080
     ```
+    The full list of variables is in [Configuration and Environment](docs/en/2-replication/configuration-and-env.md).
 
 3.  **Build and Run the container:**
     You can build and start the server instantly using the provided Makefile:
@@ -89,6 +101,24 @@ The easiest way to get `jor-mcp` running is via Docker.
     make run
     ```
     *(Alternatively, run `docker build -t jor-mcp:latest .` followed by `docker run --rm -p 8080:8080 --env-file .env jor-mcp:latest`)*
+
+## Google Cloud Requirements
+
+`jor-mcp` is not self-contained: it depends on Google Cloud **even when running locally**. Before starting the server you need:
+
+*   **A Google Cloud project** with **Firebase Auth** (Google SSO) and **Firestore** enabled.
+*   **Firestore created in Native mode.** The server uses the native Firestore client; a database in Datastore mode will not work, and the mode cannot be changed after data is written.
+*   **Credentials** available as Application Default Credentials: the service account on Cloud Run, or `gcloud auth application-default login` on your machine.
+*   **Your users in the allow-list:** a document in the `allowed_users` Firestore collection whose ID is the user's email (lowercase) with `status: "active"`.
+
+What each service is used for:
+
+| Service | Used for |
+|---|---|
+| Firebase Auth | Validating the Bearer token on every MCP request and issuing tokens at the end of the OAuth 2.1 login flow |
+| Firestore | OAuth state (registered clients, authorization codes), the user allow-list, and per-user / per-IP rate-limit counters |
+
+WordPress and GitHub requests go straight to those APIs and do not pass through Google. For a detailed walk-through of the auth flow, collections and rate limits, see [Firebase and Firestore Integration](docs/en/1-technical/integrations/firebase-and-firestore.md).
 
 ## Configuration for Your Newsroom
 
@@ -100,10 +130,15 @@ For detailed configuration options (like setting up the `.env` file for your spe
 
 If you wish to modify the code or run the server outside of a container, you will need to install it from source.
 
-1.  **Prerequisites:** Python 3.12+ and [`uv`](https://docs.astral.sh/uv/).
+1.  **Prerequisites:** Python 3.12+, [`uv`](https://docs.astral.sh/uv/), the [`gcloud` CLI](https://cloud.google.com/sdk/docs/install) and the [Google Cloud requirements](#google-cloud-requirements) above.
 2.  **Clone the repository:** `git clone https://github.com/ambiental-media/jor-mcp.git`
 3.  **Install dependencies:** `uv sync`
-4.  **Run the server:** `uv run uvicorn src.server:app --host 0.0.0.0 --port 8080`
+4.  **Create the `.env` file** as shown in the Docker section.
+5.  **Authenticate with Google Cloud:** `gcloud auth application-default login`
+6.  **Run the server:** `uv run --env-file .env uvicorn src.server:app --host 0.0.0.0 --port 8080`
+7.  **Check it is up:** `curl http://localhost:8080/health` (this route needs no authentication).
+
+To work on the code without a Google Cloud project, run the test suite with `uv run pytest`: the tests mock Firebase, Firestore and all HTTP calls.
 
 ## Using the MCP Server
 

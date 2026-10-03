@@ -48,7 +48,7 @@ Ao implantar sua própria instância do `jor-mcp`, sua redação pode capacitar 
 
 *   **Integração com WordPress:** Pesquise artigos publicados, recupere conteúdo completo e analise metadados diretamente do CMS da sua redação.
 *   **Integração com GitHub:** Consulte repositórios internos, pesquise dados e bases de código associadas às suas investigações jornalísticas.
-*   **Acesso Seguro:** A autenticação baseada em token (JWT) garante que apenas agentes de IA autorizados ou sistemas internos possam acessar seus dados.
+*   **Acesso Seguro:** Login OAuth 2.1 nativo do MCP, apoiado no Firebase Auth (Google SSO) e numa lista de e-mails autorizados, garante que só usuários autorizados acessem seus dados.
 *   **Containerizado:** Fácil de implantar em qualquer lugar usando Docker.
 *   **Facilmente Forkável:** Projetado para ser facilmente clonado, configurado via variáveis de ambiente e implantado em infraestrutura de nuvem padrão.
 
@@ -64,7 +64,7 @@ A documentação abrangente para todos os públicos está disponível no diretó
 
 ### Pré-requisitos
 
-Para executar sua própria instância do `jor-mcp`, você só precisa de um runtime de container:
+Para executar sua própria instância do `jor-mcp`, você precisa de um projeto Google Cloud (veja [Requisitos do Google Cloud](#requisitos-do-google-cloud)) e de um runtime de container:
 *   [Docker](https://www.docker.com/) (ou alternativas de código aberto como [Colima](https://github.com/abiosoft/colima) ou [Podman](https://podman.io/)).
 
 ### Instalação via Docker (Recomendado)
@@ -77,17 +77,47 @@ A maneira mais fácil de executar o `jor-mcp` é via Docker.
 2.  **Configure as Variáveis de Ambiente:**
     Crie um arquivo `.env` para configurar os pontos de acesso específicos da sua redação:
     ```env
+    # Fontes de conteúdo
     WORDPRESS_API_URL=https://yoursite.com/wp-json/wp/v2
-    MCP_GITHUB_TOKEN=your_github_personal_access_token
-    JWT_SECRET=your_secure_random_string_for_auth
+    MCP_GITHUB_REPOS=sua-org/repo-um,sua-org/repo-dois
+    MCP_GITHUB_TOKEN=your_github_personal_access_token   # opcional para repositórios públicos
+
+    # Google Cloud (veja "Requisitos do Google Cloud" abaixo)
+    GOOGLE_CLOUD_PROJECT=seu-projeto-gcp
+    FIREBASE_WEB_API_KEY=sua_firebase_web_api_key
+
+    # Só para execução local (em produção os padrões apontam para as URLs públicas)
+    OAUTH_SERVER_BASE_URL=http://localhost:8080
+    OAUTH_PORTAL_BASE_URL=http://localhost:3000
+    IP_RATE_LIMIT_TRUSTED_PROXIES=0
+
     PORT=8080
     ```
+    A lista completa de variáveis está em [Configuração e Variáveis de Ambiente](docs/pt-br/2-replicacao/configuracao-e-env.md).
 
 3.  **Construa e execute o container:**
     Você pode construir e iniciar o servidor instantaneamente usando o Makefile fornecido:
     ```bash
     make run
     ```
+
+## Requisitos do Google Cloud
+
+O `jor-mcp` não roda sozinho: ele depende do Google Cloud **mesmo quando executado localmente**. Antes de iniciar o servidor, você precisa de:
+
+*   **Um projeto Google Cloud** com **Firebase Auth** (Google SSO) e **Firestore** ativados.
+*   **Firestore criado no modo nativo.** O servidor usa o cliente nativo do Firestore; um banco em modo Datastore não funciona, e o modo não pode ser alterado depois que há dados gravados.
+*   **Credenciais** disponíveis como Application Default Credentials: a conta de serviço no Cloud Run, ou `gcloud auth application-default login` na sua máquina.
+*   **Seus usuários na lista de autorizados:** um documento na coleção `allowed_users` do Firestore cujo ID é o e-mail do usuário (em minúsculas), com `status: "active"`.
+
+Para que serve cada serviço:
+
+| Serviço | Uso |
+|---|---|
+| Firebase Auth | Validar o token Bearer em toda requisição MCP e emitir tokens ao final do login OAuth 2.1 |
+| Firestore | Estado do OAuth (clientes registrados, códigos de autorização), lista de usuários autorizados e contadores de limite de uso por usuário e por IP |
+
+As requisições ao WordPress e ao GitHub vão direto para essas APIs, sem passar pelo Google. Para uma explicação detalhada do fluxo de autenticação, das coleções e dos limites de uso, veja [Integração Firebase e Firestore](docs/pt-br/1-tecnico/integracoes/firebase-e-firestore.md).
 
 ## Configuração para sua Redação
 
@@ -99,10 +129,15 @@ Para opções detalhadas de configuração (como configurar o arquivo `.env` par
 
 Se você deseja modificar o código ou executar o servidor fora de um container, será necessário instalá-lo a partir do código-fonte.
 
-1.  **Pré-requisitos:** Python 3.12+ e [`uv`](https://docs.astral.sh/uv/).
+1.  **Pré-requisitos:** Python 3.12+, [`uv`](https://docs.astral.sh/uv/), a [CLI `gcloud`](https://cloud.google.com/sdk/docs/install) e os [requisitos do Google Cloud](#requisitos-do-google-cloud) acima.
 2.  **Clone o repositório:** `git clone https://github.com/ambiental-media/jor-mcp.git`
 3.  **Instale as dependências:** `uv sync`
-4.  **Execute o servidor:** `uv run uvicorn src.server:app --host 0.0.0.0 --port 8080`
+4.  **Crie o arquivo `.env`** como mostrado na seção do Docker.
+5.  **Autentique-se no Google Cloud:** `gcloud auth application-default login`
+6.  **Execute o servidor:** `uv run --env-file .env uvicorn src.server:app --host 0.0.0.0 --port 8080`
+7.  **Confira se subiu:** `curl http://localhost:8080/health` (essa rota não exige autenticação).
+
+Para mexer no código sem um projeto Google Cloud, rode os testes com `uv run pytest`: eles simulam o Firebase, o Firestore e todas as chamadas HTTP.
 
 ## Usando o Servidor MCP
 

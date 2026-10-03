@@ -28,7 +28,7 @@ To run `jor-mcp` securely, you should create a dedicated Google Cloud Service Ac
 ### Required IAM Roles
 Assign the following granular roles to the Cloud Run service account:
 
-1.  **Cloud Datastore User (`roles/datastore.user`):** Required to allow the application to read and write rate-limit entries, OAuth clients, and temporary codes in Firestore.
+1.  **Cloud Datastore User (`roles/datastore.user`):** Required to allow the application to read and write rate-limit entries, OAuth clients, and temporary codes in Firestore. Despite its name, this is the standard IAM role for Firestore in Native mode as well; it does not mean the database should use Datastore mode (see [Configuration and Environment](configuration-and-env.md)).
 2.  **Secret Manager Secret Accessor (`roles/secretmanager.secretAccessor`):** Required to inject sensitive environment variables (such as `FIREBASE_WEB_API_KEY` and `MCP_GITHUB_TOKEN`) directly into the container at startup.
 3.  **Cloud Trace Agent (`roles/cloudtrace.agent`):** Required to allow OpenTelemetry auto-instrumentation to send latency trace spans back to GCP Cloud Trace.
 4.  **Logs Writer (`roles/logging.logWriter`):** Required to send application logs directly to GCP Cloud Logging.

@@ -14,7 +14,10 @@ O Jor-MCP foi projetado como uma plataforma totalmente serverless no **Google Cl
 
 1.  **Google Cloud Run:** Hospeda o servidor ASGI Python `jor-mcp` baseado em containers de forma stateless.
 2.  **Google Cloud Storage (GCS):** Hospeda os ativos estáticos do portal de consentimento Next.js (`jor-mcp-site`).
-3.  **Google Cloud Firestore:** Banco de dados de documentos NoSQL utilizado no modo Datastore. Ele armazena limites de taxa mensais, clientes OAuth registrados dinamicamente (DCR) e códigos de autorização temporários.
+3.  **Google Cloud Firestore (modo nativo):** Banco de dados de documentos NoSQL. Ele armazena limites de taxa mensais, clientes OAuth registrados dinamicamente (DCR), códigos de autorização temporários e a lista de usuários autorizados.
+
+    > [!WARNING]
+    > O banco **precisa ser criado no modo nativo do Firestore**, e não no modo Datastore. O servidor acessa o banco pelo cliente nativo do Firestore (`google.cloud.firestore_v1`), que não consegue ler nem gravar num banco em modo Datastore. O modo não pode ser alterado depois que há dados gravados, então escolha o modo nativo na criação. Se usar um banco nomeado em vez do `(default)`, defina `FIRESTORE_DATABASE_ID`.
 4.  **Google Cloud Identity Platform / Firebase Auth:** Gerencia a autenticação Google SSO e emite JSON Web Tokens (JWTs) seguros.
 5.  **API REST externa do WordPress:** O site CMS de destino onde os artigos editoriais são publicados.
 6.  **API REST externa do GitHub:** Repositório de destino que hospeda metadados editoriais multilíngues em arquivos JSON.
