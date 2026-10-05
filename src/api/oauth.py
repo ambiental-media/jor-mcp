@@ -22,6 +22,7 @@ from urllib.parse import SplitResult, parse_qsl, urlencode, urlsplit, urlunsplit
 import firebase_admin.exceptions
 import httpx
 from firebase_admin import auth
+from google.api_core import exceptions as gcp_exceptions
 from google.cloud import firestore
 from google.cloud.firestore_v1 import AsyncClient as FirestoreAsyncClient
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -39,6 +40,7 @@ from src.config import (
     OAUTH_PORTAL_BASE_URL,
     OAUTH_SERVER_BASE_URL,
     SECURE_TOKEN_BASE_URL,
+    TIER_QUOTAS,
 )
 from src.http_client import get_http_client
 
@@ -186,20 +188,45 @@ def _redirect_with_code(redirect_uri: str, code: str, state: str | None) -> str:
     return urlunsplit(parts._replace(query=urlencode(query)))
 
 
-async def _is_email_allowed(db: FirestoreAsyncClient, email: str | None) -> bool:
-    """Return True if *email* is whitelisted with ``status == "active"``.
+async def _resolve_user_role(db: FirestoreAsyncClient, email: str | None) -> str | None:
+    """Return the role assigned to *email*, or None when access must be denied.
 
-    The allow-list (``allowed_users``) is curated manually by Ambiental Media;
-    access is restricted to Google SSO accounts explicitly authorized there.
+    The allow-list (``allowed_users``) is curated manually by Ambiental Media and
+    is the source of truth for both access and role: a document grants access
+    only when it exists, its ``status`` is ``"active"`` and its ``tier`` names a
+    known role. A user who was never assigned a role is treated exactly like a
+    user who is not on the list.
+
+    Args:
+        db: An active async Firestore client.
+        email: The email claim from the verified Firebase token.
+
+    Returns:
+        The role name (a key of :data:`~src.config.TIER_QUOTAS`), or None.
     """
     if not email:
-        return False
+        return None
     normalized_email = email.strip().lower()
     snapshot = await db.collection(ALLOWED_USERS_COLLECTION).document(normalized_email).get()
     if not snapshot.exists:
-        return False
+        return None
     data = snapshot.to_dict() or {}
-    return data.get("status") == "active"
+    if data.get("status") != "active":
+        return None
+    role = data.get("tier")
+    return role if role in TIER_QUOTAS else None
+
+
+async def _sync_role_claim(uid: str, role: str) -> None:
+    """Persist *role* as the user's ``tier`` custom claim on their Firebase record.
+
+    Custom claims set this way are re-issued into every ID token Firebase mints
+    for the user, including refreshes, which is what lets AuthMiddleware read the
+    role straight from the validated JWT without a Firestore lookup per request.
+    """
+    # set_custom_user_claims replaces the whole claim set rather than merging:
+    # any future claim must be written here too, or this call will drop it.
+    await asyncio.to_thread(auth.set_custom_user_claims, uid, {"tier": role})
 
 
 async def oauth_health(request: Request) -> JSONResponse:
@@ -291,9 +318,11 @@ async def oauth_approve(request: Request) -> JSONResponse:
     """Consent approval endpoint: issue an authorization code bound to PKCE state.
 
     Requires a valid Firebase ID token (``Authorization: Bearer``) to prove the
-    user's identity. Validates the client and redirect URI, then persists a
-    short-lived authorization code plus the PKCE ``code_challenge`` and the user
-    ``uid`` under :data:`OAUTH_CODES_COLLECTION` for the later token exchange.
+    user's identity. Validates the client and redirect URI, resolves the user's
+    role from the allow-list and mirrors it into their ``tier`` custom claim, then
+    persists a short-lived authorization code plus the PKCE ``code_challenge`` and
+    the user ``uid`` under :data:`OAUTH_CODES_COLLECTION` for the later token
+    exchange.
     """
     token = _extract_bearer_token(request)
     if token is None:
@@ -339,11 +368,18 @@ async def oauth_approve(request: Request) -> JSONResponse:
             "invalid_request", "redirect_uri is not registered for this client", 400
         )
 
-    if not await _is_email_allowed(db, email):
-        logger.warning("User not on the allow-list", extra={"uid": uid})
+    role = await _resolve_user_role(db, email)
+    if role is None:
+        logger.warning("User not on the allow-list or without an assigned role", extra={"uid": uid})
         return _error_response(
             "access_denied", "User is not authorized to access this resource", 403
         )
+
+    try:
+        await _sync_role_claim(uid, role)
+    except firebase_admin.exceptions.FirebaseError:
+        logger.exception("Failed to sync the role claim", extra={"uid": uid})
+        return _error_response("server_error", "Could not assign the user role", 502)
 
     code = secrets.token_urlsafe(32)
     now = datetime.now(UTC)
@@ -418,14 +454,29 @@ async def _mint_firebase_tokens(uid: str) -> dict[str, Any]:
 
 
 async def _refresh_firebase_tokens(refresh_token: str) -> dict[str, Any]:
-    """Exchange a Firebase refresh token for a fresh ID token via Secure Token."""
+    """Exchange a Firebase refresh token for a fresh ID token via Secure Token.
+
+    Returns the raw Identity Platform payload rather than an OAuth response body:
+    the caller needs the ``user_id`` field to re-check the user's authorization
+    before handing the tokens back.
+
+    Args:
+        refresh_token: The refresh token issued by a previous grant.
+
+    Returns:
+        The decoded Secure Token API response.
+    """
     response = await get_http_client().post(
         f"{SECURE_TOKEN_BASE_URL}/token",
         params={"key": FIREBASE_WEB_API_KEY},
         data={"grant_type": "refresh_token", "refresh_token": refresh_token},
     )
     response.raise_for_status()
-    data = response.json()
+    return dict(response.json())
+
+
+def _oauth_tokens_from_refresh(data: dict[str, Any]) -> dict[str, Any]:
+    """Map a Secure Token API payload onto the OAuth token response body."""
     return {
         "access_token": data["id_token"],
         "token_type": "Bearer",  # nosec B105
@@ -505,14 +556,52 @@ async def _handle_authorization_code(token_request: TokenRequest) -> JSONRespons
 
 
 async def _handle_refresh_token(token_request: TokenRequest) -> JSONResponse:
-    """Exchange a refresh token for a fresh ID token (refresh_token grant)."""
+    """Exchange a refresh token for a fresh ID token (refresh_token grant).
+
+    The allow-list is re-checked on every renewal. Without it the consent-time
+    check would be the only one for the whole life of the grant, letting a user
+    who was later disabled in the console keep renewing indefinitely.
+    """
     if not token_request.refresh_token:
         return _error_response("invalid_request", "Missing refresh_token", 400)
     try:
-        tokens = await _refresh_firebase_tokens(token_request.refresh_token)
+        data = await _refresh_firebase_tokens(token_request.refresh_token)
+        uid: str = data["user_id"]
+        tokens = _oauth_tokens_from_refresh(data)
     except (httpx.HTTPError, KeyError, ValueError):
         logger.exception("Failed to refresh Firebase token")
         return _error_response("invalid_grant", "Invalid refresh token", 400)
+
+    # Lazy import: avoids the circular import described in oauth_register.
+    from src.server import get_firestore_client
+
+    try:
+        user_record = await asyncio.to_thread(auth.get_user, uid)
+        role = await _resolve_user_role(get_firestore_client(), user_record.email)
+    except (firebase_admin.exceptions.FirebaseError, gcp_exceptions.GoogleAPICallError):
+        # Fail closed, but do not revoke: an outage is not a revocation.
+        logger.exception("Could not verify authorization during refresh", extra={"uid": uid})
+        return _error_response("server_error", "Could not verify user authorization", 502)
+
+    if role is None:
+        logger.warning("Refusing token refresh for unauthorized user", extra={"uid": uid})
+        # Break the refresh chain so the bearer cannot retry with the token the
+        # exchange above already handed back.
+        await asyncio.to_thread(auth.revoke_refresh_tokens, uid)
+        return _error_response("invalid_grant", "User is no longer authorized", 400)
+
+    if (user_record.custom_claims or {}).get("tier") != role:
+        # The console is the source of truth: re-mint so the caller leaves with a
+        # token carrying the current role instead of the stale one.
+        await _sync_role_claim(uid, role)
+        try:
+            tokens = _oauth_tokens_from_refresh(
+                await _refresh_firebase_tokens(data["refresh_token"])
+            )
+        except (httpx.HTTPError, KeyError, ValueError):
+            logger.exception("Failed to re-issue token after role sync", extra={"uid": uid})
+            return _error_response("invalid_grant", "Invalid refresh token", 400)
+
     return JSONResponse(tokens)
 
 
