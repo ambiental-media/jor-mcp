@@ -42,15 +42,20 @@ gcloud iam service-accounts create jor-mcp-runner \
 
 ### 2.2 Required IAM roles
 
-Assign only the roles the application actually needs at runtime:
+Assign only the roles the application actually needs at runtime. The five
+infrastructure roles cover Firestore, secrets and observability; the two
+authentication roles are required because the server uses the Firebase Admin SDK
+for more than JWT validation (`src/api/oauth.py`).
 
-| Role | Why it is needed |
-| :--- | :--- |
-| `roles/datastore.user` | Read and write rate-limit entries, OAuth clients, and temporary codes in Firestore. |
-| `roles/secretmanager.secretAccessor` | Decode the secrets injected into the container at startup (`MCP_GITHUB_TOKEN`, `JWT_SECRET`). |
-| `roles/cloudtrace.agent` | Let OpenTelemetry export latency spans to Cloud Trace. |
-| `roles/logging.logWriter` | Send application logs to Cloud Logging. |
-| `roles/monitoring.metricWriter` | Export service metrics to Cloud Monitoring. |
+| Role | Scope | Why it is needed |
+| :--- | :--- | :--- |
+| `roles/datastore.user` | Project | Read and write rate-limit entries, OAuth clients, and temporary codes in Firestore. |
+| `roles/secretmanager.secretAccessor` | Project | Decode the secrets injected into the container at startup (`MCP_GITHUB_TOKEN`, `JWT_SECRET`). |
+| `roles/cloudtrace.agent` | Project | Let OpenTelemetry export latency spans to Cloud Trace. |
+| `roles/logging.logWriter` | Project | Send application logs to Cloud Logging. |
+| `roles/monitoring.metricWriter` | Project | Export service metrics to Cloud Monitoring. |
+| `roles/firebaseauth.admin` | Project | Look up users (`auth.get_user`) and revoke refresh tokens (`auth.revoke_refresh_tokens`) during the OAuth refresh flow. |
+| `roles/iam.serviceAccountTokenCreator` | Runtime SA (self) | Sign Firebase custom tokens (`auth.create_custom_token`). On Cloud Run the Admin SDK has no local signing key, so it signs through the IAM `signBlob` API on the runtime service account itself. |
 
 ```bash
 RUNNER="serviceAccount:jor-mcp-runner@<project-id>.iam.gserviceaccount.com"
@@ -60,27 +65,44 @@ for ROLE in \
   roles/secretmanager.secretAccessor \
   roles/cloudtrace.agent \
   roles/logging.logWriter \
-  roles/monitoring.metricWriter
+  roles/monitoring.metricWriter \
+  roles/firebaseauth.admin
 do
   gcloud projects add-iam-policy-binding "<project-id>" \
     --member="$RUNNER" --role="$ROLE" --condition=None
 done
+
+# Scoped to the runtime service account itself: the signBlob permission is
+# only needed on this account, so keep it off the project.
+gcloud iam service-accounts add-iam-policy-binding \
+  jor-mcp-runner@<project-id>.iam.gserviceaccount.com \
+  --project "<project-id>" \
+  --member="$RUNNER" \
+  --role="roles/iam.serviceAccountTokenCreator"
 ```
 
 No Artifact Registry role is required: Cloud Run pulls the container image with
 its own service agent, not with the runtime service account. Firebase JWT
-validation needs no IAM role either — it relies on public signing certificates
-fetched over HTTPS.
+validation (`auth.verify_id_token`) likewise needs no IAM role — it relies on
+public signing certificates fetched over HTTPS. The other Firebase Admin SDK
+operations above do need roles: custom-token signing uses the IAM `signBlob`
+API, and user lookup / refresh-token revocation use the Firebase Auth admin
+permissions. The `signBlob` call requires the `cloud-platform` OAuth scope,
+which Cloud Run grants by default.
+
+> **Run order:** create the account in §2.1 first, then run the two command
+> blocks above.
 
 ### 2.3 Wiring the account into the service
 
-The runtime identity is declared in `service.yaml` and applied on every deploy:
+The runtime identity is declared in `service.yaml` and applied on every deploy.
+The account's project is substituted from `${GCP_PROJECT_ID}` by `envsubst`:
 
 ```yaml
 spec:
   template:
     spec:
-      serviceAccountName: jor-mcp-runner@<project-id>.iam.gserviceaccount.com
+      serviceAccountName: jor-mcp-runner@${GCP_PROJECT_ID}.iam.gserviceaccount.com
 ```
 
 ### 2.4 Runtime identity vs. deployment identity
@@ -104,7 +126,7 @@ gcloud iam service-accounts add-iam-policy-binding \
   --project "<project-id>" \
   --member="serviceAccount:<deployer-sa>@<project-id>.iam.gserviceaccount.com" \
   --role="roles/iam.serviceAccountUser"
-  ```
+```
 
 ---
 
@@ -212,11 +234,16 @@ Export the required environment variables and use `envsubst` to replace the plac
 ```bash
 export IMAGE_URL="us-central1-docker.pkg.dev/jor-mcp/jor-mcp/jor-mcp-server:SHA"
 export GCP_PROJECT_NUMBER="959918358302"
+export GCP_PROJECT_ID="jor-mcp"
 export FIREBASE_PROJECT_ID="..."
 export WORDPRESS_API_URL="..."
 export MCP_GITHUB_REPOS="..."
 export OTEL_EXPORTER_OTLP_ENDPOINT="..."
 export FIREBASE_WEB_API_KEY="..."
+
+for v in IMAGE_URL GCP_PROJECT_NUMBER GCP_PROJECT_ID; do
+  : "${!v:?set $v before running envsubst}"
+done
 
 envsubst < service.yaml | gcloud run services replace - --region us-central1
 ```

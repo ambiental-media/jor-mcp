@@ -69,15 +69,25 @@ jobs:
         env:
           IMAGE_URL: ${{ steps.image.outputs.url }}
           GCP_PROJECT_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
+          # The runtime service account lives in the same project we deploy to.
+          GCP_PROJECT_ID: ${{ env.PROJECT_ID }}
           FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
           WORDPRESS_API_URL: ${{ vars.WORDPRESS_API_URL }}
           MCP_GITHUB_REPOS: ${{ vars.MCP_GITHUB_REPOS }}
           OTEL_EXPORTER_OTLP_ENDPOINT: ${{ vars.OTEL_EXPORTER_OTLP_ENDPOINT }}
           FIREBASE_WEB_API_KEY: ${{ vars.FIREBASE_WEB_API_KEY }}
         run: |
+          # Fail fast on the placeholders whose blank value would corrupt the
+          # manifest itself: the image reference, the Secret Manager resource
+          # paths, and the service account email. The other variables feed
+          # plain env values and may legitimately be left unset.
+          for v in IMAGE_URL GCP_PROJECT_NUMBER GCP_PROJECT_ID; do
+            [ -n "${!v:-}" ] || { echo "::error::$v is empty"; exit 1; }
+          done
+
           # Allowlist form: only these variables are substituted, leaving any
           # other "$" in the manifest untouched.
-          envsubst '${IMAGE_URL} ${GCP_PROJECT_NUMBER} ${FIREBASE_PROJECT_ID} ${WORDPRESS_API_URL} ${MCP_GITHUB_REPOS} ${OTEL_EXPORTER_OTLP_ENDPOINT} ${FIREBASE_WEB_API_KEY}' \
+          envsubst '${IMAGE_URL} ${GCP_PROJECT_NUMBER} ${GCP_PROJECT_ID} ${FIREBASE_PROJECT_ID} ${WORDPRESS_API_URL} ${MCP_GITHUB_REPOS} ${OTEL_EXPORTER_OTLP_ENDPOINT} ${FIREBASE_WEB_API_KEY}' \
             < service.yaml > service.rendered.yaml
           echo "----- Rendered manifest -----"
           cat service.rendered.yaml

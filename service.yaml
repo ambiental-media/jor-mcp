@@ -24,7 +24,7 @@ spec:
         run.googleapis.com/secrets: "mcp-github-token:projects/${GCP_PROJECT_NUMBER}/secrets/MCP_GITHUB_TOKEN,jwt-secret:projects/${GCP_PROJECT_NUMBER}/secrets/JWT_SECRET"
     spec:
       # ← Dedicated least-privilege runtime service account
-      serviceAccountName: jor-mcp-runner@jor-mcp.iam.gserviceaccount.com
+      serviceAccountName: jor-mcp-runner@${GCP_PROJECT_ID}.iam.gserviceaccount.com
 
       containers:
         - image: ${IMAGE_URL}
