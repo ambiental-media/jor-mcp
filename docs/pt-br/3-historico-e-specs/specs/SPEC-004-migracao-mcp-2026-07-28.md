@@ -85,27 +85,44 @@ Escopo acordado para esta spike: **apenas CIMD + RFC 9207** (sem migração para
 
 **Novos requisitos:**
 
-- `server/discover` (servidores DEVEM implementar).
+- `server/discover` (servidores DEVEM implementar); divergências de versão respondem `UnsupportedProtocolVersionError`.
 - `resultType` em todo resultado (`"complete"` | `"input_required"`).
 - Campo `extensions` nas capacidades.
 - `CacheableResult` (`ttlMs`, `cacheScope`).
-- Cabeçalhos `Mcp-Method` / `Mcp-Name` nos POSTs.
+- Cabeçalhos `Mcp-Method` / `Mcp-Name` nos POSTs, além de cabeçalhos customizados expostos a partir de parâmetros de ferramenta via `x-mcp-header`.
 
 **Alterados:**
 
 - Código de erro de recurso não encontrado `-32002` → `-32602`.
+- Faixa de erros de servidor do JSON-RPC particionada; códigos renumerados — `HeaderMismatch` `-32001` → `-32020`, `MissingRequiredClientCapability` `-32003` → `-32021`, `UnsupportedProtocolVersion` `-32004` → `-32022`; `HeaderMismatchError` adicionado ao schema.
+- `inputSchema` / `outputSchema` flexibilizados para quaisquer palavras-chave do JSON Schema 2020-12; `structuredContent` pode ser qualquer valor JSON; resolução de `$ref` e limites de recursos de palavras-chave de composição definidos.
+- Removidos `notifications/elicitation/complete` e o `elicitationId` do modo URL; servidores correlacionam retries via `requestState`.
 - Tasks movidas para a extensão `io.modelcontextprotocol/tasks` (poll via `tasks/get`, `tasks/update`).
 - Multi Round-Trip Requests (MRTR) substituem requisições iniciadas pelo servidor (`sampling`/`elicitation`/`roots`).
 
-**Deprecados (janela de 12 meses):** Roots, Sampling, Logging; o transporte HTTP+SSE; o DCR; os valores de `includeContext` `"thisServer"` / `"allServers"`.
+**Deprecados (novas implementações não devem adotar):**
 
-**Nossa exposição:** o transporte `/mcp/sse` e o DCR. Não usamos sampling, roots nem logging.
+- **Roots, Sampling, Logging** — remoção mais cedo possível: primeira revisão lançada em ou após **2027-07-28**.
+- **Dynamic Client Registration (DCR)** — remoção mais cedo possível: primeira revisão lançada em ou após **2027-07-28**.
+- **`includeContext` `"thisServer"` / `"allServers"`** — remoção acompanha a funcionalidade Sampling.
+- **Transporte HTTP+SSE** — deprecado desde `2025-03-26`; remoção elegível três meses após o SEP-2596 chegar a Final.
 
-### 4.5 Outras observações
+**Nossa exposição:** o transporte `/mcp/sse` e o DCR. Não usamos sampling, roots nem logging. Veja o [Apêndice A](#apêndice-a--inventário-completo-de-mudanças) para o inventário completo de mudanças.
+
+### 4.5 Extensões e outras observações
+
+Extensões oficiais usam o formato de identificador `{vendor}/{name}`, são anunciadas pelo campo de capacidade `extensions` e são **desabilitadas por padrão** (opt-in explícito).
+
+| Extensão | Propósito | Relevância para nós |
+|---|---|---|
+| OAuth Client Credentials | Fluxo OAuth 2.0 client-credentials para autenticação máquina-a-máquina | Possível para clientes automatizados de redações |
+| Enterprise-Managed Authorization (EMA) | Controle de acesso empresarial centralizado | Clientes enterprise (fora de escopo agora) |
+| MCP Apps | UI interativa renderizada inline nas conversas | Experimentos de consentimento/UX (fora de escopo) |
+| MCP Tasks | Trabalho assíncrono de longa duração, polling, handles duráveis | Ingestão de longa duração no futuro |
+| Skills over MCP | Descobrir/ler Agent Skills via recursos MCP | Fluxos editoriais reutilizáveis |
 
 - O `2026-07-28` documenta a propagação de contexto de trace do OpenTelemetry em `_meta` (`traceparent`, `tracestate`, `baggage`) — já usamos auto-instrumentação OTel.
-- A extensão Tasks é candidata para ingestão de longa duração no futuro.
-- MCP Apps e MCP tunnels estão fora do escopo desta avaliação.
+- MCP tunnels estão fora do escopo desta avaliação.
 
 ## 5. Oportunidades Priorizadas
 
@@ -146,6 +163,43 @@ Escopo acordado para esta spike: **apenas CIMD + RFC 9207** (sem migração para
 
 - Especificação MCP `2026-07-28` — https://modelcontextprotocol.io/specification/2026-07-28
 - Principais mudanças / changelog do MCP `2026-07-28` — https://modelcontextprotocol.io/specification/2026-07-28/changelog
+- Registro de funcionalidades deprecadas do MCP `2026-07-28` — https://modelcontextprotocol.io/specification/2026-07-28/deprecated
+- Visão geral das extensões MCP — https://modelcontextprotocol.io/docs/extensions/overview
 - "The 2026-07-28 Specification" — https://blog.modelcontextprotocol.io/posts/2026-07-28/
 - "Bringing MCP 2026-07-28 to Claude" — https://claude.com/resources/articles/bringing-mcp-2026-07-28-to-claude
 - Documentação do FastMCP — https://gofastmcp.com (modo stateless, CIMD, cache de respostas, guia de upgrade)
+
+## Apêndice A — Inventário Completo de Mudanças
+
+Cruzamento completo do changelog `2026-07-28` contra o `jor-mcp`. `Nos afeta` é `Sim` (acionável agora), `Depois` (apenas se a funcionalidade for adotada), `Parcial` ou `Não`.
+
+| # | Mudança | Nos afeta | Ação |
+|---|---|---|---|
+| M1 | Sessões no nível de protocolo / `Mcp-Session-Id` removidas | Sim | Modo stateless (#1) |
+| M2 | Core stateless; handshake `initialize` removido; `_meta` carrega versão/capacidades; `UnsupportedProtocolVersionError` em divergência | Sim | FastMCP 4 (#5) |
+| M3 | `server/discover` (OBRIGATÓRIO) | Sim | Fornecido pelo FastMCP 4 |
+| M4 | `subscriptions/listen` substitui endpoint GET + `resources/subscribe`/`unsubscribe` | Não | Nenhuma subscription exposta |
+| M5 | `ping`, `logging/setLevel`, `notifications/roots/list_changed` removidos | Não | Não utilizados |
+| M6 | Tasks movidas para a extensão `io.modelcontextprotocol/tasks` | Depois | Reavaliar (#10) |
+| M7 | MRTR substitui sampling/elicitation/roots iniciados pelo servidor | Não | Não utilizados |
+| M8 | `resultType` obrigatório em todos os resultados | Sim | Tratado pelo SDK v2 |
+| M9 | Ressumabilidade do stream SSE removida | Sim | Parte da retirada do `/mcp/sse` (#4) |
+| m1 | Campo de capacidade `extensions` | Sim | Anunciar apenas ao adotar uma extensão |
+| m2 | Contexto de trace OTel em `_meta` | Depois | Opcional (#9) |
+| m3 | Ordem determinística em `tools/list` (SHOULD) | Sim | #3 |
+| m4 | Cabeçalhos `Mcp-Method` / `Mcp-Name`; `x-mcp-header` de parâmetros | Parcial | #8; `x-mcp-header` apenas se necessário |
+| m5 | `ttlMs` / `cacheScope` (`CacheableResult`) | Sim | #2 |
+| m6 | Recurso não encontrado `-32002` → `-32602` | Sim | Tratado pelo SDK v2 |
+| m7 | RFC 9207 `iss` nas respostas de autorização | Sim | #7 |
+| m8 | SEP-837 `application_type` no DCR | Sim | #7 |
+| m9 | SEP-2352 credenciais vinculadas ao issuer | Não | Lado do cliente |
+| m10 | Flexibilização do JSON Schema 2020-12; `structuredContent` qualquer JSON; limites de `$ref` | Depois | Revisar se os schemas de saída mudarem |
+| m11 | `notifications/elicitation/complete` + `elicitationId` removidos | Não | Não utilizados |
+| m12 | Política de alocação de códigos de erro; renumeração; `HeaderMismatchError` | Depois | Tratamento de erros customizado |
+| D1 | Roots, Sampling, Logging deprecados | Não | Não utilizados |
+| D2 | Transporte HTTP+SSE deprecado | Sim | #4 |
+| D3 | Valores de `includeContext` deprecados | Não | Não utilizados |
+| D4 | DCR deprecado → CIMD | Sim | #6 |
+| S1 | `schema.json` min/max/default agora `number` | Não | Interno à spec |
+| G1 | Política de ciclo de vida / deprecação | Sim | Agendamento de migração |
+| P1 | Workflow de processo SEP | Não | Governança |
