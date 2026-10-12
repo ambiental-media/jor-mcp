@@ -2,6 +2,35 @@
 
 <!-- version list -->
 
+## v0.13.1 (2026-10-12)
+
+### Bug Fixes
+
+- **iam**: Correct runtime SA roles and harden deploy
+  ([#70](https://github.com/ambiental-media/jor-mcp/pull/70),
+  [`1332afe`](https://github.com/ambiental-media/jor-mcp/commit/1332afeee36adaae076238d8278aa28873e059fa))
+
+### Chores
+
+- Allocate 1Gi of memory to the cloud run service
+  ([#77](https://github.com/ambiental-media/jor-mcp/pull/77),
+  [`9b6019c`](https://github.com/ambiental-media/jor-mcp/commit/9b6019cdafdcef975d2fa8f19e67f07078c38c69))
+
+- Dedicated least-privilege service account for Cloud Run
+  ([#70](https://github.com/ambiental-media/jor-mcp/pull/70),
+  [`1332afe`](https://github.com/ambiental-media/jor-mcp/commit/1332afeee36adaae076238d8278aa28873e059fa))
+
+- Use dedicated least-privilege service account for cloud run
+  ([#70](https://github.com/ambiental-media/jor-mcp/pull/70),
+  [`1332afe`](https://github.com/ambiental-media/jor-mcp/commit/1332afeee36adaae076238d8278aa28873e059fa))
+
+### Documentation
+
+- Document dedicated runtime service account setup
+  ([#70](https://github.com/ambiental-media/jor-mcp/pull/70),
+  [`1332afe`](https://github.com/ambiental-media/jor-mcp/commit/1332afeee36adaae076238d8278aa28873e059fa))
+
+
 ## v0.13.0 (2026-10-02)
 
 ### Bug Fixes
