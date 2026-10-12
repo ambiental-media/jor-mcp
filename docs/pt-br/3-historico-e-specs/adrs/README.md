@@ -14,4 +14,3 @@ Este diretório contém registros de decisões arquiteturais significativas toma
 - [005: Resultados da Mentoria](005-resultados-mentoria.md)
 - [006: Estratégia de Implementação do OAuth 2.1](006-estrategia-implementacao-oauth2-1.md)
 - [007: Estratégia de Hospedagem Frontend (Bucket GCS)](007-hospedagem-frontend-gcs.md)
-- [008: Conta de Serviço de Menor Privilégio no Cloud Run](008-conta-de-servico-menor-privilegio.md)

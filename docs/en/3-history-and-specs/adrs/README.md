@@ -14,4 +14,3 @@ This directory contains records of significant architectural decisions made duri
 - [005: Mentorship Outcomes](005-mentorship-outcomes.md)
 - [006: OAuth 2.1 Implementation Strategy](006-oauth2-1-implementation-strategy.md)
 - [007: Frontend Hosting Strategy (GCS Bucket)](007-frontend-hosting-gcs.md)
-- [008: Least-Privilege Cloud Run Runtime Service Account](008-least-privilege-cloud-run-service-account.md)
