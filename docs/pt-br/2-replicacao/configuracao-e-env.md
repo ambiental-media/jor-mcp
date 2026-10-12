@@ -18,6 +18,7 @@ O Jor-MCP foi projetado como uma plataforma totalmente serverless no **Google Cl
 4.  **Google Cloud Identity Platform / Firebase Auth:** Gerencia a autenticação Google SSO e emite JSON Web Tokens (JWTs) seguros.
 5.  **API REST externa do WordPress:** O site CMS de destino onde os artigos editoriais são publicados.
 6.  **API REST externa do GitHub:** Repositório de destino que hospeda metadados editoriais multilíngues em arquivos JSON.
+7.  **Conta de Serviço IAM (`jor-mcp-runner`):** A identidade de execução dedicada e de menor privilégio anexada ao Cloud Run. Suas funções devem cobrir Firestore, segredos, observabilidade e o Firebase Admin SDK — veja o [guia de implantação, seção 2](guia-de-implantacao.md).
 
 ---
 
