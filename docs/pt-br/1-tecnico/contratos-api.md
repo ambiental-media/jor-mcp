@@ -144,7 +144,7 @@ Todos os endpoints OAuth seguem este esquema de erro padrão para respostas não
 ### Política de CORS
 Todas as rotas `/api/oauth/*` são servidas atrás de um middleware de CORS para que
 o portal de consentimento no navegador (`jor-mcp-site`) possa chamá-las via AJAX.
-Elas também ignoram a autenticação Firebase e a cota mensal por usuário — são o
+Elas também ignoram a autenticação Firebase e a cota semanal por usuário — são o
 mecanismo pelo qual os clientes obtêm os tokens Firebase em primeiro lugar. Em
 lugar dela, aplica-se um limite por IP (veja abaixo).
 

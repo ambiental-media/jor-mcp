@@ -49,7 +49,12 @@ def _fetch_firebase_token(api_key: str, email: str, password: str) -> str:
     return str(resp.json()["idToken"])
 
 
-LIMIT = int(os.environ.get("RATE_LIMIT_BASIC_REQUESTS", "20"))
+TOKEN_LIMIT = int(os.environ.get("RATE_LIMIT_BASIC_TOKENS", "200"))
+
+# How many tokens a request costs depends on its payload, so the number of calls
+# needed to exhaust the quota is not known up front. This caps the loop so a
+# generous quota does not turn the smoke test into an endless one.
+MAX_ATTEMPTS = 60
 
 GREEN = "\033[92m"
 RED = "\033[91m"
@@ -65,8 +70,8 @@ def main() -> None:
     mode = "Real Firebase" if _USE_REAL_FIREBASE else "Mocked Firebase"
     print(f"\nMode: {mode}")
     print("Rate limit backend: Firestore")
-    print(f"Tier: basic | Monthly limit: {LIMIT} req")
-    print(f"Firing {LIMIT + 2} requests...\n")
+    print(f"Tier: basic | Weekly limit: {TOKEN_LIMIT} tokens")
+    print(f"Firing requests until blocked (max {MAX_ATTEMPTS})...\n")
 
     if _USE_REAL_FIREBASE:
         print("Logging in to Firebase...")
@@ -79,7 +84,8 @@ def main() -> None:
 
     # Use TestClient as context manager so server_lifespan runs.
     with TestClient(app, raise_server_exceptions=False) as client:
-        for i in range(1, LIMIT + 3):
+        blocked = False
+        for i in range(1, MAX_ATTEMPTS + 1):
             resp = client.get("/mcp/", headers=headers, follow_redirects=False)
             status = resp.status_code
 
@@ -87,10 +93,19 @@ def main() -> None:
                 retry_after = resp.headers.get("retry-after", "?")
                 msg = f"  [{i:02d}] {status} BLOCKED by rate limiter (Retry-After: {retry_after}s)"
                 print(colored(msg, RED))
-            else:
-                # Any non-429 means the request passed through the rate limiter.
-                # FastMCP returns 406 for non-MCP requests — that's expected.
-                print(colored(f"  [{i:02d}] {status} passed through rate limiter", GREEN))
+                blocked = True
+                break
+
+            # Any non-429 means the request passed through the rate limiter.
+            # FastMCP returns 406 for non-MCP requests — that's expected.
+            print(colored(f"  [{i:02d}] {status} passed through rate limiter", GREEN))
+
+        if not blocked:
+            msg = (
+                f"  Quota of {TOKEN_LIMIT} tokens not reached in {MAX_ATTEMPTS} requests — "
+                "lower RATE_LIMIT_BASIC_TOKENS to exercise the limiter."
+            )
+            print(colored(msg, YELLOW))
 
         print("\n--- Fail-open test ---")
         print("Injecting a broken Firestore client...")
@@ -100,6 +115,9 @@ def main() -> None:
         import src.server as server_module  # noqa: E402
 
         class _BrokenDocument:
+            async def get(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+                raise gcp_exceptions.GoogleAPICallError("Firestore unavailable")  # type: ignore[no-untyped-call]
+
             async def set(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
                 raise gcp_exceptions.GoogleAPICallError("Firestore unavailable")  # type: ignore[no-untyped-call]
 

@@ -144,7 +144,7 @@ All OAuth endpoints follow this standard error schema for non-2xx responses:
 ### CORS Policy
 All `/api/oauth/*` routes are served behind a CORS middleware so the browser-based
 consent portal (`jor-mcp-site`) can call them via AJAX. They also bypass Firebase
-authentication and the per-user monthly quota — they are the mechanism through which
+authentication and the per-user weekly quota — they are the mechanism through which
 clients obtain Firebase tokens in the first place. In their place, a per-IP limit
 applies (see below).
 

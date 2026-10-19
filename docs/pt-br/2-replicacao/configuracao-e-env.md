@@ -14,7 +14,7 @@ O Jor-MCP foi projetado como uma plataforma totalmente serverless no **Google Cl
 
 1.  **Google Cloud Run:** Hospeda o servidor ASGI Python `jor-mcp` baseado em containers de forma stateless.
 2.  **Google Cloud Storage (GCS):** Hospeda os ativos estáticos do portal de consentimento Next.js (`jor-mcp-site`).
-3.  **Google Cloud Firestore:** Banco de dados de documentos NoSQL utilizado no modo Datastore. Ele armazena limites de taxa mensais, clientes OAuth registrados dinamicamente (DCR) e códigos de autorização temporários.
+3.  **Google Cloud Firestore:** Banco de dados de documentos NoSQL utilizado no modo Datastore. Ele armazena limites de taxa semanais, clientes OAuth registrados dinamicamente (DCR) e códigos de autorização temporários.
 4.  **Google Cloud Identity Platform / Firebase Auth:** Gerencia a autenticação Google SSO e emite JSON Web Tokens (JWTs) seguros.
 5.  **API REST externa do WordPress:** O site CMS de destino onde os artigos editoriais são publicados.
 6.  **API REST externa do GitHub:** Repositório de destino que hospeda metadados editoriais multilíngues em arquivos JSON.
@@ -27,9 +27,22 @@ Configure estas variáveis nas configurações de ambiente do seu serviço Cloud
 
 ### 2.1 Estado e Limitação de Taxa (Firestore)
 *   `FIRESTORE_DATABASE_ID` (Padrão: `"(default)"`): O ID do banco de dados Firestore. Substitua se utilizar uma instância de banco de dados nomeada.
-*   `RATE_LIMIT_COLLECTION` (Padrão: `"rate_limits"`): Coleção do Firestore contendo janelas mensais de contadores de usuários.
-*   `RATE_LIMIT_BASIC_REQUESTS` (Padrão: `"500"`): Cota mensal para usuários do nível `basic`.
-*   `RATE_LIMIT_PRO_REQUESTS` (Padrão: `"2000"`): Cota mensal para usuários do nível `pro`.
+*   `RATE_LIMIT_COLLECTION` (Padrão: `"rate_limits"`): Coleção do Firestore contendo janelas semanais de contadores de usuários. O id do documento é `{uid}_YYYY-Www`, indexado pela semana ISO.
+*   `RATE_LIMIT_BASIC_TOKENS` (Padrão: `"300000"`): Cota semanal de tokens para usuários do nível `basic`.
+*   `RATE_LIMIT_PRO_TOKENS` (Padrão: `"1200000"`): Cota semanal de tokens para usuários do nível `pro`.
+
+As cotas são cobradas em tokens, e não em requisições, porque uma busca que retorna
+três matérias completas custa muito mais do que uma que não encontra nada. O servidor
+não executa nenhum modelo, então não tem como observar a contagem de tokens cobrada
+pelo provedor; ele mede os payloads de requisição e resposta trocados com o cliente e
+os converte à razão de quatro caracteres por token. Os padrões são um ponto de partida
+— calibre-os com o uso real antes de depender deles.
+
+A cota é verificada antes da requisição rodar e cobrada depois que ela termina, já que
+o custo só é conhecido quando a resposta existe. Por isso, quem estiver logo abaixo do
+limite pode ultrapassá-lo com uma única resposta grande; a requisição seguinte é
+rejeitada com HTTP 429 e um `Retry-After` apontando para a meia-noite UTC da segunda-feira
+seguinte.
 
 #### Limite por IP nas rotas não autenticadas
 Aplica-se somente à superfície isenta de autenticação (`/.well-known/*` e `/api/oauth/*`), que

@@ -15,24 +15,32 @@ FIRESTORE_DATABASE_ID: str = os.environ.get("FIRESTORE_DATABASE_ID", "(default)"
 """Firestore database ID. Override when using a named database (e.g. 'jor-mcp')."""
 
 RATE_LIMIT_COLLECTION: str = os.environ.get("RATE_LIMIT_COLLECTION", "rate_limits")
-"""Firestore collection used to store monthly fixed-window user counters."""
+"""Firestore collection used to store weekly fixed-window user counters."""
 
-# Rate-limit quotas per tier: monthly request allowance (Fixed Window)
-RATE_LIMIT_BASIC: int = int(os.environ.get("RATE_LIMIT_BASIC_REQUESTS", "500"))
-"""Monthly request quota for 'basic' tier users."""
-RATE_LIMIT_PRO: int = int(os.environ.get("RATE_LIMIT_PRO_REQUESTS", "2000"))
-"""Monthly request quota for 'pro' tier users."""
+# Rate-limit quotas per tier: weekly token allowance (Fixed Window)
+RATE_LIMIT_BASIC: int = int(os.environ.get("RATE_LIMIT_BASIC_TOKENS", "300000"))
+"""Weekly token quota for 'basic' tier users."""
+RATE_LIMIT_PRO: int = int(os.environ.get("RATE_LIMIT_PRO_TOKENS", "1200000"))
+"""Weekly token quota for 'pro' tier users."""
 
 TIER_QUOTAS: dict[str, int] = {
     "basic": RATE_LIMIT_BASIC,
     "pro": RATE_LIMIT_PRO,
 }
-"""Map of tier (role) name -> monthly request quota.
+"""Map of tier (role) name -> weekly token quota.
 
 Single definition of which roles exist: the authentication middleware rejects
 any token whose ``tier`` claim is not a key here, and the rate limiter reads the
 quota from the same mapping. Roles are assigned manually by Ambiental Media on
 the ``allowed_users`` Firestore documents.
+
+Quotas are counted in tokens rather than requests because a request that returns
+three full articles costs far more than one that finds nothing. The defaults
+keep the previous 1:4 ratio between tiers and preserve the old monthly request
+allowance spread over four weeks (125 and 500 requests), priced at ~2,400 tokens
+per request. That figure comes from measuring real tool responses: ~1,900 tokens
+for a search with results, ~7,500 for a full article and ~1,900 for the
+``tools/list`` handshake. Recalibrate as usage data accumulates.
 """
 
 # ---------------------------------------------------------------------------
