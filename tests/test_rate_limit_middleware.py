@@ -31,16 +31,16 @@ async def _noop_receive() -> dict[str, Any]:
     return {"type": "http.request", "body": b"", "more_body": False}
 
 
-def _make_firestore_mock(*, count: int = 1) -> tuple[MagicMock, MagicMock]:
-    """Build a Firestore client mock whose post-increment count resolves to *count*.
+def _make_firestore_mock(*, count: int = 1, exists: bool = True) -> tuple[MagicMock, MagicMock]:
+    """Build a Firestore client mock whose stored token counter resolves to *count*.
 
-    ``count`` is the value returned by the document read that follows the atomic
-    ``firestore.Increment(1)`` write, i.e. the count *after* this request.
+    ``count`` is the number of tokens already charged to the current weekly
+    window, i.e. what the middleware reads *before* serving the request.
     """
     firestore_client = MagicMock()
     doc_ref = MagicMock()
     snapshot = MagicMock()
-    snapshot.exists = True
+    snapshot.exists = exists
     snapshot.get.return_value = count
 
     doc_ref.set = AsyncMock(return_value=None)
@@ -51,6 +51,16 @@ def _make_firestore_mock(*, count: int = 1) -> tuple[MagicMock, MagicMock]:
     firestore_client.collection.return_value = collection_ref
 
     return firestore_client, doc_ref
+
+
+def _responding_app(body: bytes) -> Any:
+    """Return an inner ASGI app that answers with *body*, so the meter sees payload."""
+
+    async def inner_app(scope: Any, receive: Any, send: Any) -> None:
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": body, "more_body": False})
+
+    return inner_app
 
 
 # ---------------------------------------------------------------------------
@@ -152,14 +162,14 @@ async def test_first_request_always_allowed(tier: str) -> None:
     assert called["app"] is True
 
 
-async def test_uses_monthly_document_id() -> None:
-    """Document id follows the {uid}_YYYY-MM fixed monthly window convention."""
+async def test_uses_weekly_document_id() -> None:
+    """Document id follows the {uid}_YYYY-Www fixed weekly window convention."""
     from datetime import UTC, datetime
 
     from src.middleware.rate_limit import RateLimitMiddleware
 
     firestore_client, _doc_ref = _make_firestore_mock(count=1)
-    fixed_now = datetime(2026, 5, 20, 12, 30, tzinfo=UTC)
+    fixed_now = datetime(2026, 5, 20, 12, 30, tzinfo=UTC)  # ISO week 21 of 2026
 
     middleware = RateLimitMiddleware(AsyncMock(), lambda: firestore_client)
 
@@ -167,13 +177,70 @@ async def test_uses_monthly_document_id() -> None:
         mock_datetime.now.return_value = fixed_now
         await middleware(_make_scope(uid="abc-123"), _noop_receive, AsyncMock())
 
-    firestore_client.collection.return_value.document.assert_called_once_with("abc-123_2026-05")
+    firestore_client.collection.return_value.document.assert_called_with("abc-123_2026-W21")
 
 
-async def test_uses_atomic_increment_for_count() -> None:
-    """Rate-limit check increments the counter with firestore.Increment(1)."""
+async def test_charges_measured_tokens_with_atomic_increment() -> None:
+    """Usage is recorded after the response, with firestore.Increment."""
     from google.cloud import firestore
 
+    from src.middleware.rate_limit import RateLimitMiddleware
+
+    firestore_client, doc_ref = _make_firestore_mock(count=1)
+    middleware = RateLimitMiddleware(_responding_app(b"x" * 400), lambda: firestore_client)
+
+    await middleware(_make_scope(), _noop_receive, AsyncMock())
+
+    doc_ref.set.assert_awaited_once()
+    payload = doc_ref.set.call_args.args[0]
+    assert isinstance(payload["tokens"], type(firestore.Increment(1)))
+    assert doc_ref.set.call_args.kwargs["merge"] is True
+
+
+async def test_quota_is_checked_before_the_request_runs() -> None:
+    """The window counter is read before the inner app is reached."""
+    from src.middleware.rate_limit import RateLimitMiddleware
+
+    firestore_client, doc_ref = _make_firestore_mock(count=10)
+    order: list[str] = []
+
+    async def inner_app(scope: Any, receive: Any, send: Any) -> None:
+        order.append("app")
+
+    snapshot = MagicMock()
+    snapshot.exists = True
+    snapshot.get.return_value = 10
+
+    async def recording_get(*args: Any, **kwargs: Any) -> MagicMock:
+        order.append("read")
+        return snapshot
+
+    doc_ref.get = AsyncMock(side_effect=recording_get)
+
+    middleware = RateLimitMiddleware(inner_app, lambda: firestore_client)
+    await middleware(_make_scope(), _noop_receive, AsyncMock())
+
+    assert order == ["read", "app"]
+
+
+async def test_window_without_document_starts_at_zero() -> None:
+    """The first request of a window reads a missing document as zero usage."""
+    from src.middleware.rate_limit import RateLimitMiddleware
+
+    firestore_client, _doc_ref = _make_firestore_mock(exists=False)
+    called = {"app": False}
+
+    async def inner_app(scope: Any, receive: Any, send: Any) -> None:
+        called["app"] = True
+
+    middleware = RateLimitMiddleware(inner_app, lambda: firestore_client)
+    await middleware(_make_scope(), _noop_receive, AsyncMock())
+
+    assert called["app"] is True
+
+
+async def test_no_usage_means_no_write() -> None:
+    """A request that exchanges no payload does not touch the counter."""
     from src.middleware.rate_limit import RateLimitMiddleware
 
     firestore_client, doc_ref = _make_firestore_mock(count=1)
@@ -181,11 +248,68 @@ async def test_uses_atomic_increment_for_count() -> None:
 
     await middleware(_make_scope(), _noop_receive, AsyncMock())
 
+    doc_ref.set.assert_not_awaited()
+
+
+async def test_charges_both_request_and_response_payloads() -> None:
+    """Tokens billed cover what the client sent and what the server answered."""
+    from google.cloud import firestore
+
+    from src.middleware.rate_limit import RateLimitMiddleware
+
+    firestore_client, doc_ref = _make_firestore_mock(count=1)
+
+    async def receive_with_body() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"q" * 200, "more_body": False}
+
+    async def inner_app(scope: Any, receive: Any, send: Any) -> None:
+        await receive()
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"r" * 600, "more_body": False})
+
+    middleware = RateLimitMiddleware(inner_app, lambda: firestore_client)
+    await middleware(_make_scope(), receive_with_body, AsyncMock())
+
+    charged = doc_ref.set.call_args.args[0]["tokens"]
+    # 200 request chars + 600 response chars, at four characters per token.
+    assert charged == firestore.Increment(200)
+
+
+async def test_streamed_response_chunks_are_all_counted() -> None:
+    """A chunked response is charged for every chunk, not just the first."""
+    from google.cloud import firestore
+
+    from src.middleware.rate_limit import RateLimitMiddleware
+
+    firestore_client, doc_ref = _make_firestore_mock(count=1)
+
+    async def streaming_app(scope: Any, receive: Any, send: Any) -> None:
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        for _ in range(3):
+            await send({"type": "http.response.body", "body": b"z" * 400, "more_body": True})
+        await send({"type": "http.response.body", "body": b"", "more_body": False})
+
+    middleware = RateLimitMiddleware(streaming_app, lambda: firestore_client)
+    await middleware(_make_scope(), _noop_receive, AsyncMock())
+
+    charged = doc_ref.set.call_args.args[0]["tokens"]
+    assert charged == firestore.Increment(300)
+
+
+async def test_accounting_failure_does_not_break_the_response() -> None:
+    """A Firestore error while charging usage is logged, not raised."""
+    from src.middleware.rate_limit import RateLimitMiddleware
+
+    firestore_client, doc_ref = _make_firestore_mock(count=1)
+    doc_ref.set = AsyncMock(
+        side_effect=gcp_exceptions.DeadlineExceeded("timeout")  # type: ignore[no-untyped-call]
+    )
+
+    middleware = RateLimitMiddleware(_responding_app(b"y" * 400), lambda: firestore_client)
+
+    await middleware(_make_scope(), _noop_receive, AsyncMock())
+
     doc_ref.set.assert_awaited_once()
-    payload = doc_ref.set.call_args.args[0]
-    assert isinstance(payload["count"], type(firestore.Increment(1)))
-    assert doc_ref.set.call_args.kwargs["merge"] is True
-    doc_ref.get.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------
@@ -343,20 +467,38 @@ def test_get_firestore_client_raises_before_lifespan() -> None:
         server_module._firestore_client = original
 
 
-class TestSecondsUntilNextMonth:
-    def test_rolls_into_january_from_december(self) -> None:
-        """December must wrap to the next year instead of month 13."""
+class TestWeekKey:
+    def test_formats_the_iso_week_with_two_digits(self) -> None:
         from datetime import UTC, datetime
 
-        from src.middleware.rate_limit import _seconds_until_next_month
+        from src.middleware.rate_limit import _week_key
 
-        now = datetime(2026, 12, 31, 23, 59, 30, tzinfo=UTC)
-        assert _seconds_until_next_month(now) == 30
+        assert _week_key(datetime(2026, 1, 8, tzinfo=UTC)) == "2026-W02"
 
-    def test_rolls_into_the_next_month(self) -> None:
+    def test_uses_the_iso_year_across_a_year_boundary(self) -> None:
+        """2027-01-01 is a Friday, so ISO-8601 counts it as week 53 of 2026."""
         from datetime import UTC, datetime
 
-        from src.middleware.rate_limit import _seconds_until_next_month
+        from src.middleware.rate_limit import _week_key
 
-        now = datetime(2026, 3, 31, 23, 59, 0, tzinfo=UTC)
-        assert _seconds_until_next_month(now) == 60
+        assert _week_key(datetime(2027, 1, 1, tzinfo=UTC)) == "2026-W53"
+
+
+class TestSecondsUntilNextWeek:
+    def test_counts_down_to_monday_midnight(self) -> None:
+        from datetime import UTC, datetime
+
+        from src.middleware.rate_limit import _seconds_until_next_week
+
+        # Sunday 23:59:30 UTC -> 30 seconds left in the window.
+        now = datetime(2026, 10, 11, 23, 59, 30, tzinfo=UTC)
+        assert _seconds_until_next_week(now) == 30
+
+    def test_a_full_week_is_left_right_after_a_reset(self) -> None:
+        from datetime import UTC, datetime
+
+        from src.middleware.rate_limit import _seconds_until_next_week
+
+        # Monday 00:00 UTC -> the whole week remains.
+        now = datetime(2026, 10, 5, 0, 0, 0, tzinfo=UTC)
+        assert _seconds_until_next_week(now) == 7 * 24 * 60 * 60

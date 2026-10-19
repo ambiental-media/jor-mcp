@@ -14,7 +14,7 @@ Jor-MCP is designed as a fully serverless platform on **Google Cloud Platform (G
 
 1.  **Google Cloud Run:** Hosts the stateless, containerized Python `jor-mcp` ASGI server.
 2.  **Google Cloud Storage (GCS):** Hosts the static web portal assets for the Next.js consent portal (`jor-mcp-site`).
-3.  **Google Cloud Firestore:** A NoSQL document database used in Datastore mode. It stores monthly rate limits, dynamically registered OAuth clients (DCR), and short-lived authorization codes.
+3.  **Google Cloud Firestore:** A NoSQL document database used in Datastore mode. It stores weekly rate limits, dynamically registered OAuth clients (DCR), and short-lived authorization codes.
 4.  **Google Cloud Identity Platform / Firebase Auth:** Handles Google SSO authentication and mints secure JSON Web Tokens (JWTs).
 5.  **External WordPress REST API:** The target CMS site where editorial articles are published.
 6.  **External GitHub REST API:** Target repository hosting multilingual editorial metadata in JSON files.
@@ -28,9 +28,21 @@ Configure these variables in your Cloud Run service environment settings or loca
 
 ### 2.1 State & Rate Limiting (Firestore)
 *   `FIRESTORE_DATABASE_ID` (Default: `"(default)"`): The Firestore database ID. Override if utilizing a named database instance.
-*   `RATE_LIMIT_COLLECTION` (Default: `"rate_limits"`): Firestore collection containing monthly user counter windows.
-*   `RATE_LIMIT_BASIC_REQUESTS` (Default: `"500"`): Monthly quota for `basic` tier users.
-*   `RATE_LIMIT_PRO_REQUESTS` (Default: `"2000"`): Monthly quota for `pro` tier users.
+*   `RATE_LIMIT_COLLECTION` (Default: `"rate_limits"`): Firestore collection containing weekly user counter windows. Document id is `{uid}_YYYY-Www`, keyed by ISO week.
+*   `RATE_LIMIT_BASIC_TOKENS` (Default: `"300000"`): Weekly token quota for `basic` tier users.
+*   `RATE_LIMIT_PRO_TOKENS` (Default: `"1200000"`): Weekly token quota for `pro` tier users.
+
+Quotas are charged in tokens rather than requests, because a search returning three
+full articles costs far more than one that finds nothing. The server never runs a
+model, so it cannot observe the provider's billed token counts; it measures the
+request and response payloads it exchanges with the client and converts them at four
+characters per token. The defaults are a starting point — calibrate them against real
+usage before relying on them.
+
+Quota is checked before a request runs and charged after it completes, since the cost
+is only known once the response exists. A caller just under the limit can therefore
+overshoot it with one large response; the next request is rejected with HTTP 429 and a
+`Retry-After` pointing at midnight UTC on the coming Monday.
 
 #### Per-IP limit on unauthenticated routes
 Applies only to the auth-exempt surface (`/.well-known/*` and `/api/oauth/*`), which would
