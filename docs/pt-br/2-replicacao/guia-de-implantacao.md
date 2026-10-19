@@ -23,17 +23,113 @@ O sistema foi projetado para ser totalmente serverless, altamente disponível e 
 
 ## 2. Permissões de Conta de Serviço GCP IAM
 
-Para executar o `jor-mcp` de forma segura, você deve criar uma Conta de Serviço (Service Account) dedicada no Google Cloud para o serviço Cloud Run. A execução do serviço com a Conta de Serviço padrão de computação (que possui permissão ampla de "Editor") é fortemente desencorajada em produção.
+O Cloud Run atribui a Conta de Serviço padrão do Compute a um serviço, a menos
+que seja instruído de outra forma. Essa conta possui a permissão ampla de
+`Editor`, então um container comprometido ganharia controle sobre todos os
+recursos do projeto. Crie uma conta de serviço dedicada e de menor privilégio
+para o serviço Cloud Run.
 
-### Funções IAM Necessárias
-Atribua as seguintes permissões granulares para a conta de serviço do Cloud Run:
+Nesta implantação de referência, a identidade de execução é
+`jor-mcp-runner@<project-id>.iam.gserviceaccount.com`.
 
-1.  **Usuário do Cloud Datastore (`roles/datastore.user`):** Necessário para permitir que a aplicação leia e grave os registros de limites de taxa, clientes OAuth e códigos temporários no Firestore.
-2.  **Acessor de Segredos do Secret Manager (`roles/secretmanager.secretAccessor`):** Necessário para injetar variáveis de ambiente confidenciais (como `FIREBASE_WEB_API_KEY` e `MCP_GITHUB_TOKEN`) diretamente no container durante a inicialização.
-3.  **Agente do Cloud Trace (`roles/cloudtrace.agent`):** Necessário para permitir que a auto-instrumentação do OpenTelemetry envie rastreamentos de latência para o GCP Cloud Trace.
-4.  **Gravador de Logs (`roles/logging.logWriter`):** Necessário para enviar os registros de log da aplicação diretamente para o GCP Cloud Logging.
-5.  **Gravador de Métricas do Monitoring (`roles/monitoring.metricWriter`):** Necessário para exportar métricas padrão do serviço para o Cloud Monitoring.
-6.  **Leitor de Objetos do Storage (`roles/storage.objectViewer`):** Opcional, mas necessário caso o servidor precise ler assets ou configurações extras de buckets privados do GCS.
+### 2.1 Criando a conta de serviço
+
+```bash
+gcloud iam service-accounts create jor-mcp-runner \
+  --project "<project-id>" \
+  --display-name="Jor-MCP Cloud Run Runtime" \
+  --description="Dedicated runtime identity for the jor-mcp-server Cloud Run service"
+```
+
+### 2.2 Funções IAM necessárias
+
+Atribua apenas as permissões que a aplicação realmente utiliza em execução. As
+cinco funções de infraestrutura cobrem Firestore, segredos e observabilidade; as
+duas funções de autenticação são necessárias porque o servidor usa o Firebase
+Admin SDK para mais do que validar JWT (`src/api/oauth.py`).
+
+| Função | Escopo | Por que é necessária |
+| :--- | :--- | :--- |
+| `roles/datastore.user` | Projeto | Ler e gravar registros de limite de taxa, clientes OAuth e códigos temporários no Firestore. |
+| `roles/secretmanager.secretAccessor` | Projeto | Decodificar os segredos injetados no container na inicialização (`MCP_GITHUB_TOKEN`, `JWT_SECRET`). |
+| `roles/cloudtrace.agent` | Projeto | Permitir que o OpenTelemetry exporte rastreamentos de latência para o Cloud Trace. |
+| `roles/logging.logWriter` | Projeto | Enviar os logs da aplicação para o Cloud Logging. |
+| `roles/monitoring.metricWriter` | Projeto | Exportar métricas do serviço para o Cloud Monitoring. |
+| `roles/firebaseauth.admin` | Projeto | Buscar usuários (`auth.get_user`) e revogar refresh tokens (`auth.revoke_refresh_tokens`) durante o fluxo de refresh do OAuth. |
+| `roles/iam.serviceAccountTokenCreator` | SA de execução (nela mesma) | Assinar tokens customizados do Firebase (`auth.create_custom_token`). No Cloud Run o Admin SDK não tem chave de assinatura local, então assina pela API IAM `signBlob` na própria conta de serviço de execução. |
+
+```bash
+RUNNER="serviceAccount:jor-mcp-runner@<project-id>.iam.gserviceaccount.com"
+
+for ROLE in \
+  roles/datastore.user \
+  roles/secretmanager.secretAccessor \
+  roles/cloudtrace.agent \
+  roles/logging.logWriter \
+  roles/monitoring.metricWriter \
+  roles/firebaseauth.admin
+do
+  gcloud projects add-iam-policy-binding "<project-id>" \
+    --member="$RUNNER" --role="$ROLE" --condition=None
+done
+
+# Restrita à própria conta de serviço de execução: a permissão signBlob só é
+# necessária nessa conta, então mantenha-a fora do projeto.
+gcloud iam service-accounts add-iam-policy-binding \
+  jor-mcp-runner@<project-id>.iam.gserviceaccount.com \
+  --project "<project-id>" \
+  --member="$RUNNER" \
+  --role="roles/iam.serviceAccountTokenCreator"
+```
+
+Nenhuma permissão do Artifact Registry é necessária: o Cloud Run baixa a imagem
+do container com o próprio agente de serviço, não com a conta de serviço de
+execução. A validação de JWT do Firebase (`auth.verify_id_token`) também não
+exige permissão IAM — ela utiliza certificados públicos de assinatura obtidos
+via HTTPS. As demais operações do Firebase Admin SDK acima exigem funções: a
+assinatura de tokens customizados usa a API IAM `signBlob`, e a busca de usuários
+/ revogação de refresh tokens usam as permissões de administrador do Firebase
+Auth. A chamada `signBlob` requer o escopo OAuth `cloud-platform`, que o Cloud
+Run concede por padrão.
+
+> **Ordem de execução:** crie a conta na seção 2.1 primeiro, depois execute os
+> dois blocos de comando acima.
+
+### 2.3 Vinculando a conta ao serviço
+
+A identidade de execução é declarada no `service.yaml` e aplicada a cada deploy.
+O projeto da conta é substituído a partir de `${GCP_PROJECT_ID}` pelo `envsubst`:
+
+```yaml
+spec:
+  template:
+    spec:
+      serviceAccountName: jor-mcp-runner@${GCP_PROJECT_ID}.iam.gserviceaccount.com
+```
+
+### 2.4 Identidade de execução vs. identidade de implantação
+
+São duas contas distintas e não devem ser confundidas:
+
+* **Identidade de execução** (`jor-mcp-runner`) — a conta sob a qual o container
+  é executado. Precisa das permissões listadas acima e de nenhuma permissão de
+  implantação.
+* **Identidade de implantação** — a conta com a qual o pipeline de CI/CD se
+  autentica (veja `GCP_SA_KEY` na seção 8.1). Precisa de permissão para enviar
+  imagens ao Artifact Registry e implantar no Cloud Run.
+
+A identidade de implantação também precisa da permissão
+`roles/iam.serviceAccountUser` sobre a conta de serviço de execução, caso
+contrário o `gcloud run services replace` falha com `iam.serviceaccounts.actAs`.
+O mesmo vale para qualquer operador humano que execute um deploy manual:
+
+```bash
+gcloud iam service-accounts add-iam-policy-binding \
+  jor-mcp-runner@<project-id>.iam.gserviceaccount.com \
+  --project "<project-id>" \
+  --member="serviceAccount:<deployer-sa>@<project-id>.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountUser"
+```
 
 ---
 
@@ -146,6 +242,11 @@ export FIREBASE_PROJECT_ID="..."
 export WORDPRESS_API_URL="..."
 export MCP_GITHUB_REPOS="..."
 export OTEL_EXPORTER_OTLP_ENDPOINT="..."
+export FIREBASE_WEB_API_KEY="..."
+
+for v in IMAGE_URL GCP_PROJECT_NUMBER GCP_PROJECT_ID; do
+  : "${!v:?defina $v antes de executar o envsubst}"
+done
 
 envsubst < service.yaml | gcloud run services replace - --region us-central1
 ```
