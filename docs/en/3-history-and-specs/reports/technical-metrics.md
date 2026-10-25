@@ -10,6 +10,7 @@ Post-launch operational report for the Jor-MCP server, built exclusively from te
 |---|---|
 | Snapshot date | 2026-10-25 |
 | Measurement window | 2026-09-25T20:28:36Z → 2026-10-25 (30 days, full log retention) |
+| Data extraction | 2026-10-25T20:55Z (counts drift slightly with live traffic) |
 | Service | `jor-mcp-server` |
 | Revision | `jor-mcp-server-00018-dxn` (image `v0.13.1`) |
 | GCP project | `jor-mcp`, region `us-central1` |
@@ -19,9 +20,9 @@ Post-launch operational report for the Jor-MCP server, built exclusively from te
 
 | # | Indicator | Target | Measured | Verdict |
 |---|---|---|---|---|
-| 1 | Response time | Mean < 10 s | Mean **1.03 s**, p95 **0.90 s**, p99 **12.42 s** | **Pass** on mean; tail and cold start at risk |
+| 1 | Response time | Mean < 10 s | Mean **0.73 s**, p95 **0.64 s**, p99 **2.52 s**; 2 requests at 301 s | **Pass** on mean; cold start at risk |
 | 2 | Availability | ≥ 95% | Infra **99.64%**, legit traffic **98.30%**; 2 days below 95% | **Pass** over 30 days; **fail** on 2 individual days |
-| 3 | AI assistant integration | ≥ 2 assistants | Claude (580 calls) + ChatGPT connector (22 calls); Gemini absent | **Pass** |
+| 3 | AI assistant integration | ≥ 2 assistants | Claude (580 MCP calls) + ChatGPT (4 MCP calls, 18 OAuth token calls); Gemini absent | **Pass** |
 | 4 | Query precision | ≥ 90% relevant | 35.7% of searches returned zero results; no relevance labels | **Not demonstrated** |
 | 5 | Real-time updates | No reindexing | No cache, no index; live probe showed 0 staleness | **Pass** by design; single-point evidence |
 
@@ -41,7 +42,7 @@ All data is stored telemetry, read with read-only scopes through the `mcp-viewer
 - **Infra availability** = `1 − (5xx / all requests)`. Includes internet scanner noise.
 - **Legit-traffic availability** = `1 − (5xx / requests to /mcp* and /api/oauth*)`. Excludes scanner paths (`/`, `/.env`, `/wp-*`, `/ws`, `/socket.io`, `/raw`) that never reach the MCP application.
 - **Response time** = latency of `POST /mcp` with status `200`/`202`, read from request logs.
-- **Excluded from response time:** `GET /mcp` SSE sessions. These are long-lived streams held open until the 300 s timeout (observed p95 310 s), so their duration measures session lifetime, not query latency.
+- **Excluded from response time:** `GET /mcp` SSE sessions. These are long-lived streams held open until the 300 s timeout (observed p95 301 s; 33.6% of sessions reach the deadline), so their duration measures session lifetime, not query latency.
 
 ### 2.2 Instrumentation State at Snapshot
 
@@ -51,39 +52,36 @@ All data is stored telemetry, read with read-only scopes through the `mcp-viewer
 
 ## 3. Response Time (Indicator 1)
 
-Source: 1,326 successful `POST /mcp` requests (status 200/202), 30-day window.
+Source: 1,158 successful `POST /mcp` requests (status 200/202), 30-day window.
 
 | Metric | Value |
 |---|---|
-| Requests | 1,326 |
-| Mean | **1.03 s** |
-| p50 | 0.15 s |
-| p90 | 0.61 s |
-| p95 | 0.90 s |
-| p99 | 12.42 s |
+| Requests | 1,158 |
+| Mean | **0.73 s** |
+| p50 | 0.14 s |
+| p90 | 0.37 s |
+| p95 | 0.64 s |
+| p99 | 2.52 s |
 | Max | 301.00 s |
-| Requests > 10 s | 21 (1.58%) |
-| Within target | **98.42%** |
+| Requests > 10 s | 2 (0.17%) |
+| Within target | **99.83%** |
 
 ### 3.1 By Client
 
 | Client (user agent family) | Calls | Mean | p95 | First seen | Last seen |
 |---|---|---|---|---|---|
 | `Claude-User` | 580 | 1.27 s | 0.56 s | 2026-09-25 | 2026-10-24 |
-| `codex-mcp-client` | 382 | 0.17 s | 0.74 s | 2026-10-20 | 2026-10-20 |
-| `opencode` | 188 | 0.22 s | 0.49 s | 2026-09-27 | 2026-10-25 |
-| `python-httpx` | 106 | 2.81 s | 12.42 s | 2026-09-25 | 2026-10-24 |
-| `openai-connectors-oauth` | 18 | 1.96 s | 13.08 s | 2026-10-20 | 2026-10-25 |
-| `braintrust-mcp-client` | 18 | 9.59 s | 58.05 s | 2026-10-21 | 2026-10-22 |
-| `Mozilla` (manual tests) | 13 | 0.44 s | 0.65 s | 2026-10-11 | 2026-10-22 |
+| `codex-mcp-client` | 377 | 0.17 s | 0.74 s | 2026-10-20 | 2026-10-20 |
+| `opencode` | 180 | 0.20 s | 0.46 s | 2026-10-01 | 2026-10-25 |
+| `(none)` | 11 | 0.52 s | 2.58 s | 2026-10-21 | 2026-10-21 |
 | `undici` | 6 | 0.13 s | 0.21 s | 2026-10-21 | 2026-10-21 |
 | `openai-mcp` | 4 | 0.81 s | 2.76 s | 2026-10-20 | 2026-10-20 |
 
 ### 3.2 Cold Start Caveat
 
-Minimum instances is `0`, so the first request after an idle period waits for container startup. `run.googleapis.com/container/startup_latencies` p95 = **24.03 s** over the window. This time is not part of Cloud Run request latency but is part of the user-perceived wait, so a cold request can exceed the 10 s target even when the reported mean is 1.03 s.
+Minimum instances is `0`, so the first request after an idle period waits for container startup. `run.googleapis.com/container/startup_latencies` p95 = **24.03 s** over the window. This time is not part of Cloud Run request latency but is part of the user-perceived wait, so a cold request can exceed the 10 s target even when the reported mean is 0.73 s.
 
-**Verdict:** target met on average. Tail latency (p99 = 12.42 s) and cold start (p95 = 24.03 s) are the two risks to disclose alongside the average.
+**Verdict:** target met on average. Two POST outliers hit 301 s and cold start p95 is 24.03 s; both must be disclosed alongside the average.
 
 ## 4. Availability (Indicator 2)
 
@@ -109,7 +107,7 @@ Status distribution (30 days):
 | 500 | 20 | 0.08% |
 | 409 | 4 | 0.02% |
 
-The 401 majority is internet scanning: requests for `/.env`, `/wp-login.php`, `/socket.io/`, root paths, and crawler user agents such as `libredtail-http`, `l9explore`, `zgrab`, and `WP-Safe-Scanner`. These attempts never reach the MCP application, which is why the raw 2xx ratio (8.0%) is not a usable availability measure.
+The 401 majority is internet scanning: requests for `/.env`, `/wp-login.php`, `/socket.io/`, root paths, and crawler user agents such as `libredtail-http`, `l9explore`, `zgrab`, and `WP-Safe-Scanner`. Most of them target paths outside the MCP application; roughly 2,000 of them (9%) hit `/mcp` and were rejected by `AuthMiddleware` before any tool executed. Because these probes dominate the denominator, the raw 2xx ratio (8.0%) is not a usable availability measure. On `/mcp` itself, ≈1,980 of 3,155 POST attempts (63%) were rejected with 401, which points to expired or missing access tokens rather than server failure.
 
 ### 4.1 5xx Breakdown
 
@@ -157,7 +155,7 @@ No 5xx was recorded on `/mcp` itself.
 | 2026-10-24 | 454 | 0 | 100.00% | 100.00% |
 | 2026-10-25 | 629 | 4 | 99.36% | 100.00% |
 
-Two days fall below the 95% target: 2026-10-14 (94.04%) and 2026-10-16 (72.73%). The 2026-10-16 value comes from a small denominator (11 legit requests, 3 failures), so one failed OAuth call moves the daily rate by nine points.
+Two days fall below the 95% target: 2026-10-14 (94.04%) and 2026-10-16 (72.73%). The 2026-10-16 value comes from a small denominator (22 legit requests, 6 failures), so a handful of failed OAuth calls moves the daily rate sharply.
 
 **Verdict:** the 30-day aggregate meets the target on both definitions. The daily series does not, driven entirely by the OAuth proxy, not by the MCP endpoint.
 
@@ -168,13 +166,12 @@ Source: user agents on successful `POST /mcp` requests, cross-checked against ap
 | Assistant / client | Family | Calls | Evidence |
 |---|---|---|---|
 | Claude Desktop | `Claude-User` | 580 | Active 2026-09-25 → 2026-10-24 |
-| ChatGPT connector | `openai-connectors-oauth`, `openai-mcp` | 22 | First seen 2026-10-20, still active 2026-10-25 |
-| OpenAI Codex CLI | `codex-mcp-client` | 382 | Single-day run, 2026-10-20 |
-| OpenCode | `opencode` | 188 | 2026-09-27 → 2026-10-25 |
-| Braintrust eval client | `braintrust-mcp-client` | 18 | 2026-10-21 → 2026-10-22 |
+| ChatGPT connector | `openai-mcp` (MCP), `openai-connectors-oauth` (OAuth) | 4 + 18 | First seen 2026-10-20, still active 2026-10-25 |
+| OpenAI Codex CLI | `codex-mcp-client` | 377 | Single-day run, 2026-10-20 |
+| OpenCode | `opencode` | 180 | 2026-10-01 → 2026-10-25 |
 | Gemini | — | 0 | **No request in the window** |
 
-Authentication evidence: 1,493 `Authenticated request` events in application logs, including tier metadata (`tier: pro`) issued by the OAuth flow.
+Authentication evidence: 1,493 `Authenticated request` events in application logs at extraction, including tier metadata (`tier: pro`) issued by the OAuth flow.
 
 **Verdict:** the two-assistant target is met (Claude and ChatGPT). Gemini integration is unproven in the data.
 
@@ -276,7 +273,8 @@ Response time slice:
 gcloud logging read \
   'logName="projects/jor-mcp/logs/run.googleapis.com%2Frequests"
    AND httpRequest.requestMethod="POST"
-   AND httpRequest.status=200' \
+   AND httpRequest.requestUrl:"/mcp"
+   AND (httpRequest.status=200 OR httpRequest.status=202)' \
   --limit=100000 --format=json
 ```
 
@@ -320,27 +318,32 @@ Representative entry:
 
 ### 8.4 Cloud Monitoring Queries
 
+`gcloud monitoring` does not expose time series, so the values were read from the Monitoring REST API:
+
 ```bash
-# Request volume by status class (30d)
-gcloud monitoring time-series list \
-  --project=jor-mcp \
-  --filter='metric.type="run.googleapis.com/request_count"
-            AND resource.labels.service_name="jor-mcp-server"'
+TOKEN=$(gcloud auth print-access-token)
 
-# Request latency percentiles (30d)
-gcloud monitoring time-series list \
-  --project=jor-mcp \
-  --filter='metric.type="run.googleapis.com/request_latencies"
-            AND resource.labels.service_name="jor-mcp-server"'
-
-# Cold start latency (30d)
-gcloud monitoring time-series list \
-  --project=jor-mcp \
-  --filter='metric.type="run.googleapis.com/container/startup_latencies"
-            AND resource.labels.service_name="jor-mcp-server"'
+curl -sG "https://monitoring.googleapis.com/v3/projects/jor-mcp/timeSeries" \
+  -H "Authorization: Bearer $TOKEN" \
+  --data-urlencode 'filter=metric.type="run.googleapis.com/request_latencies"
+    AND resource.labels.service_name="jor-mcp-server"' \
+  --data-urlencode 'interval.startTime=2026-09-25T20:28:36Z' \
+  --data-urlencode 'interval.endTime=2026-10-25T20:55:00Z' \
+  --data-urlencode 'aggregation.alignmentPeriod=2592000s' \
+  --data-urlencode 'aggregation.perSeriesAligner=ALIGN_PERCENTILE_95' \
+  --data-urlencode 'aggregation.crossSeriesReducer=REDUCE_PERCENTILE_95'
 ```
 
-Aggregation used: alignment period 30 days, `ALIGN_PERCENTILE_95` with `REDUCE_PERCENTILE_95` for distributions, `ALIGN_SUM` with `REDUCE_SUM` for counters.
+Swap `metric.type` and the aggregation per metric:
+
+| Metric | Per-series aligner | Cross-series reducer |
+|---|---|---|
+| `request_count` | `ALIGN_SUM` | `REDUCE_SUM` |
+| `request_latencies` | `ALIGN_PERCENTILE_95` | `REDUCE_PERCENTILE_95` |
+| `container/startup_latencies` | `ALIGN_PERCENTILE_95` | `REDUCE_PERCENTILE_95` |
+| `container/cpu/utilizations` | `ALIGN_PERCENTILE_95` | `REDUCE_PERCENTILE_95` |
+| `container/memory/utilizations` | `ALIGN_PERCENTILE_95` | `REDUCE_PERCENTILE_95` |
+| `container/instance_count` | `ALIGN_MAX` | `REDUCE_MAX` |
 
 ### 8.5 Resource Utilisation
 
@@ -356,7 +359,7 @@ Aggregation used: alignment period 30 days, `ALIGN_PERCENTILE_95` with `REDUCE_P
 ```bash
 curl -s -o /dev/null -w '%{http_code} %{time_total}s\n' \
   https://jormcp.ambiental.media/api/oauth/health
-# 200 0.804140s
+# 200 0.804140s (re-probe: 200 1.082923s)
 ```
 
 `/health` returns 404 through the load balancer because only `/mcp*` and `/api/oauth*` are routed to Cloud Run; `/api/oauth/health` is the reachable health endpoint.
