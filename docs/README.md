@@ -18,7 +18,7 @@ This project is currently in **Beta** phase. Key focus is to validate user exper
 ## Documentation Structure
 
 - **1-technical** (`docs/en/1-technical/`): Architecture, API contracts, available tools, prompting best practices, and client integration instructions.
-- **2-replication** (`docs/en/2-replication/`): Guides for environment variables, prerequisites, load balancer setup, and cloud deployments.
+- **2-replication** (`docs/en/2-replication/`): Prerequisites, step-by-step GCP provisioning, environment variables, load balancer setup, and deployment.
 - **3-history-and-specs** (`docs/en/3-history-and-specs/`): Project journey, specifications (RFCs), and architectural decision records (ADRs).
 - **4-legal** (`docs/en/4-legal/`): Licenses, terms of use, and privacy policies.
 

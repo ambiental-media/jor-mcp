@@ -67,10 +67,6 @@ de outra forma permitiria a qualquer pessoa inundar o Firestore via `POST /api/o
 
 ---
 
-## 3. Nota sobre a Replicação da Infraestrutura (Playbook Futuro)
+## 3. Provisionamento da Infraestrutura
 
-Atualmente, os recursos de infraestrutura do GCP (Load Balancers, Cloud Run, coleções do Firestore e Identity Platform) são provisionados manualmente.
-
-**Atualização Planejada:** Após a conclusão da fase inicial de replicação piloto, entregaremos um **playbook de replicação abrangente**. Isso incluirá:
-*   **Infraestrutura como Código (IaC):** Scripts do Terraform para provisionar automaticamente todos os recursos necessários no GCP.
-*   **Configuração como Código (CaC):** Configurações automatizadas para vincular com segurança o Identity Platform, regras do Firestore e implantação automatizada de segredos.
+Os recursos GCP usados pelo Jor-MCP são provisionados com os comandos `gcloud` do [Guia de Provisionamento GCP](provisionamento-gcp.md).

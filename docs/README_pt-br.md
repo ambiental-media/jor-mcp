@@ -18,7 +18,7 @@ Este projeto está atualmente na fase **Beta**. O foco principal é validar a ex
 ## Estrutura da Documentação
 
 - **1-tecnico** (`docs/pt-br/1-tecnico/`): Arquitetura, contratos de API, ferramentas disponíveis, melhores práticas de prompt e instruções para conexão de clientes.
-- **2-replicacao** (`docs/pt-br/2-replicacao/`): Guias para variáveis de ambiente, pré-requisitos, configuração de load balancer e implantações em nuvem.
+- **2-replicacao** (`docs/pt-br/2-replicacao/`): Pré-requisitos, provisionamento GCP passo a passo, variáveis de ambiente, configuração de load balancer e implantação.
 - **3-historico-e-specs** (`docs/pt-br/3-historico-e-specs/`): Trajetória do projeto, especificações (RFCs) e registros de decisões de arquitetura (ADRs).
 - **4-legal** (`docs/pt-br/4-legal/`): Licenças, termos de uso e políticas de privacidade.
 

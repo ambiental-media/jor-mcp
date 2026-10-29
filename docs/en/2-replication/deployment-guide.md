@@ -6,6 +6,8 @@
 
 This document outlines the deployment architecture for the Jor-MCP server on Google Cloud Platform (GCP), GCP service account permissions, Firebase Authentication console security settings, and Firestore allow-list management.
 
+> For step-by-step `gcloud` commands to provision this infrastructure, see the [GCP Provisioning Guide](gcp-provisioning.md).
+
 ---
 
 ## 1. GCP Architecture Overview
