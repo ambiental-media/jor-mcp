@@ -1,0 +1,183 @@
+Política de Privacidade do [NOME DO SERVIÇO]
+
+
+Última atualização: [DATA]
+
+
+Boas vindas ao [NOME DO SERVIÇO]!
+
+
+A [RAZÃO SOCIAL DA ORGANIZAÇÃO], pessoa jurídica de direito privado, inscrita no CNPJ sob o no. [CNPJ], com sede na [ENDEREÇO COMPLETO DA SEDE] (“Organização”, “Nós” ou “Controladora”), oferece uma ferramenta que permite a sistemas e aplicações compatíveis consultar, localizar e recuperar conteúdos jornalísticos da Organização por meio do protocolo aberto Model Context Protocol (MCP), disponibilizando tais conteúdos para utilização como contexto por agentes de inteligência artificial e outras tecnologias compatíveis (o “[NOME DO SERVIÇO]”, serviço desenvolvido a partir do software de código aberto JOR-MCP).
+
+
+Nós somos controladores dos seus dados pessoais, conforme definido pela legislação cabível.
+
+
+Isso significa que nós tomamos decisões sobre quais dados seus coletar, onde e como armazená-los, como processá-los, entre outras – tudo em conformidade com a nossa Política de Privacidade abaixo (a “Política”).
+
+
+O JOR-MCP é um software de código aberto desenvolvido pela Associação Ambiental Media e distribuído sob a licença Apache 2.0. A instância do JOR-MCP objeto desta Política é instalada, configurada e operada sob responsabilidade exclusiva da ORGANIZAÇÃO. A Associação Ambiental Media não participa das decisões sobre o tratamento de dados pessoais realizado nesta instância e não assume, em razão do desenvolvimento ou da disponibilização do software, a condição de controladora ou operadora desses dados.
+
+
+A presente Política está dividida da seguinte forma para facilitar a sua compreensão:
+
+
+1. Informações gerais
+2. Dados coletados
+3. Uso e compartilhamento das suas informações
+4. Direitos dos titulares
+5. Segurança da informação e retenção dos dados
+6. Cookies
+7. Atualizações da Política de Privacidade
+8. Lei aplicável
+
+
+Caso tenha dúvidas ou precise tratar de qualquer assunto relacionado a esta Política, entre em contato conosco através do e-mail [CONTATO]. Encarregado pelo tratamento de dados pessoais, quando aplicável: [NOME E CANAL DE CONTATO DO ENCARREGADO].
+
+
+1. Informações gerais
+
+
+1.1. Essa Política tem como objetivo lhe informar com transparência sobre o tratamento dos seus dados pessoais, coletados quando Você acessa páginas relacionadas ao [NOME DO SERVIÇO], como as de cadastro, autorização de acesso ou documentação, conecta-se ao [NOME DO SERVIÇO] e passa a utilizá-lo, por exemplo como plugin de um chatbot em “large language model – LLM”. Esta Política não se aplica ao site jornalístico da Organização, regido por política própria.
+
+
+1.2. Os seus dados pessoais, ou seja, informações que te identificam ou possam te identificar, conforme definidos pela legislação cabível, em especial a legislação de proteção de dados aplicável, poderão ser coletados e processados por nós nos termos desta Política. Você declara e garante que todas as informações pessoais suas que nos fornecer são verdadeiras, atuais e completas.
+
+
+1.3. Você, titular de dados pessoais, será referido como “Você” em nossa Política.
+
+
+2. Dados coletados
+
+
+Ao utilizar algum de nossos Serviços, coletaremos os seguintes dados:
+
+
+2.1. Dados de visitação e navegação [OPCIONAL]. Quando Você acessa páginas relacionadas ao [NOME DO SERVIÇO], como as de cadastro, autorização de acesso ou documentação, nós coletaremos cookies do seu computador (para mais informações quanto a cookies, veja a Seção 6), seus cliques na página e interações de navegação, páginas acessadas, tempo de permanência, origem do acesso, sua localização via endereço de IP, tipo de navegador, tipo do aparelho que utiliza para acessar o site, sistema operacional de seu aparelho, e país de origem do seu acesso. Essas informações, em regra, não podem identificar Você diretamente, e são utilizadas para análise de tráfego dessas páginas e para as outras finalidades apontadas nesta Política.
+
+
+2.2. Dados cadastrais. Poderemos coletar informações como nome, e-mail, telefone, empresa, cargo, identificadores de usuário, credenciais de acesso e outras informações fornecidas por Você durante o cadastro, contratação, solicitação de demonstração ou utilização do [NOME DO SERVIÇO].
+
+
+2.3. Dados de autenticação e acesso. Poderemos coletar informações necessárias para autenticação, gerenciamento de contas, controle de acesso, prevenção a fraudes e proteção da infraestrutura do [NOME DO SERVIÇO].
+
+
+2.4. Dados de consulta e interação. Poderemos coletar e armazenar as consultas, pesquisas, prompts, comandos, solicitações, perguntas, conteúdos buscados, parâmetros enviados ao [NOME DO SERVIÇO], resultados retornados, histórico de utilização, frequência de uso, data e horário das interações e demais informações relacionadas à utilização do Serviço.
+
+
+2.5. Dados técnicos e logs. Poderemos coletar endereço IP, data e horário de acesso, identificadores de dispositivos, informações de navegador, sistema operacional, localização aproximada derivada do IP, registros de autenticação, erros, falhas, eventos de segurança e demais logs técnicos necessários para operação, monitoramento e segurança do [NOME DO SERVIÇO].
+
+
+2.6. Dados de comunicação. Quando Você entrar em contato conosco, poderemos coletar o conteúdo das comunicações, solicitações, reclamações, sugestões, dúvidas, documentos enviados e demais informações fornecidas voluntariamente.
+
+
+2.7. Dados de faturamento e contratação [OPCIONAL]. Caso o acesso ao [NOME DO SERVIÇO] seja contratado mediante pagamento, poderemos coletar informações necessárias para emissão de documentos fiscais, faturamento, cobrança, gestão contratual e processamento de pagamentos.
+
+
+2.8. Dados de suporte [OPCIONAL]. Quando Você entra em contato conosco para solicitar suporte, nós coletaremos os dados explicitamente solicitados nesse momento, como seu nome e e-mail, e o utilizaremos para a finalidade específica de processamento do seu pedido. Seus dados coletados dessa maneira poderão ser cruzados com os dados que temos sobre você de outras fontes, respeitadas essas finalidades.
+
+
+3. Uso e compartilhamento das suas informações
+
+
+3.1. Finalidade geral. Prezamos muito pela sua privacidade. Por isso, todos os dados e informações sobre Você são tratados como confidenciais, e somente os usaremos para os fins aqui descritos. Seus dados pessoais serão utilizados para o próprio oferecimento e operacionalização do [NOME DO SERVIÇO], além das outras finalidades abaixo.
+
+
+Os dados pessoais poderão ser utilizados para as seguintes finalidades:
+
+
+a) disponibilizar, operar, manter, monitorar e aprimorar o [NOME DO SERVIÇO];
+b) autenticar usuários e gerenciar contas de acesso;
+c) permitir a recuperação, organização e disponibilização de conteúdos por meio do [NOME DO SERVIÇO];
+d) prestar suporte técnico e atendimento ao usuário;
+e) realizar auditorias, monitoramento, prevenção a fraudes, prevenção a abusos e proteção da infraestrutura tecnológica;
+f) cumprir obrigações legais, regulatórias, judiciais ou administrativas;
+g) emitir documentos fiscais, processar pagamentos e administrar relações contratuais;
+h) analisar padrões de uso, métricas de utilização, desempenho, qualidade, segurança e estabilidade do [NOME DO SERVIÇO];
+i) [OPCIONAL] desenvolver, testar, validar, aprimorar e lançar funcionalidades, produtos, serviços, tecnologias, ferramentas, sistemas, modelos analíticos e soluções relacionadas às atividades da Organização;
+j) [OPCIONAL] produzir estatísticas, relatórios, estudos, pesquisas e análises de mercado;
+k) [OPCIONAL] realizar atividades de pesquisa, desenvolvimento, inovação e inteligência de negócios;
+l) [OPCIONAL] identificar tendências, interesses, padrões de consumo informacional e oportunidades comerciais;
+m) gerar informações agregadas, estatísticas ou anonimizadas para utilização interna ou externa;
+n) exercer regularmente direitos da Organização em processos judiciais, administrativos ou arbitrais.
+
+
+3.2. Bases legais. Tratamos seus dados pessoais com fundamento nas hipóteses previstas na legislação aplicável, conforme a finalidade de cada tratamento, como: a execução do contrato ou de procedimentos preliminares a ele, no cadastro, na autenticação, na operação do Serviço e no suporte; o legítimo interesse da Organização, na segurança, na prevenção a fraudes e nas métricas de desempenho; o cumprimento de obrigação legal ou regulatória, na guarda de registros e nas obrigações fiscais; o exercício regular de direitos; e o consentimento, quando exigido, como no caso de cookies não necessários.
+
+
+3.3. Compartilhamento. Não vendemos seus dados pessoais nem os compartilhamos com parceiros comerciais. Poderemos compartilhá-los apenas com prestadores de serviços necessários à operação do [NOME DO SERVIÇO], como provedores de hospedagem e de envio de e-mails [LISTAR OS PRINCIPAIS PRESTADORES], para as finalidades descritas nesta Política. Alguns desses prestadores podem estar localizados fora do país.
+
+
+3.4. Requisição judicial. A Organização se reserva o direito de fornecer dados e informações sobre Você caso seja requisitada judicialmente para tanto, exclusivamente na medida em que tal compartilhamento for obrigatório por lei.
+
+
+3.5. Dados anonimizados. Poderemos também anonimizar os seus dados e utilizá-los, de forma agregada, para outras finalidades razoáveis, de modo que não seja possível identificá-lo por meios técnicos razoáveis, descaracterizando tais informações como “pessoais”.
+
+
+3.6. Plataformas de terceiros. O [NOME DO SERVIÇO] pode ser utilizado em conjunto com plataformas, aplicações ou serviços operados por terceiros, em especial chatbots em “large language models – LLMs”, que são plataformas tecnológicas disponibilizadas por terceiros. A Organização não controla nem é responsável pelas práticas de privacidade adotadas por tais terceiros. O tratamento de dados realizado por essas plataformas é regido por suas respectivas políticas de privacidade e termos de uso. Esta Política regula exclusivamente os tratamentos de dados realizados pela própria Organização no contexto do [NOME DO SERVIÇO].
+
+
+4. Direitos dos titulares
+
+
+4.1. Você tem, por lei, diversos direitos relativos à privacidade e à proteção dos seus dados pessoais. Tais direitos encontram-se resumidos abaixo. Caso queira exercer qualquer um destes direitos, por favor envie um e-mail para [CONTATO], e cumpriremos com sua solicitação o mais rápido possível. Caso Você entre em contato conosco para exercer algum desses direitos, teremos de acessar seus dados pessoais correspondentes para poder cumprir com suas solicitações.
+
+
+a) Direito de acesso. Este direito permite que Você possa confirmar a existência de tratamento e requisitar e receber uma cópia dos dados pessoais que possuímos sobre Você.
+
+
+b) Direito de retificação. Este direito permite que Você, a qualquer momento, possa solicitar a correção e/ou retificação dos seus dados pessoais, caso identifique que alguns deles estão incorretos. Contudo, para ser efetivada essa correção, teremos que checar a veracidade dos dados que Você nos fornecer.
+
+
+c) Direito de eliminação. Você poderá solicitar a eliminação dos dados pessoais tratados com base no seu consentimento, ressalvadas as hipóteses legais de conservação.
+
+
+d) Direito de oposição ao tratamento. Você poderá se opor a tratamento realizado com fundamento em bases legais diversas do consentimento, em caso de descumprimento da legislação aplicável.
+
+
+e) Direito de solicitar anonimização, bloqueio ou eliminação. Você poderá solicitar a anonimização, o bloqueio ou a eliminação de dados pessoais desnecessários, excessivos ou tratados em desconformidade com a legislação aplicável.
+
+
+f) Direito à portabilidade. Você poderá solicitar a portabilidade dos seus dados pessoais a outro fornecedor de serviço, observadas a regulamentação aplicável e a proteção dos segredos comercial e industrial.
+
+
+g) Direito à revisão de decisões automatizadas. Você também tem o direito de solicitar a revisão de decisões tomadas unicamente com base em tratamento automatizado de seus dados pessoais que afetem seus interesses, incluídas as decisões destinadas à definição de perfis pessoais, profissionais, de consumo e de crédito e/ou os aspectos de sua personalidade.
+
+
+h) Outros direitos. Você também pode obter informações sobre as entidades com as quais compartilhamos seus dados e sobre a possibilidade de não fornecer consentimento e as consequências da negativa, revogar consentimentos eventualmente concedidos e apresentar reclamação à autoridade de proteção de dados competente.
+
+
+4.2. Talvez seja necessário solicitar informações específicas suas para nos ajudar a confirmar sua identidade e garantir seus direitos acima. Esta é uma medida de segurança para garantir que os dados pessoais não sejam divulgados a qualquer pessoa que não tenha direito de recebê-los.
+
+
+5. Segurança da informação e retenção dos dados
+
+
+5.1. Todos os seus dados são confidenciais e somente as pessoas com as devidas autorizações e necessidade terão acesso a eles. Qualquer uso dos seus dados pessoais estará de acordo com a presente Política. A Organização empreenderá todos os esforços razoáveis de mercado para garantir a segurança dos nossos sistemas e dos seus dados. O acesso aos servidores onde estão seus dados somente pode ser feito por meio de canais de comunicação previamente autorizados.
+
+
+5.2. Retenção. Os registros de acesso ao [NOME DO SERVIÇO] serão mantidos por [PRAZO DE RETENÇÃO DOS REGISTROS DE ACESSO], e o conteúdo das consultas, quando registrado, por [PRAZO DE RETENÇÃO DAS CONSULTAS]. Os dados cadastrais, de autenticação, de suporte e de faturamento serão mantidos por [PRAZOS OU CRITÉRIOS POR CATEGORIA], observadas as obrigações legais aplicáveis. Os demais dados pessoais serão mantidos somente até quando forem necessários ou relevantes para as finalidades descritas nesta Política, ou pelos períodos exigidos por lei.
+
+
+5.3. A Organização considera a sua privacidade algo extremamente importante e fará tudo que estiver ao alcance para protegê-la. Todavia, não temos como garantir que todos os dados e informações sobre Você em nossa plataforma estarão livres de acessos não autorizados, principalmente caso haja compartilhamento indevido das credenciais necessárias para acessar o [NOME DO SERVIÇO].
+
+
+6. Cookies [OPCIONAL]
+
+
+6.1. Nós utilizamos cookies, que são arquivos de texto gerados e armazenados no seu navegador ou aparelho por sites, aplicativos e anúncios online. Os cookies poderão ser utilizados para autenticar sua sessão, lembrar suas preferências e configurações e entender, de forma agregada e anonimizada, os comportamentos e interesses dos usuários de nossa plataforma.
+
+
+6.2. Ao acessar páginas relacionadas ao [NOME DO SERVIÇO] e consentir com o uso de cookies, você manifesta conhecer e aceitar a utilização de um sistema de coleta de dados de navegação com o uso de cookies em seu dispositivo. Você pode, a qualquer tempo e sem nenhum custo por meio do seu navegador, alterar as permissões, bloquear ou recusar os cookies. Todavia, a revogação do consentimento de determinados Cookies pode inviabilizar o funcionamento correto de alguns recursos dos nossos Serviços.
+
+
+7. Atualizações da Política de Privacidade
+
+
+7.1. A Organização se reserva o direito de alterar essa Política quantas vezes forem necessárias, contanto que em compasso com as normativas legais. É por isso que é muito importante acessar nossa Política periodicamente. Para facilitar, indicamos no início do documento a data da última atualização. Alterações relevantes serão comunicadas com destaque no site da Organização ou por outros meios disponíveis. 
+
+
+8. Lei aplicável 
+
+
+8.1. Este documento é regido e deve ser interpretado de acordo com as leis [DO PAÍS]. Fica eleito o Foro da Comarca de [CIDADE], [ESTADO], como o competente para dirimir quaisquer questões porventura oriundas do presente documento, ressalvadas as hipóteses de competência legal obrigatória, inclusive nas relações de consumo.
