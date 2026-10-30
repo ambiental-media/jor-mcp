@@ -24,6 +24,42 @@ The Apache License 2.0 is a permissive free software license written by the Apac
 
 ---
 
+## Trademark and Name
+
+The license covers the source code. It does **not** grant rights over the **Jor-MCP** name, the **Ambiental Media** name, or their visual identities.
+
+If you operate your own instance, you may:
+- run it under any name your organization chooses;
+- state that your service is "based on Jor-MCP" or "built on Jor-MCP";
+- credit Jor-MCP and Ambiental Media as the authors of the software;
+- publish modified versions, provided it is clear that they are derivative versions.
+
+You may not:
+- name your service "Jor-MCP" or use that name as its main brand;
+- present your instance as operated, hosted, maintained, certified, or endorsed by Ambiental Media;
+- use the Jor-MCP or Ambiental Media logos or visual identity without written authorization;
+- suggest any partnership, affiliation, or responsibility of Ambiental Media for your service without a formal agreement.
+
+The full policy is in [Terms of Use and Privacy Policy Templates](terms-and-privacy-templates.md).
+
+---
+
+## Content Rights
+
+The Apache License 2.0 applies to the software only. Journalistic content, databases, metadata, images, audio, and video served by an instance are **not** covered by this license: their rights remain with the organization operating the instance and with the respective rights holders.
+
+---
+
+## Related Legal Documents
+
+- [Terms of Use Template](terms-and-conditions-of-use.txt)
+- [Privacy Policy Template](privacy-policy.txt)
+- [Terms of Use and Privacy Policy Templates](terms-and-privacy-templates.md) — how to use the templates and the name policy.
+
+These templates are reference material, not legal advice. Each organization is solely responsible for the documents it publishes and for the instance it operates.
+
+---
+
 ## Full License Text
 
 For the full terms and conditions, please refer to the main **[LICENSE](../../../LICENSE)** file located at the root of this repository.

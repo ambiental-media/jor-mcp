@@ -1,0 +1,109 @@
+Termos e Condições de Uso do [NOME DO SERVIÇO]
+
+
+Boas vindas ao [NOME DO SERVIÇO]!
+
+
+A [RAZÃO SOCIAL DA ORGANIZAÇÃO], pessoa jurídica de direito privado, inscrita no CNPJ sob o no. [CNPJ], com sede na [ENDEREÇO COMPLETO DA SEDE] (“Organização” ou “Nós”), oferece uma ferramenta que permite a sistemas e aplicações compatíveis consultar, localizar e recuperar conteúdos jornalísticos da Organização por meio do protocolo aberto Model Context Protocol (MCP), disponibilizando tais conteúdos para utilização como contexto por agentes de inteligência artificial e outras tecnologias compatíveis (o “[NOME DO SERVIÇO]”, serviço desenvolvido a partir do software de código aberto JOR-MCP).
+
+
+Ao utilizar o [NOME DO SERVIÇO], seja de forma onerosa ou como simples demonstração, o usuário, seja ele pessoa física ou jurídica (“Você” ou “Usuário”), automaticamente concorda com estes Termos de Uso, responsabilizando-se integralmente por todos e quaisquer atos praticados por Você ao utilizar o [NOME DO SERVIÇO]. Caso Você não concorde com qualquer dos termos e condições abaixo estabelecidos, Você não deve utilizar nossos serviços. Para utilizar o [NOME DO SERVIÇO], Você também deve concordar com os termos descritos em nossa Política de Privacidade. Sempre que tecnicamente viável, a Organização poderá solicitar o aceite expresso destes Termos no momento do cadastro ou da emissão das credenciais de acesso.
+
+
+Para entender suas limitações de responsabilidade, veja a Seção 2 (Responsabilidades).
+
+
+Caso queira nos dar algum feedback sobre o [NOME DO SERVIÇO], tenha dúvidas ou precise tratar de qualquer assunto relacionado a estes Termos e Condições de Uso do [NOME DO SERVIÇO] (os “Termos” ou “Termos de Uso”), entre em contato conosco através do e-mail [CONTATO].
+
+
+1. Principais obrigações
+
+
+1.1. O [NOME DO SERVIÇO] e o Acervo. O [NOME DO SERVIÇO] consiste em uma ferramenta disponibilizada pela Organização destinada a permitir que sistemas compatíveis consultem e recuperem conteúdos jornalísticos e informações disponibilizados pela Organização por meio de protocolo compatível com o padrão “Model Context Protocol” (MCP), funcionando como infraestrutura de acesso a conteúdo editorial e não como sistema de inteligência artificial, mecanismo de tomada de decisão automatizada ou serviço de geração de respostas. Para fins destes Termos, o [NOME DO SERVIÇO] constitui exclusivamente a camada tecnológica que viabiliza o acesso e a disponibilização de conteúdos, não se confundindo com o acervo jornalístico da Organização, o qual compreende reportagens, textos, imagens, vídeos, áudios, bases de dados, metadados e demais materiais editoriais disponibilizados por meio da ferramenta (o “Acervo”). A utilização do [NOME DO SERVIÇO] não implica qualquer transferência de titularidade ou cessão de direitos sobre tais conteúdos, que permanecem sujeitos aos direitos de propriedade intelectual e às demais regras aplicáveis estabelecidas pela Organização e por seus respectivos titulares, conforme será detalhado adiante.
+
+
+1.2. Desenvolvimento do JOR-MCP. O JOR-MCP é um software de código aberto desenvolvido pela Associação Ambiental Media e distribuído sob a licença Apache 2.0. A instância do JOR-MCP objeto destes Termos é instalada, configurada e operada sob responsabilidade exclusiva da Organização. A Associação Ambiental Media não é parte destes Termos, não opera esta instância e não assume, em razão do desenvolvimento ou da disponibilização do software, obrigações de operação, hospedagem, manutenção, suporte, segurança, tratamento de dados ou gestão do Acervo, nem responde, por esse fundamento, pelo funcionamento ou pela utilização desta instância.
+
+
+1.3. Acesso. O acesso ao [NOME DO SERVIÇO] poderá depender de cadastro prévio, autenticação, criação de credenciais, fornecimento de informações cadastrais ou adoção de mecanismos técnicos definidos pela Organização, comprometendo-se o Usuário a fornecer informações verdadeiras, completas e atualizadas, bem como a manter a confidencialidade de suas credenciais e responder integralmente por toda atividade realizada por meio de sua conta ou identificador de acesso. Para saber mais sobre a privacidade de seus dados pessoais no [NOME DO SERVIÇO], acesse nossa Política de Privacidade. O [NOME DO SERVIÇO] poderá ser referido como um “Serviço” da Organização nos presentes Termos. Estes Termos regulam exclusivamente o acesso ao Acervo por meio da instância do JOR-MCP operada pela Organização e não se aplicam ao código-fonte do JOR-MCP, distribuído sob a licença Apache 2.0.
+
+
+1.4. Suporte [OPCIONAL]. A Organização compromete-se a fornecer suporte técnico aos usuários para esclarecimento de dúvidas e resolução de problemas relacionados aos serviços, por meio dos canais de comunicação disponíveis, como e-mail ou suporte online. O suporte técnico apontado nesta cláusula refere-se exclusivamente à correção de erros, indisponibilidade, lentidão e outros problemas técnicos relacionados única e exclusivamente ao [NOME DO SERVIÇO] e sobre os quais a Organização tem possibilidade de controle e ingerência, para cuja rápida solução a Organização envidará seus melhores esforços.
+
+
+1.5. Outras questões. Você declara e garante que está de acordo, ainda, com o seguinte:
+
+
+a) Caso o usuário seja uma pessoa jurídica, a pessoa que realiza o procedimento de aceitação dos Termos de Uso em nome da empresa declara ter autoridade para vinculá-la a estes termos.
+
+
+b) O usuário deve cumprir todas as leis aplicáveis e os regulamentos em vigor ao utilizar os Serviços da Organização, incluindo, mas não se limitando a, leis de proteção de dados, direitos autorais e propriedade intelectual.
+
+
+c) O usuário concorda em não utilizar os Serviços da Organização para fins ilegais, fraudulentos, difamatórios, prejudiciais, obscenos ou de qualquer outra forma imprópria.
+
+
+d) O usuário concorda em não violar a segurança dos sistemas da Organização, tentar obter acesso não autorizado ou interferir no funcionamento adequado dos serviços.
+
+
+e) O usuário reconhece que o uso dos serviços da Organização é por sua própria conta e risco, nos limites previstos na Seção 2.
+
+
+f) A Organização poderá modificar, atualizar, expandir, restringir, suspender ou descontinuar funcionalidades do [NOME DO SERVIÇO] a qualquer momento, temporária ou definitivamente, inclusive para manutenção, atualização tecnológica, correção de falhas, razões comerciais, segurança, conformidade legal ou proteção de sua infraestrutura, sem que disso decorra qualquer direito de indenização, ressalvados os direitos assegurados pela legislação aplicável e eventuais condições comerciais contratadas.
+
+
+g) A Organização não garante a disponibilidade contínua e ininterrupta dos serviços, podendo haver interrupções temporárias por motivos técnicos, de segurança ou de manutenção.
+
+
+2. Responsabilidades
+
+
+2.1. Responsabilidade pelo uso. Você é exclusivamente responsável pelo uso do [NOME DO SERVIÇO] e deverá respeitar as regras destes Termos de Uso, bem como a legislação aplicável a seu uso do [NOME DO SERVIÇO]. Você é exclusivamente responsável pelos comandos, consultas, solicitações, integrações, decisões, análises, interpretações e atos praticados com base nos conteúdos obtidos por meio da ferramenta, assumindo integralmente os riscos decorrentes de sua utilização. Na máxima extensão permitida pela legislação aplicável, a Organização não será responsável por danos indiretos, lucros cessantes, perda de oportunidades, perda de dados, interrupções de negócios, falhas de terceiros, indisponibilidades de rede, falhas de provedores externos, resultados produzidos por sistemas de inteligência artificial, decisões tomadas por Você ou por terceiros, nem por consequências decorrentes da utilização do [NOME DO SERVIÇO] em desconformidade com estes Termos.
+
+
+2.2. Independência dos sistemas de IA. A Organização não controla, desenvolve, opera ou supervisiona os sistemas de inteligência artificial de terceiros utilizados para acessar conteúdos por meio do [NOME DO SERVIÇO], não sendo responsável pela forma como tais sistemas interpretam, processam, transformam, resumem, reproduzem ou, de forma geral, apresentam os conteúdos recebidos, nem por informações inexatas, fabricadas ou não fundamentadas que venham a produzir.
+
+
+2.3. Conteúdo jornalístico. O conteúdo disponibilizado por meio do [NOME DO SERVIÇO] faz parte do Acervo e possui natureza predominantemente informativa e editorial, podendo refletir o contexto, as fontes, as informações e o estado do conhecimento disponíveis à época de sua publicação, não constituindo aconselhamento profissional, parecer técnico, recomendação individualizada ou garantia de exatidão permanente. A Organização não garante que conteúdos disponibilizados por meio do [NOME DO SERVIÇO] serão citados, atribuídos, reproduzidos fielmente ou apresentados de forma completa por sistemas de inteligência artificial de terceiros, tampouco garante a precisão, integridade, atualidade ou adequação das respostas produzidas por tais sistemas.
+
+
+2.4. Indenização. Você compromete-se a indenizar e manter a Organização, seus administradores, empregados, representantes e parceiros livres de quaisquer perdas, danos, custos, despesas, condenações ou responsabilidades na medida em que decorram de atos ou omissões imputáveis a Você, tais como violação destes Termos, uso indevido do [NOME DO SERVIÇO] ou do Acervo, violação de direitos de terceiros ou descumprimento da legislação aplicável, observados os requisitos e limites da legislação aplicável.
+
+
+3.1. Licença de uso. Os direitos sobre o Acervo pertencem à Organização ou aos respectivos titulares que autorizaram sua disponibilização. A instância do JOR-MCP operada pela Organização e o Acervo são disponibilizados ao Usuário mediante licença de uso não exclusiva, limitada, revogável, pessoal, intransferível e não sublicenciável, nos limites dos direitos que a Organização detém ou está autorizada a conceder, exclusivamente para consulta, recuperação e acesso aos conteúdos disponibilizados por meio do [NOME DO SERVIÇO], bem como para sua utilização em interações com sistemas compatíveis, p.ex. chatbots criados em “large language models – LLMs”, observados estes Termos, a legislação aplicável e eventuais condições comerciais específicas. A presente licença não implica cessão, transferência ou renúncia de quaisquer direitos de propriedade intelectual da Organização ou de terceiros. 
+
+
+3.2. Direitos reservados. Os direitos de propriedade intelectual sobre o Acervo e sobre os componentes próprios da instância operada pela Organização, incluindo matérias jornalísticas, imagens, códigos-fonte, documentação, estrutura, organização, interface, funcionalidades, bases de dados, elementos visuais, marcas, metadados, taxonomias e demais materiais disponibilizados por meio do [NOME DO SERVIÇO], pertencem à Organização ou a seus respectivos titulares, observadas as licenças aplicáveis, sendo vedada qualquer utilização além daquelas expressamente autorizadas nestes Termos ou pela legislação aplicável, exceto quanto ao código-fonte do JOR-MCP, distribuído sob a licença Apache 2.0, cujos termos se aplicarão, e quanto a componentes de terceiros, regidos por suas respectivas licenças. 
+
+
+3.3. Restrições de uso. Salvo autorização prévia e expressa da Organização, e ressalvado o uso do conteúdo como contexto para respostas de sistemas compatíveis, conforme autorizado na cláusula 3.1, é vedado copiar, reproduzir, modificar, adaptar, traduzir, distribuir, redistribuir, publicar, transmitir, comercializar, licenciar, explorar economicamente ou criar obras, produtos, serviços ou bases derivadas a partir do [NOME DO SERVIÇO] ou do Acervo; remover avisos de autoria ou titularidade; utilizar o conteúdo para treinamento, ajuste fino, avaliação, desenvolvimento ou aprimoramento de modelos de inteligência artificial, sistemas de aprendizado de máquina, datasets, bases de conhecimento persistentes ou repositórios de treinamento; reproduzir sistematicamente parcela substancial do Acervo; realizar raspagem de dados, indexação automatizada, mineração de dados ou coleta massiva de informações; praticar engenharia reversa na medida não permitida pela legislação aplicável; contornar mecanismos de autenticação, limites de uso, quotas, rate limits, controles de tráfego ou medidas de segurança; acessar áreas não autorizadas; interferir no funcionamento da infraestrutura; ou praticar qualquer ato que possa comprometer a integridade, disponibilidade, segurança, finalidade econômica ou funcionamento regular do [NOME DO SERVIÇO]. Não configura violação desta cláusula o armazenamento temporário do conteúdo pelo sistema compatível, na medida necessária à execução das consultas e à manutenção do contexto da interação autorizada, desde que o conteúdo não seja retido além do necessário a essa finalidade nem utilizado para treinamento de modelos ou para constituir bases de conhecimento persistentes. As restrições previstas nesta cláusula não limitam os usos permitidos pela legislação aplicável, incluindo as limitações aos direitos autorais previstas em lei, nem os direitos concedidos pela licença Apache 2.0 sobre o código-fonte do JOR-MCP. A Organização poderá monitorar o uso indevido de sua propriedade intelectual e tomar as medidas legais cabíveis para sua proteção, incluindo ações cíveis indenizatórias e criminais por uso indevido de direitos autorais, quando cabíveis. 
+
+
+3.4. Atribuição da fonte. Sempre que o conteúdo do Acervo for apresentado, citado ou resumido a terceiros, o Usuário deverá, na medida do tecnicamente possível, preservar a atribuição à Organização e aos respectivos autores, bem como as referências à publicação original, incluindo título, data e endereço eletrônico. 
+
+
+3.5. Suspensão e encerramento. Nós nos reservamos o direito de suspender ou cancelar, a qualquer momento, o seu acesso ao [NOME DO SERVIÇO] em caso de suspeita de fraude, obtenção de benefício ou vantagem de forma ilícita, ou pelo não cumprimento de quaisquer condições previstas nestes Termos de Uso, na Política de Privacidade ou na legislação aplicável. A Organização poderá, ainda, suspender temporariamente ou encerrar definitivamente o [NOME DO SERVIÇO], mediante aviso prévio aos usuários, por razões técnicas, operacionais, regulatórias ou de força maior. Ressalvados os direitos assegurados pela legislação aplicável, nenhuma indenização será devida pela Organização em caso de suspensão do serviço. 
+
+
+4. Disposições gerais 
+
+
+4.1. Alterações. Para melhorar sua experiência, o [NOME DO SERVIÇO] está sempre sendo atualizado. Por esse motivo, estes Termos podem ser alterados, a qualquer tempo, a fim de refletir os ajustes realizados. No entanto, sempre que ocorrer qualquer modificação, Você será previamente informado pelo endereço de e-mail fornecido por Você no momento do cadastro, quando houver, ou por outros meios de comunicação disponíveis, incluindo aviso em destaque no site da Organização. Caso Você não concorde com os novos Termos de Uso, Você poderá rejeitá-los, mas isso significa que Você não poderá mais ter acesso e fazer uso do [NOME DO SERVIÇO]. Se de qualquer maneira Você utilizar o [NOME DO SERVIÇO] mesmo após a alteração destes Termos de Uso, isso significa que Você concorda com todas as modificações. 
+
+
+4.2. Autonomia das partes. Cada parte é totalmente responsável por seus atos e obrigações assumidos por meio destes Termos. As partes reconhecem que não têm nenhuma autoridade ou poder para, direta ou indiretamente, negociar, contratar, assumir qualquer tipo de obrigação ou criar responsabilidade em nome da outra parte, sob hipótese alguma. Nenhuma previsão destes Termos deverá ser interpretada de forma a constituir parceria ou vínculo de qualquer natureza, inclusive trabalhista, entre qualquer das partes e/ou entre uma parte e os empregados ou prestadores de serviços da outra parte, bem como não deverá ser interpretada, exceto se consignado expressamente em sentido diverso, de forma a constituir qualquer das partes como agente ou representante da outra parte, nem de criar qualquer relação fiduciária entre as partes. 
+
+
+4.3. Conciliação. As partes elegem a negociação e a conciliação como formas prioritárias para a resolução de quaisquer disputas ou controvérsias decorrentes destes Termos, buscando sempre alcançar uma solução amigável e satisfatória para ambas as partes. 
+
+
+4.4. Invalidade parcial. A invalidade parcial destes Termos não os afetará na parte considerada válida, desde que as obrigações sejam desmembráveis entre si. 
+
+
+4.5. Cessão. O usuário não poderá ceder ou transferir os direitos e obrigações decorrentes dos presentes Termos, no todo ou em parte, a terceiros, sem prévia e expressa anuência da Organização. 
+
+
+4.6. Tolerância. A tolerância de qualquer das partes com relação à exigência do regular e tempestivo cumprimento das obrigações da outra parte ou extensão de prazos concedida por qualquer das partes a outra não constituirá desistência, alteração, modificação ou novação de quaisquer dos direitos ou obrigações estabelecidas por meio destes Termos, constituindo mera liberalidade, o que não impedirá a parte tolerante de exigir da outra o fiel e cabal cumprimento destes Termos a qualquer tempo. 
+
+
+4.7. Lei e foro. Estes Termos de Uso são regidos pelas leis [DO PAÍS], observadas as normas de aplicação obrigatória eventualmente incidentes. Quaisquer dúvidas e situações não previstas nestes Termos de Uso serão primeiramente resolvidas pela Organização e, caso persistam, deverão ser solucionadas pelo Foro da Comarca de [CIDADE], [ESTADO], ressalvadas as hipóteses de competência legal obrigatória, inclusive nas relações de consumo. [CIDADE], [DATA]
