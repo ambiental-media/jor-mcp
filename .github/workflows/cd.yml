@@ -14,11 +14,11 @@ on:
         type: string
  
 env:
-  REGISTRY: us-central1-docker.pkg.dev
-  PROJECT_ID: jor-mcp
-  REPOSITORY: jor-mcp
-  IMAGE: jor-mcp-server
-  REGION: us-central1
+  REGISTRY: ${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID || 'jor-mcp' }}
+  REPOSITORY: ${{ vars.GCP_AR_REPO || 'jor-mcp' }}
+  IMAGE: ${{ vars.GCP_IMAGE_NAME || 'jor-mcp-server' }}
+  REGION: ${{ vars.GCP_REGION || 'us-central1' }}
  
 # Queue overlapping deploys instead of cancelling an in-flight rollout.
 concurrency:
@@ -71,6 +71,7 @@ jobs:
           GCP_PROJECT_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
           # The runtime service account lives in the same project we deploy to.
           GCP_PROJECT_ID: ${{ env.PROJECT_ID }}
+          GCP_REGION: ${{ env.REGION }}
           FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
           WORDPRESS_API_URL: ${{ vars.WORDPRESS_API_URL }}
           MCP_GITHUB_REPOS: ${{ vars.MCP_GITHUB_REPOS }}
@@ -81,13 +82,13 @@ jobs:
           # manifest itself: the image reference, the Secret Manager resource
           # paths, and the service account email. The other variables feed
           # plain env values and may legitimately be left unset.
-          for v in IMAGE_URL GCP_PROJECT_NUMBER GCP_PROJECT_ID; do
+          for v in IMAGE_URL GCP_PROJECT_NUMBER GCP_PROJECT_ID GCP_REGION; do
             [ -n "${!v:-}" ] || { echo "::error::$v is empty"; exit 1; }
           done
 
           # Allowlist form: only these variables are substituted, leaving any
           # other "$" in the manifest untouched.
-          envsubst '${IMAGE_URL} ${GCP_PROJECT_NUMBER} ${GCP_PROJECT_ID} ${FIREBASE_PROJECT_ID} ${WORDPRESS_API_URL} ${MCP_GITHUB_REPOS} ${OTEL_EXPORTER_OTLP_ENDPOINT} ${FIREBASE_WEB_API_KEY}' \
+          envsubst '${IMAGE_URL} ${GCP_PROJECT_NUMBER} ${GCP_PROJECT_ID} ${GCP_REGION} ${FIREBASE_PROJECT_ID} ${WORDPRESS_API_URL} ${MCP_GITHUB_REPOS} ${OTEL_EXPORTER_OTLP_ENDPOINT} ${FIREBASE_WEB_API_KEY}' \
             < service.yaml > service.rendered.yaml
           echo "----- Rendered manifest -----"
           cat service.rendered.yaml

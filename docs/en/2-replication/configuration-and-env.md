@@ -14,7 +14,7 @@ Jor-MCP is designed as a fully serverless platform on **Google Cloud Platform (G
 
 1.  **Google Cloud Run:** Hosts the stateless, containerized Python `jor-mcp` ASGI server.
 2.  **Google Cloud Storage (GCS):** Hosts the static web portal assets for the Next.js consent portal (`jor-mcp-site`).
-3.  **Google Cloud Firestore:** A NoSQL document database used in Datastore mode. It stores monthly rate limits, dynamically registered OAuth clients (DCR), and short-lived authorization codes.
+3.  **Google Cloud Firestore:** A NoSQL document database in Native mode. It stores monthly rate limits, dynamically registered OAuth clients (DCR), and short-lived authorization codes.
 4.  **Google Cloud Identity Platform / Firebase Auth:** Handles Google SSO authentication and mints secure JSON Web Tokens (JWTs).
 5.  **External WordPress REST API:** The target CMS site where editorial articles are published.
 6.  **External GitHub REST API:** Target repository hosting multilingual editorial metadata in JSON files.

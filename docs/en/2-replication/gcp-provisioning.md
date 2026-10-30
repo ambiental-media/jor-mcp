@@ -18,6 +18,10 @@ export FIRESTORE_LOCATION="nam5"
 export DOMAIN="mcp.example.org"
 export AR_REPO="jor-mcp"
 export SERVICE="jor-mcp-server"
+export GCS_BUCKET="jor-mcp-site-${PROJECT_ID}"
+# SERVICE and AR_REPO are wired into the repository: SERVICE must equal
+# service.yaml `metadata.name` and the GCP_IMAGE_NAME variable below, and
+# AR_REPO must equal the GCP_AR_REPO variable.
 
 # Point gcloud to the project
 gcloud config set project "$PROJECT_ID"
@@ -29,6 +33,28 @@ export CI_SA="github-actions-ci@${PROJECT_ID}.iam.gserviceaccount.com"
 ```
 
 Reference: [`gcloud config set`](https://cloud.google.com/sdk/gcloud/reference/config/set) · [`gcloud projects describe`](https://cloud.google.com/sdk/gcloud/reference/projects/describe)
+
+## Step 0.1 – Repository configuration
+
+The GitHub Actions workflows read the deployment targets from repository
+variables, so a fork deploys to its own project without editing any file. An
+unset variable falls back to the Ambiental Media deployment, so set all of them
+before enabling the workflows. Configure in **Settings → Secrets and variables →
+Actions**:
+
+| Type | Name | Value |
+| :--- | :--- | :--- |
+| Variable | `GCP_PROJECT_ID` | `$PROJECT_ID` |
+| Variable | `GCP_PROJECT_NUMBER` | `$PROJECT_NUMBER` |
+| Variable | `GCP_REGION` | `$REGION` |
+| Variable | `GCP_AR_REPO` | `$AR_REPO` |
+| Variable | `GCP_IMAGE_NAME` | `$SERVICE` |
+| Variable | `FIREBASE_PROJECT_ID` | `$PROJECT_ID` |
+| Variable | `WORDPRESS_API_URL` | Base URL of your WordPress API |
+| Variable | `MCP_GITHUB_REPOS` | `org/repo-a,org/repo-b` |
+| Variable | `OTEL_EXPORTER_OTLP_ENDPOINT` | Leave empty unless you run an OTLP collector |
+| Variable | `FIREBASE_WEB_API_KEY` | Value from step 6.1 |
+| Secret | `GCP_SA_KEY` | base64 key created in step 3 |
 
 ## Step 1 – APIs
 
@@ -68,9 +94,9 @@ Reference: [`gcloud artifacts repositories create`](https://cloud.google.com/sdk
 | Service account | Purpose | Roles |
 | :--- | :--- | :--- |
 | `jor-mcp-runner` | Cloud Run runtime identity | Project: `datastore.user`, `secretmanager.secretAccessor`, `cloudtrace.agent`, `logging.logWriter`, `monitoring.metricWriter`, `firebaseauth.admin`. On itself: `iam.serviceAccountTokenCreator` |
-| `github-actions-ci` | Image publishing and deploys from GitHub Actions | Project: `artifactregistry.admin`, `run.admin`, `run.sourceDeveloper`, `secretmanager.secretAccessor`. On `jor-mcp-runner`: `iam.serviceAccountUser` |
+| `github-actions-ci` | Image publishing and deploys from GitHub Actions | Project: `artifactregistry.writer`, `run.admin`. On `MCP_GITHUB_TOKEN` and `JWT_SECRET`: `secretmanager.secretAccessor` (only if a deploy rejects the secret). On `jor-mcp-runner`: `iam.serviceAccountUser` |
 
-The reason for each runtime role is described in section 2 of the [Deployment Guide](deployment-guide.md).
+The reason for each runtime role is described in section 2 of the [Deployment Guide](deployment-guide.md). `roles/run.sourceDeveloper` is not required: it only covers `gcloud run deploy --source`, which no workflow uses.
 
 ```bash
 # Runtime SA for Cloud Run
@@ -93,8 +119,7 @@ gcloud iam service-accounts create github-actions-ci \
   --display-name="github-actions-ci" \
   --description="Used by GitHub Actions to push images and deploy to Cloud Run"
 
-for ROLE in roles/artifactregistry.admin roles/run.admin roles/run.sourceDeveloper \
-            roles/secretmanager.secretAccessor; do
+for ROLE in roles/artifactregistry.writer roles/run.admin; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${CI_SA}" --role="$ROLE" --condition=None
 done
@@ -103,12 +128,16 @@ done
 gcloud iam service-accounts add-iam-policy-binding "$RUNNER_SA" \
   --member="serviceAccount:${CI_SA}" --role="roles/iam.serviceAccountUser"
 
-# JSON key for GitHub Actions (base64-encoded, as the workflows expect)
-gcloud iam service-accounts keys create github-actions-ci-key.json --iam-account="$CI_SA"
-base64 -w0 github-actions-ci-key.json > github-actions-ci-key.b64
+# JSON key for GitHub Actions, written OUTSIDE the repository
+KEY_DIR="$(mktemp -d)"
+gcloud iam service-accounts keys create "${KEY_DIR}/github-actions-ci-key.json" --iam-account="$CI_SA"
+base64 -w0 "${KEY_DIR}/github-actions-ci-key.json" > "${KEY_DIR}/github-actions-ci-key.b64"
+echo "Paste ${KEY_DIR}/github-actions-ci-key.b64 into the GCP_SA_KEY secret, then delete: ${KEY_DIR}"
 ```
 
-On macOS, use `base64 -i github-actions-ci-key.json > github-actions-ci-key.b64`. The `.b64` file content is the `GCP_SA_KEY` repository secret described in section 8 of the [Deployment Guide](deployment-guide.md).
+On macOS, use `base64 -i "${KEY_DIR}/github-actions-ci-key.json" > "${KEY_DIR}/github-actions-ci-key.b64"`. The `.b64` file content is the `GCP_SA_KEY` repository secret described in section 8 of the [Deployment Guide](deployment-guide.md).
+
+> **Prefer keyless authentication.** This guide uses a long-lived service account key because the current workflows expect `GCP_SA_KEY`. [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation) (`google-github-actions/auth` with `workload_identity_provider`) removes the key and its rotation burden entirely. If you keep the key, rotate it at least every 90 days and never write it inside the repository.
 
 Reference: [`gcloud iam service-accounts create`](https://cloud.google.com/sdk/gcloud/reference/iam/service-accounts/create) · [`gcloud projects add-iam-policy-binding`](https://cloud.google.com/sdk/gcloud/reference/projects/add-iam-policy-binding) · [`gcloud iam service-accounts add-iam-policy-binding`](https://cloud.google.com/sdk/gcloud/reference/iam/service-accounts/add-iam-policy-binding) · [`gcloud iam service-accounts keys create`](https://cloud.google.com/sdk/gcloud/reference/iam/service-accounts/keys/create)
 
@@ -122,6 +151,15 @@ printf '%s' "ghp_xxx" | gcloud secrets create MCP_GITHUB_TOKEN \
 # Random value
 openssl rand -hex 32 | tr -d '\n' | gcloud secrets create JWT_SECRET \
   --replication-policy=automatic --data-file=-
+
+# Optional: grant the CI SA read access to these two secrets only.
+# Cloud Run resolves mounted secrets with the runtime identity, so the deployer
+# normally needs nothing here. Add it only if a deploy fails with
+# "Permission denied on secret".
+for SECRET in MCP_GITHUB_TOKEN JWT_SECRET; do
+  gcloud secrets add-iam-policy-binding "$SECRET" \
+    --member="serviceAccount:${CI_SA}" --role="roles/secretmanager.secretAccessor"
+done
 ```
 
 Reference: [`gcloud secrets create`](https://cloud.google.com/sdk/gcloud/reference/secrets/create)
@@ -135,12 +173,16 @@ gcloud firestore databases create \
 # Point-in-time recovery
 gcloud firestore databases update --database="(default)" --enable-pitr
 
+# Reclaim expired per-IP rate-limit windows (see configuration-and-env.md §2.1)
+gcloud firestore fields ttls update expires_at \
+  --collection-group=ip_rate_limits --enable-ttl
+
 # Daily backup, kept for 98 days
 gcloud firestore backups schedules create \
   --database="(default)" --recurrence=daily --retention=98d
 ```
 
-Reference: [`gcloud firestore databases create`](https://cloud.google.com/sdk/gcloud/reference/firestore/databases/create) · [`gcloud firestore databases update`](https://cloud.google.com/sdk/gcloud/reference/firestore/databases/update) · [`gcloud firestore backups schedules create`](https://cloud.google.com/sdk/gcloud/reference/firestore/backups/schedules/create)
+Reference: [`gcloud firestore databases create`](https://cloud.google.com/sdk/gcloud/reference/firestore/databases/create) · [`gcloud firestore databases update`](https://cloud.google.com/sdk/gcloud/reference/firestore/databases/update) · [`gcloud firestore fields ttls update`](https://cloud.google.com/sdk/gcloud/reference/firestore/fields/ttls/update) · [`gcloud firestore backups schedules create`](https://cloud.google.com/sdk/gcloud/reference/firestore/backups/schedules/create)
 
 ## Step 6 – Firebase Auth
 
@@ -188,14 +230,18 @@ docker push "$IMAGE_URL"
 # Values injected into service.yaml
 export GCP_PROJECT_ID="$PROJECT_ID"
 export GCP_PROJECT_NUMBER="$PROJECT_NUMBER"
+export GCP_REGION="$REGION"
 export FIREBASE_PROJECT_ID="$PROJECT_ID"
 export WORDPRESS_API_URL="https://example.org/wp-json"
 export MCP_GITHUB_REPOS="org/repo-a,org/repo-b"
-export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4318"
+# Leave empty unless you run an OTLP collector. A dead endpoint makes every
+# batch retry and fail (see configuration-and-env.md §2.4). To export spans,
+# also add OTEL_TRACES_EXPORTER=otlp to service.yaml.
+export OTEL_EXPORTER_OTLP_ENDPOINT=""
 # FIREBASE_WEB_API_KEY was exported in step 6.1
 
 # Render and deploy the service
-envsubst '${IMAGE_URL} ${GCP_PROJECT_NUMBER} ${GCP_PROJECT_ID} ${FIREBASE_PROJECT_ID} ${WORDPRESS_API_URL} ${MCP_GITHUB_REPOS} ${OTEL_EXPORTER_OTLP_ENDPOINT} ${FIREBASE_WEB_API_KEY}' \
+envsubst '${IMAGE_URL} ${GCP_PROJECT_NUMBER} ${GCP_PROJECT_ID} ${GCP_REGION} ${FIREBASE_PROJECT_ID} ${WORDPRESS_API_URL} ${MCP_GITHUB_REPOS} ${OTEL_EXPORTER_OTLP_ENDPOINT} ${FIREBASE_WEB_API_KEY}' \
   < service.yaml | gcloud run services replace - --region="$REGION"
 
 # Allow unauthenticated invocations (access is restricted by ingress and enforced by the app)
@@ -205,12 +251,19 @@ gcloud run services add-iam-policy-binding "$SERVICE" \
 
 Reference: [`gcloud auth configure-docker`](https://cloud.google.com/sdk/gcloud/reference/auth/configure-docker) · [`docker build`](https://docs.docker.com/reference/cli/docker/buildx/build/) · [`docker push`](https://docs.docker.com/reference/cli/docker/image/push/) · [`gcloud run services replace`](https://cloud.google.com/sdk/gcloud/reference/run/services/replace) · [`gcloud run services add-iam-policy-binding`](https://cloud.google.com/sdk/gcloud/reference/run/services/add-iam-policy-binding)
 
-## Step 8 – Load balancer and Cloud Armor
+## Step 8 – Load balancer (Cloud Armor optional)
 
 ```
-HTTPS :443  ip-lb-jor-mcp → lb-jor-mcp-target-proxy (cert-ip-jor-mcp) → lb-jor-mcp → back-end-jor-mcp (+ Cloud Armor) → neg-cloudrun-jor-mcp → Cloud Run
+HTTPS :443  ip-lb-jor-mcp → lb-jor-mcp-target-proxy (cert-ip-jor-mcp) → lb-jor-mcp
+              ├── /mcp/*, /api/oauth/*, /.well-known/*  → back-end-jor-mcp → neg-cloudrun-jor-mcp → Cloud Run
+              └── /* (default)                          → back-end-bucket-jor-mcp (Cloud CDN → GCS)
+            back-end-jor-mcp carries Cloud Armor when it is enabled (step 8.2)
 HTTP  :80   ip-lb-jor-mcp-forwarding-rule → ip-lb-jor-mcp-target-proxy → ip-lb-jor-mcp-redirect (301 → HTTPS)
 ```
+
+Cloud Armor is optional: the server already rate-limits per user in Firestore,
+and the policy adds a fixed monthly cost. Enable step 8.2 only if you expect
+volumetric abuse.
 
 **8.1 – IP, NEG and backend service**
 
@@ -223,7 +276,7 @@ gcloud compute network-endpoint-groups create neg-cloudrun-jor-mcp \
 
 gcloud compute backend-services create back-end-jor-mcp \
   --global --load-balancing-scheme=EXTERNAL_MANAGED --protocol=HTTPS \
-  --enable-logging --logging-sample-rate=1.0
+  --timeout=3600s --enable-logging --logging-sample-rate=0.1
 gcloud compute backend-services add-backend back-end-jor-mcp --global \
   --network-endpoint-group=neg-cloudrun-jor-mcp --network-endpoint-group-region="$REGION"
 ```
@@ -241,10 +294,45 @@ gcloud compute backend-services update back-end-jor-mcp --global \
   --security-policy=jor-mcp-backend-policy
 ```
 
-**8.3 – URL map, certificate and HTTPS frontend**
+**8.3 – Frontend bucket, URL map, certificate and HTTPS frontend**
+
+The URL map splits traffic: `/mcp/*`, `/api/oauth/*` and `/.well-known/*` go to
+Cloud Run, everything else is served by the static portal in the GCS bucket
+(see [Load Balancer Configuration](load-balancer-config.md) §3).
 
 ```bash
-gcloud compute url-maps create lb-jor-mcp --global --default-service=back-end-jor-mcp
+# Static portal bucket, served through Cloud CDN
+gcloud storage buckets create "gs://${GCS_BUCKET}" \
+  --location="$REGION" --uniform-bucket-level-access
+# Upload the portal build output to the bucket root before going further.
+gcloud compute backend-buckets create back-end-bucket-jor-mcp \
+  --gcs-bucket-name="$GCS_BUCKET" --enable-cdn
+
+# The heredoc is unquoted on purpose: ${PROJECT_ID} and ${DOMAIN} must expand.
+gcloud compute url-maps import lb-jor-mcp --global --quiet <<EOF
+name: lb-jor-mcp
+defaultService: projects/${PROJECT_ID}/global/backendBuckets/back-end-bucket-jor-mcp
+hostRules:
+- hosts:
+  - ${DOMAIN}
+  pathMatcher: jor-mcp-paths
+pathMatchers:
+- name: jor-mcp-paths
+  defaultService: projects/${PROJECT_ID}/global/backendBuckets/back-end-bucket-jor-mcp
+  pathRules:
+  - paths:
+    - /mcp
+    - /mcp/*
+    service: projects/${PROJECT_ID}/global/backendServices/back-end-jor-mcp
+  - paths:
+    - /api/oauth
+    - /api/oauth/*
+    service: projects/${PROJECT_ID}/global/backendServices/back-end-jor-mcp
+  - paths:
+    - /.well-known
+    - /.well-known/*
+    service: projects/${PROJECT_ID}/global/backendServices/back-end-jor-mcp
+EOF
 
 gcloud compute ssl-certificates create cert-ip-jor-mcp --global --domains="$DOMAIN"
 
@@ -274,7 +362,7 @@ gcloud compute forwarding-rules create ip-lb-jor-mcp-forwarding-rule --global \
   --address=static-ip-addr-jor-mcp --target-http-proxy=ip-lb-jor-mcp-target-proxy --ports=80
 ```
 
-Reference: [`addresses create`](https://cloud.google.com/sdk/gcloud/reference/compute/addresses/create) · [`network-endpoint-groups create`](https://cloud.google.com/sdk/gcloud/reference/compute/network-endpoint-groups/create) · [`backend-services create`](https://cloud.google.com/sdk/gcloud/reference/compute/backend-services/create) · [`backend-services add-backend`](https://cloud.google.com/sdk/gcloud/reference/compute/backend-services/add-backend) · [`backend-services update`](https://cloud.google.com/sdk/gcloud/reference/compute/backend-services/update) · [`security-policies create`](https://cloud.google.com/sdk/gcloud/reference/compute/security-policies/create) · [`security-policies rules create`](https://cloud.google.com/sdk/gcloud/reference/compute/security-policies/rules/create) · [`url-maps create`](https://cloud.google.com/sdk/gcloud/reference/compute/url-maps/create) · [`url-maps import`](https://cloud.google.com/sdk/gcloud/reference/compute/url-maps/import) · [`ssl-certificates create`](https://cloud.google.com/sdk/gcloud/reference/compute/ssl-certificates/create) · [`target-https-proxies create`](https://cloud.google.com/sdk/gcloud/reference/compute/target-https-proxies/create) · [`target-http-proxies create`](https://cloud.google.com/sdk/gcloud/reference/compute/target-http-proxies/create) · [`forwarding-rules create`](https://cloud.google.com/sdk/gcloud/reference/compute/forwarding-rules/create)
+Reference: [`addresses create`](https://cloud.google.com/sdk/gcloud/reference/compute/addresses/create) · [`network-endpoint-groups create`](https://cloud.google.com/sdk/gcloud/reference/compute/network-endpoint-groups/create) · [`backend-services create`](https://cloud.google.com/sdk/gcloud/reference/compute/backend-services/create) · [`backend-services add-backend`](https://cloud.google.com/sdk/gcloud/reference/compute/backend-services/add-backend) · [`backend-services update`](https://cloud.google.com/sdk/gcloud/reference/compute/backend-services/update) · [`security-policies create`](https://cloud.google.com/sdk/gcloud/reference/compute/security-policies/create) · [`security-policies rules create`](https://cloud.google.com/sdk/gcloud/reference/compute/security-policies/rules/create) · [`backend-buckets create`](https://cloud.google.com/sdk/gcloud/reference/compute/backend-buckets/create) · [`storage buckets create`](https://cloud.google.com/sdk/gcloud/reference/storage/buckets/create) · [`url-maps import`](https://cloud.google.com/sdk/gcloud/reference/compute/url-maps/import) · [`ssl-certificates create`](https://cloud.google.com/sdk/gcloud/reference/compute/ssl-certificates/create) · [`target-https-proxies create`](https://cloud.google.com/sdk/gcloud/reference/compute/target-https-proxies/create) · [`target-http-proxies create`](https://cloud.google.com/sdk/gcloud/reference/compute/target-http-proxies/create) · [`forwarding-rules create`](https://cloud.google.com/sdk/gcloud/reference/compute/forwarding-rules/create)
 
 ## Step 9 – DNS and certificate
 
@@ -295,11 +383,14 @@ Reference: [`ssl-certificates describe`](https://cloud.google.com/sdk/gcloud/ref
 Each authorized user is a document in the `allowed_users` collection: the document ID is the lowercase Google email, `status` must be `active` and `tier` is `basic` or `pro`.
 
 ```bash
-EMAIL="journalist@example.org"
+EMAIL="journalist@example.org"   # document IDs are always lowercase (see deployment-guide.md §5.1)
+# URL-encode the ID: the local part may contain characters that are not path-safe
+DOC_ID="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1].lower(), safe=""))' "$EMAIL")"
 curl -sS -X POST \
   -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "x-goog-user-project: $PROJECT_ID" \
   -H "Content-Type: application/json" \
-  "https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/allowed_users?documentId=${EMAIL}" \
+  "https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/allowed_users?documentId=${DOC_ID}" \
   -d '{"fields":{"status":{"stringValue":"active"},"tier":{"stringValue":"basic"}}}'
 ```
 

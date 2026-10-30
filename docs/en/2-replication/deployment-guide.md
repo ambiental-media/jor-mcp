@@ -205,14 +205,22 @@ We use a multi-stage `Dockerfile` to keep the production image secure and lightw
 
 If your organization is replicating `jor-mcp` using a fork or a cloned repository, you can utilize the included GitHub Actions workflows (`.github/workflows/`) to automate building your Docker images and deploying them to Google Cloud Run.
 
-### 8.1 Configuring Repository Secrets
-To enable the deployment workflows in your repository, navigate to **Settings > Secrets and variables > Actions** in your GitHub repository and define the following secrets:
+### 8.1 Configuring Repository Variables and Secrets
+To enable the deployment workflows in your repository, navigate to **Settings > Secrets and variables > Actions** in your GitHub repository. The workflows read the deployment targets from repository **variables**, so a fork deploys to its own project without editing any file.
 
-| Secret Name | Description | Example / Resource |
-| :--- | :--- | :--- |
-| `GCP_SA_KEY` | JSON key of a GCP Service Account with permissions to write to Artifact Registry and deploy to Cloud Run. | *(Required)* |
-| `GCP_PROJECT_ID` | Your Google Cloud project ID. | `my-mcp-project-123` |
-| `GCP_PROJECT_NUMBER` | Your Google Cloud project number (used in the Knative service annotations). | `959918358302` |
+| Type | Name | Description | Example |
+| :--- | :--- | :--- | :--- |
+| Secret | `GCP_SA_KEY` | base64-encoded JSON key of the deployment service account (see [GCP Provisioning Guide](gcp-provisioning.md) step 3). | *(Required)* |
+| Variable | `GCP_PROJECT_ID` | Your Google Cloud project ID. | `my-mcp-project-123` |
+| Variable | `GCP_PROJECT_NUMBER` | Your Google Cloud project number (used in the Knative service annotations). | `959918358302` |
+| Variable | `GCP_REGION` | Region of the Cloud Run service and Artifact Registry repository. | `us-central1` |
+| Variable | `GCP_AR_REPO` | Artifact Registry repository name. | `jor-mcp` |
+| Variable | `GCP_IMAGE_NAME` | Image name; must equal `service.yaml` `metadata.name`. | `jor-mcp-server` |
+| Variable | `FIREBASE_PROJECT_ID` | Firebase / Identity Platform project. | `my-mcp-project-123` |
+| Variable | `WORDPRESS_API_URL` | Base URL of the WordPress REST API. | `https://example.org/wp-json` |
+| Variable | `MCP_GITHUB_REPOS` | Comma-separated `owner/repo` list. | `org/repo-a,org/repo-b` |
+| Variable | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP collector endpoint. Leave empty unless you run one. | *(empty)* |
+| Variable | `FIREBASE_WEB_API_KEY` | Firebase Web API key used for token exchange. | `AIza...` |
 
 ### 8.2 Available Workflows
 Our repository contains pre-configured workflows that you can adapt:
@@ -237,13 +245,14 @@ Export the required environment variables and use `envsubst` to replace the plac
 export IMAGE_URL="us-central1-docker.pkg.dev/jor-mcp/jor-mcp/jor-mcp-server:SHA"
 export GCP_PROJECT_NUMBER="959918358302"
 export GCP_PROJECT_ID="jor-mcp"
+export GCP_REGION="us-central1"
 export FIREBASE_PROJECT_ID="..."
 export WORDPRESS_API_URL="..."
 export MCP_GITHUB_REPOS="..."
 export OTEL_EXPORTER_OTLP_ENDPOINT="..."
 export FIREBASE_WEB_API_KEY="..."
 
-for v in IMAGE_URL GCP_PROJECT_NUMBER GCP_PROJECT_ID; do
+for v in IMAGE_URL GCP_PROJECT_NUMBER GCP_PROJECT_ID GCP_REGION; do
   : "${!v:?set $v before running envsubst}"
 done
 
@@ -252,6 +261,6 @@ envsubst < service.yaml | gcloud run services replace - --region us-central1
 
 ### In the CD pipeline (GitHub Actions)
 
-The variables above are injected automatically as repository secrets and variables. The `envsubst` command is executed by the pipeline before calling `gcloud run services replace`, so no manual substitution is needed.
+The variables above are injected automatically from the repository variables. The `envsubst` command is executed by the pipeline before calling `gcloud run services replace`, so no manual substitution is needed.
 
 After `gcloud run services replace`, the pipeline also enforces the `roles/run.invoker` binding for `allUsers`, guaranteeing the no-authentication state on every deploy.

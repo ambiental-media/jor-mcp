@@ -16,10 +16,10 @@ jobs:
     if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.actor != 'jor-mcp-gh-release[bot]'
 
     env:
-      REGISTRY: us-central1-docker.pkg.dev
-      PROJECT_ID: jor-mcp
-      REPOSITORY: jor-mcp
-      IMAGE: jor-mcp-server
+      REGISTRY: ${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID || 'jor-mcp' }}
+      REPOSITORY: ${{ vars.GCP_AR_REPO || 'jor-mcp' }}
+      IMAGE: ${{ vars.GCP_IMAGE_NAME || 'jor-mcp-server' }}
 
     steps:
       - name: Generate GitHub App Token

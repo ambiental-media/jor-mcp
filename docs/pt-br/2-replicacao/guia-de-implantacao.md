@@ -208,14 +208,22 @@ Usamos um `Dockerfile` de múltiplos estágios para manter a imagem de produçã
 
 Se sua organização está replicando o `jor-mcp` usando um fork ou repositório clonado, você pode utilizar os workflows integrados do GitHub Actions (`.github/workflows/`) para automatizar as compilações de suas imagens Docker e as implantações no Google Cloud Run.
 
-### 8.1 Configurando Segredos do Repositório
-Para habilitar os workflows de implantação no seu repositório, navegue até **Settings > Secrets and variables > Actions** no GitHub e defina os seguintes segredos:
+### 8.1 Configurando Variáveis e Segredos do Repositório
+Para habilitar os workflows de implantação no seu repositório, navegue até **Settings > Secrets and variables > Actions** no GitHub. Os workflows leem os destinos de deploy das **variáveis** do repositório, então um fork faz deploy no próprio projeto sem editar nenhum arquivo.
 
-| Nome do Segredo | Descrição | Exemplo / Recurso |
-| :--- | :--- | :--- |
-| `GCP_SA_KEY` | Chave JSON de uma Conta de Serviço do GCP com permissões para gravar no Artifact Registry e implantar no Cloud Run. | *(Obrigatório)* |
-| `GCP_PROJECT_ID` | O ID do seu projeto no Google Cloud. | `meu-projeto-mcp-123` |
-| `GCP_PROJECT_NUMBER` | O número do seu projeto no Google Cloud (usado nas anotações do serviço Knative). | `959918358302` |
+| Tipo | Nome | Descrição | Exemplo |
+| :--- | :--- | :--- | :--- |
+| Secret | `GCP_SA_KEY` | Chave JSON da conta de serviço de deploy, codificada em base64 (veja o [Guia de Provisionamento GCP](provisionamento-gcp.md) passo 3). | *(Obrigatório)* |
+| Variable | `GCP_PROJECT_ID` | O ID do seu projeto no Google Cloud. | `meu-projeto-mcp-123` |
+| Variable | `GCP_PROJECT_NUMBER` | O número do seu projeto no Google Cloud (usado nas anotações do serviço Knative). | `959918358302` |
+| Variable | `GCP_REGION` | Região do serviço Cloud Run e do repositório Artifact Registry. | `us-central1` |
+| Variable | `GCP_AR_REPO` | Nome do repositório no Artifact Registry. | `jor-mcp` |
+| Variable | `GCP_IMAGE_NAME` | Nome da imagem; deve ser igual ao `metadata.name` do `service.yaml`. | `jor-mcp-server` |
+| Variable | `FIREBASE_PROJECT_ID` | Projeto do Firebase / Identity Platform. | `meu-projeto-mcp-123` |
+| Variable | `WORDPRESS_API_URL` | URL base da API REST do WordPress. | `https://example.org/wp-json` |
+| Variable | `MCP_GITHUB_REPOS` | Lista de `owner/repo` separada por vírgulas. | `org/repo-a,org/repo-b` |
+| Variable | `OTEL_EXPORTER_OTLP_ENDPOINT` | Endpoint do coletor OTLP. Deixe vazio, a menos que você rode um. | *(vazio)* |
+| Variable | `FIREBASE_WEB_API_KEY` | Chave Web API do Firebase usada na troca de tokens. | `AIza...` |
 
 ### 8.2 Workflows Disponíveis
 Nosso repositório contém workflows pré-configurados que você pode adaptar:
@@ -240,13 +248,14 @@ Exporte as variáveis de ambiente necessárias e use `envsubst` para substituir 
 export IMAGE_URL="us-central1-docker.pkg.dev/jor-mcp/jor-mcp/jor-mcp-server:SHA"
 export GCP_PROJECT_NUMBER="959918358302"
 export GCP_PROJECT_ID="jor-mcp"
+export GCP_REGION="us-central1"
 export FIREBASE_PROJECT_ID="..."
 export WORDPRESS_API_URL="..."
 export MCP_GITHUB_REPOS="..."
 export OTEL_EXPORTER_OTLP_ENDPOINT="..."
 export FIREBASE_WEB_API_KEY="..."
 
-for v in IMAGE_URL GCP_PROJECT_NUMBER GCP_PROJECT_ID; do
+for v in IMAGE_URL GCP_PROJECT_NUMBER GCP_PROJECT_ID GCP_REGION; do
   : "${!v:?defina $v antes de executar o envsubst}"
 done
 
@@ -255,6 +264,6 @@ envsubst < service.yaml | gcloud run services replace - --region us-central1
 
 ### No pipeline de CD (GitHub Actions)
 
-As variáveis acima são injetadas automaticamente como segredos e variáveis do repositório. O comando `envsubst` é executado pelo pipeline antes de chamar `gcloud run services replace`, portanto, nenhuma substituição manual é necessária.
+As variáveis acima são injetadas automaticamente a partir das variáveis do repositório. O comando `envsubst` é executado pelo pipeline antes de chamar `gcloud run services replace`, portanto, nenhuma substituição manual é necessária.
 
 Após o `gcloud run services replace`, o pipeline também aplica o binding `roles/run.invoker` para `allUsers`, garantindo o estado sem autenticação em cada deploy.
