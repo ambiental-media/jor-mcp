@@ -2,6 +2,32 @@
 
 <!-- version list -->
 
+## v0.13.2 (2026-10-30)
+
+### Bug Fixes
+
+- **deps**: Bump authlib, dnspython and msgpack to patched versions
+  ([#86](https://github.com/ambiental-media/jor-mcp/pull/86),
+  [`836bbc6`](https://github.com/ambiental-media/jor-mcp/commit/836bbc6b702440f14d74c7c1add0ee4832e87513))
+
+### Documentation
+
+- Add step-by-step GCP provisioning guide for replication
+  ([#86](https://github.com/ambiental-media/jor-mcp/pull/86),
+  [`836bbc6`](https://github.com/ambiental-media/jor-mcp/commit/836bbc6b702440f14d74c7c1add0ee4832e87513))
+
+- Harden GCP provisioning guide for replication.
+  ([#86](https://github.com/ambiental-media/jor-mcp/pull/86),
+  [`836bbc6`](https://github.com/ambiental-media/jor-mcp/commit/836bbc6b702440f14d74c7c1add0ee4832e87513))
+
+- Publish post-launch technical metrics report
+  ([#84](https://github.com/ambiental-media/jor-mcp/pull/84),
+  [`4ef16d4`](https://github.com/ambiental-media/jor-mcp/commit/4ef16d4cb1ed08a24bac334870e0e0fe61ed5b04))
+
+- Technical metrics update ([#85](https://github.com/ambiental-media/jor-mcp/pull/85),
+  [`7cfe33a`](https://github.com/ambiental-media/jor-mcp/commit/7cfe33af2f5f6fa477c8479b72d26f8e96172b14))
+
+
 ## v0.13.1 (2026-10-12)
 
 ### Bug Fixes
