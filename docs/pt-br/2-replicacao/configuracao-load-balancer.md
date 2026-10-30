@@ -5,6 +5,10 @@
 
 # Configuração do Load Balancer Global
 
+> **Comandos:** a configuração executável está no
+> [Guia de Provisionamento GCP](provisionamento-gcp.md) passo 8. Este documento
+> explica *por que* cada peça existe e como o roteamento deve ficar.
+
 ## 1. Visão Geral
 O Global External Application Load Balancer atua como o único ponto de entrada para `jormcp.ambiental.media`. Ele tem duas funções críticas:
 1.  **Terminação SSL/TLS:** Gerencia o certificado SSL gerenciado pelo Google.

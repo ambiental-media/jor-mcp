@@ -38,7 +38,13 @@ dev = [
 ]
 
 [tool.uv]
-constraint-dependencies = ["joserfc>=1.6.7"]
+constraint-dependencies = [
+    "joserfc>=1.6.7",
+    # Security floors: keep the patched versions from being re-resolved down
+    "authlib>=1.9.1",
+    "dnspython>=2.9.1",
+    "msgpack>=1.2.4",
+]
 
 [tool.ruff]
 line-length = 100

@@ -4,10 +4,10 @@ on:
   pull_request:
 
 env:
-  REGISTRY: us-central1-docker.pkg.dev
-  PROJECT_ID: jor-mcp
-  REPOSITORY: jor-mcp
-  IMAGE: jor-mcp-server
+  REGISTRY: ${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID || 'jor-mcp' }}
+  REPOSITORY: ${{ vars.GCP_AR_REPO || 'jor-mcp' }}
+  IMAGE: ${{ vars.GCP_IMAGE_NAME || 'jor-mcp-server' }}
 
 jobs:
 
