@@ -8,6 +8,7 @@ Welcome, AI Agent. This `AGENTS.md` file defines the standard operating procedur
 - **Language:** Python >= 3.12
 - **Core Libraries:** `fastmcp`, `uvicorn`, `httpx` (async), `pyjwt`, `opentelemetry`
 - **Dependency Manager:** `uv`
+- **Consent Portal:** `portal/` (Next.js static export, npm), deployed to GCS behind the load balancer. It is a separate npm project: `make check` never invokes Node.
 
 ---
 
@@ -18,6 +19,7 @@ Before making any changes, you **must read and adhere to the rules defined in `C
 - Enforcing strict typing, linting (`ruff`), and formatting.
 - Ensuring all new code maintains the **90% test coverage minimum**.
 - **Validation:** After writing or modifying code, use the `make check` command to run all linters, formatters, type checkers, and tests at once. Do not propose a Pull Request or consider a task finished until `make check` passes completely.
+- **Portal validation:** Run `make check-portal` after any change under `portal/`; it installs, audits, tests, and builds both deployment profiles. `make check-docs` guards living documentation.
 - **Documentation Sync:** For every proposed change, you MUST review and update the `docs/` directory to ensure it accurately reflects the new code, new environment variables, or new architecture. Never submit code changes without checking if the technical, deployment, or usage documentation needs updating.
 
 ---

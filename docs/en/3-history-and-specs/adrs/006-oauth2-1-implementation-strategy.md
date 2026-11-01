@@ -5,6 +5,8 @@
 
 # ADR 006: Native MCP OAuth 2.1 Implementation Strategy
 
+> **Superseded for the consent UI by [ADR 008](008-self-contained-consent-portal.md).**
+
 ## 1. The "Why" (Context)
 *   **Goal:** Provide a "zero-configuration" login experience for non-technical journalists using Claude Desktop.
 *   **Problem:** Claude Desktop does not support interactive browser logins natively unless the server implements the strict MCP OAuth 2.1 protocol (PKCE + Dynamic Client Registration).

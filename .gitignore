@@ -33,3 +33,14 @@ requirements-ci.txt
 # GCP service account keys — never commit
 *-key.json
 *-key.json.b64
+
+# Portal (Next.js static export)
+portal/node_modules/
+portal/.next/
+portal/out/
+portal/coverage/
+portal/dist/
+portal/dist-*/
+
+# Keep the template, ignore real local env files
+!portal/.env.example

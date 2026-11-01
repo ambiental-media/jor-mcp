@@ -1,4 +1,4 @@
-.PHONY: check check-lint check-format check-types check-tests check-sast check-deps check-container run _audit-fail-hint
+.PHONY: check check-lint check-format check-types check-tests check-sast check-deps check-container check-portal check-docs run _audit-fail-hint
 
 # Run all code quality validations
 check:
@@ -67,6 +67,35 @@ _audit-fail-hint:
 	@echo "      uv lock --upgrade-package <vuln-lib>"
 	@echo "======================================================================"
 	@echo ""
+
+# Portal: install, lint, test with coverage and build both deployment profiles
+check-portal:
+	cd portal && npm ci
+	cd portal && npm run lint
+	cd portal && npm run format:check
+	cd portal && npm audit --audit-level=high
+	cd portal && npm run test:coverage
+	cd portal && NEXT_PUBLIC_FIREBASE_API_KEY=dummy \
+		NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=dummy.firebaseapp.com \
+		NEXT_PUBLIC_FIREBASE_PROJECT_ID=dummy \
+		NEXT_PUBLIC_FIREBASE_APP_ID=dummy npm run build
+	cd portal && bash scripts/prepare-dist.sh out dist-standalone
+	cd portal && PORTAL_ASSET_PREFIX=/authorize-static \
+		NEXT_PUBLIC_FIREBASE_API_KEY=dummy \
+		NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=dummy.firebaseapp.com \
+		NEXT_PUBLIC_FIREBASE_PROJECT_ID=dummy \
+		NEXT_PUBLIC_FIREBASE_APP_ID=dummy npm run build
+	cd portal && bash scripts/prepare-dist.sh out dist-overlay /authorize-static
+
+# Docs: living documentation must not reference the retired external repo
+check-docs:
+	@if grep -rn "jor-mcp-site" README.md README_pt-br.md CONTRIBUTING.md \
+		CONTRIBUTING_pt-br.md docs/README.md docs/README_pt-br.md \
+		docs/en/1-technical docs/en/2-replication \
+		docs/pt-br/1-tecnico docs/pt-br/2-replicacao; then \
+		echo "Living documentation must not reference jor-mcp-site."; \
+		exit 1; \
+	fi
 
 # Container scan: scan the Docker image for vulnerabilities
 check-container:

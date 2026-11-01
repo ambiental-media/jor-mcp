@@ -50,6 +50,7 @@ Ao implantar sua própria instância do `jor-mcp`, sua redação pode capacitar 
 *   **Integração com GitHub:** Consulte repositórios internos, pesquise dados e bases de código associadas às suas investigações jornalísticas.
 *   **Acesso Seguro:** A autenticação baseada em token (JWT) garante que apenas agentes de IA autorizados ou sistemas internos possam acessar seus dados.
 *   **Containerizado:** Fácil de implantar em qualquer lugar usando Docker.
+*   **Portal de Consentimento Incluído:** A interface de consentimento OAuth 2.1 vem em `portal/`, então o repositório basta para provisionar um servidor funcional.
 *   **Facilmente Forkável:** Projetado para ser facilmente clonado, configurado via variáveis de ambiente e implantado em infraestrutura de nuvem padrão.
 
 ## Documentação
@@ -64,8 +65,10 @@ A documentação abrangente para todos os públicos está disponível no diretó
 
 ### Pré-requisitos
 
-Para executar sua própria instância do `jor-mcp`, você só precisa de um runtime de container:
+Para executar sua própria instância do `jor-mcp`, você precisa de um runtime de container:
 *   [Docker](https://www.docker.com/) (ou alternativas de código aberto como [Colima](https://github.com/abiosoft/colima) ou [Podman](https://podman.io/)).
+
+Para compilar o portal de consentimento incluído, você também precisa de [Node.js 24+ e npm](https://nodejs.org/).
 
 ### Instalação via Docker (Recomendado)
 

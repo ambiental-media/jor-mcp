@@ -13,7 +13,7 @@ Este documento fornece uma lista abrangente de todas as variáveis de ambiente e
 O Jor-MCP foi projetado como uma plataforma totalmente serverless no **Google Cloud Platform (GCP)**. Os seguintes recursos principais devem ser configurados:
 
 1.  **Google Cloud Run:** Hospeda o servidor ASGI Python `jor-mcp` baseado em containers de forma stateless.
-2.  **Google Cloud Storage (GCS):** Hospeda os ativos estáticos do portal de consentimento Next.js (`jor-mcp-site`).
+2.  **Google Cloud Storage (GCS):** Hospeda os ativos estáticos do portal de consentimento (`portal/`).
 3.  **Google Cloud Firestore:** Banco de dados de documentos NoSQL no modo Native. Ele armazena limites de taxa mensais, clientes OAuth registrados dinamicamente (DCR) e códigos de autorização temporários.
 4.  **Google Cloud Identity Platform / Firebase Auth:** Gerencia a autenticação Google SSO e emite JSON Web Tokens (JWTs) seguros.
 5.  **API REST externa do WordPress:** O site CMS de destino onde os artigos editoriais são publicados.
@@ -50,6 +50,9 @@ de outra forma permitiria a qualquer pessoa inundar o Firestore via `POST /api/o
 *   `OAUTH_CODE_TTL_SECONDS` (Padrão: `"600"`): Tempo de vida dos códigos de autorização emitidos.
 *   `ALLOWED_USERS_COLLECTION` (Padrão: `"allowed_users"`): Lista branca no Firestore contendo e-mails autorizados.
 *   `FIREBASE_WEB_API_KEY` (Obrigatório em produção): A Web API Key encontrada nas configurações do seu projeto Firebase, usada para a troca segura de tokens.
+*   `OAUTH_ALLOWED_REDIRECT_HOSTS` (Padrão: vazio → apenas loopback): Hosts separados por vírgula que os clientes podem registrar como destino de redirecionamento além de `localhost`. Conectores remotos (Claude web, ChatGPT, Braintrust) precisam do host aqui. Hosts fora de loopback precisam usar `https`; loopback pode usar `http`. O registro e a aprovação de consentimento rejeitam qualquer outro com `invalid_redirect_uri` / `invalid_request`.
+
+`OAUTH_SERVER_BASE_URL`, `OAUTH_PORTAL_BASE_URL`, `CORS_ALLOWED_ORIGINS` e `OAUTH_ALLOWED_REDIRECT_HOSTS` são definidas a partir de `${DOMAIN}` e de uma lista fixa de clientes no `service.yaml`, para que uma implantação replicada anuncie o próprio domínio em vez do domínio de referência.
 
 ### 2.3 Configurações de Fontes de Conteúdo Externas
 *   `WORDPRESS_API_URL` (Padrão: `"https://ambiental.media/wp-json"`): URL base da API do CMS WordPress de destino.
@@ -64,6 +67,17 @@ de outra forma permitiria a qualquer pessoa inundar o Firestore via `POST /api/o
 *   `OTEL_EXPORTER_OTLP_ENDPOINT` (Opcional): Endpoint do coletor usado quando `OTEL_TRACES_EXPORTER=otlp`.
 *   `OTEL_SERVICE_NAME` (Padrão: `"jor-mcp"`): Nome do serviço registrado nos rastreamentos.
 *   `GCP_PROJECT_ID` (Opcional no Cloud Run, obrigatório fora dele): ID do projeto GCP usado para vincular as entradas de log aos rastreamentos no Cloud Logging. No Cloud Run, é lido das credenciais do ambiente quando ausente. Em qualquer outro lugar precisa ser informado, caso contrário os campos de correlação são omitidos de todas as entradas de log.
+
+### 2.5 Build do Portal de Consentimento (`portal/`)
+
+A interface de consentimento é uma exportação estática do Next.js. Estes valores são embutidos no momento do build pelo workflow de implantação do portal, não são lidos em tempo de execução:
+
+*   `NEXT_PUBLIC_FIREBASE_API_KEY`: mesmo valor de `FIREBASE_WEB_API_KEY`.
+*   `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`: domínio do Firebase Auth do projeto.
+*   `NEXT_PUBLIC_FIREBASE_PROJECT_ID`: id do projeto Firebase.
+*   `NEXT_PUBLIC_FIREBASE_APP_ID`: id do aplicativo web Firebase.
+*   `NEXT_PUBLIC_OAUTH_BACKEND_URL` (Padrão: mesma origem): origem do backend usada pela página de consentimento.
+*   `PORTAL_ASSET_PREFIX` (Padrão: vazio): deixe vazio no perfil standalone; defina um caminho como `/authorize-static` apenas quando outro site compartilhar o host e for dono de `/_next`.
 
 ---
 

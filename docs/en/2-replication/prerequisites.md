@@ -20,6 +20,7 @@
 - [Google Cloud CLI (`gcloud`)](https://cloud.google.com/sdk/docs/install), authenticated with `gcloud auth login`
 - [Firebase CLI](https://firebase.google.com/docs/cli)
 - [Docker](https://docs.docker.com/get-started/get-docker/)
+- [Node.js 24+ with npm](https://nodejs.org/) — only needed to build or deploy the consent portal in `portal/`
 - [`envsubst`](https://www.gnu.org/software/gettext/manual/html_node/envsubst-Invocation.html) (`gettext` package)
 - `curl` and `openssl`
 

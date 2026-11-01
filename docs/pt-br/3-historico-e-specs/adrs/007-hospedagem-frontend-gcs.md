@@ -5,6 +5,8 @@
 
 # ADR 007: Estratégia de Hospedagem Frontend (Bucket GCS)
 
+> **Substituído, para a interface de consentimento, pelo [ADR 008](008-portal-de-consentimento-autocontido.md). A divisão de buckets descrita aqui não se aplica mais ao portal de consentimento.**
+
 ## 1. Contexto
 O projeto Jor-MCP exige a hospedagem da landing page `jor-mcp-site` (Next.js) e da interface interativa de consentimento OAuth 2.1 (`/authorize`) no mesmo domínio personalizado (`jormcp.ambiental.media`) da API backend Python FastMCP. Utilizamos um Global External Application Load Balancer do Google Cloud como ponto de entrada principal para gerenciar TLS e roteamento de URL.
 

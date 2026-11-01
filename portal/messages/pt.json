@@ -1,0 +1,22 @@
+{
+  "authorize": {
+    "title": "Autorizar acesso",
+    "consentIntro": "Um aplicativo ({clientName}) está solicitando acesso à sua conta Ambiental Media para consultar o conteúdo jornalístico do Jor-MCP.",
+    "loginTitle": "Entre para continuar",
+    "signInWithGoogle": "Entrar com o Google",
+    "loggedInAs": "Conectado como {email}",
+    "authorizeButton": "Permitir acesso",
+    "cancel": "Cancelar",
+    "useAnotherAccount": "Usar outra conta",
+    "accessDeniedTitle": "Acesso negado",
+    "accessDenied": "Esta conta não tem autorização para acessar o Jor-MCP. Entre em contato com a Ambiental Media.",
+    "accessErrorTitle": "Erro de conexão",
+    "accessError": "Não foi possível verificar sua autorização no momento. Verifique sua conexão e tente novamente.",
+    "retry": "Tentar novamente",
+    "missingParams": "Requisição inválida: parâmetros de autorização ausentes.",
+    "errors": {
+      "signIn": "Não foi possível entrar com o Google. Tente novamente.",
+      "authorize": "Falha ao autorizar o acesso. Tente novamente."
+    }
+  }
+}

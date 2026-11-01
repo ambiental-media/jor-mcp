@@ -52,6 +52,14 @@ spec:
               value: "${OTEL_EXPORTER_OTLP_ENDPOINT}"
             - name: FIREBASE_WEB_API_KEY
               value: "${FIREBASE_WEB_API_KEY}"
+            - name: OAUTH_SERVER_BASE_URL
+              value: "https://${DOMAIN}"
+            - name: OAUTH_PORTAL_BASE_URL
+              value: "https://${DOMAIN}"
+            - name: CORS_ALLOWED_ORIGINS
+              value: "https://${DOMAIN}"
+            - name: OAUTH_ALLOWED_REDIRECT_HOSTS
+              value: "claude.ai,chatgpt.com,www.braintrust.dev"
 
             # ── Secrets via Secret Manager ───────────────────────────────────
             - name: MCP_GITHUB_TOKEN

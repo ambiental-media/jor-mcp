@@ -18,7 +18,7 @@ export FIRESTORE_LOCATION="nam5"
 export DOMAIN="mcp.example.org"
 export AR_REPO="jor-mcp"
 export SERVICE="jor-mcp-server"
-export GCS_BUCKET="jor-mcp-site-${PROJECT_ID}"
+export GCS_PORTAL_BUCKET="jor-mcp-portal-${PROJECT_ID}"
 # SERVICE and AR_REPO are wired into the repository: SERVICE must equal
 # service.yaml `metadata.name` and the GCP_IMAGE_NAME variable below, and
 # AR_REPO must equal the GCP_AR_REPO variable.
@@ -241,7 +241,7 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=""
 # FIREBASE_WEB_API_KEY was exported in step 6.1
 
 # Render and deploy the service
-envsubst '${IMAGE_URL} ${GCP_PROJECT_NUMBER} ${GCP_PROJECT_ID} ${GCP_REGION} ${FIREBASE_PROJECT_ID} ${WORDPRESS_API_URL} ${MCP_GITHUB_REPOS} ${OTEL_EXPORTER_OTLP_ENDPOINT} ${FIREBASE_WEB_API_KEY}' \
+envsubst '${IMAGE_URL} ${GCP_PROJECT_NUMBER} ${GCP_PROJECT_ID} ${GCP_REGION} ${FIREBASE_PROJECT_ID} ${WORDPRESS_API_URL} ${MCP_GITHUB_REPOS} ${OTEL_EXPORTER_OTLP_ENDPOINT} ${FIREBASE_WEB_API_KEY} ${DOMAIN}' \
   < service.yaml | gcloud run services replace - --region="$REGION"
 
 # Allow unauthenticated invocations (access is restricted by ingress and enforced by the app)
@@ -256,7 +256,7 @@ Reference: [`gcloud auth configure-docker`](https://cloud.google.com/sdk/gcloud/
 ```
 HTTPS :443  ip-lb-jor-mcp → lb-jor-mcp-target-proxy (cert-ip-jor-mcp) → lb-jor-mcp
               ├── /mcp/*, /api/oauth/*, /.well-known/*  → back-end-jor-mcp → neg-cloudrun-jor-mcp → Cloud Run
-              └── /* (default)                          → back-end-bucket-jor-mcp (Cloud CDN → GCS)
+              └── /* (default)                          → back-end-bucket-jor-mcp (Cloud CDN → portal bucket)
             back-end-jor-mcp carries Cloud Armor when it is enabled (step 8.2)
 HTTP  :80   ip-lb-jor-mcp-forwarding-rule → ip-lb-jor-mcp-target-proxy → ip-lb-jor-mcp-redirect (301 → HTTPS)
 ```
@@ -294,7 +294,7 @@ gcloud compute backend-services update back-end-jor-mcp --global \
   --security-policy=jor-mcp-backend-policy
 ```
 
-**8.3 – Frontend bucket, URL map, certificate and HTTPS frontend**
+**8.3 – Portal bucket, URL map, certificate and HTTPS frontend**
 
 The URL map splits traffic: `/mcp/*`, `/api/oauth/*` and `/.well-known/*` go to
 Cloud Run, everything else is served by the static portal in the GCS bucket
@@ -302,11 +302,15 @@ Cloud Run, everything else is served by the static portal in the GCS bucket
 
 ```bash
 # Static portal bucket, served through Cloud CDN
-gcloud storage buckets create "gs://${GCS_BUCKET}" \
+gcloud storage buckets create "gs://${GCS_PORTAL_BUCKET}" \
   --location="$REGION" --uniform-bucket-level-access
-# Upload the portal build output to the bucket root before going further.
+# Objects must be publicly readable for the backend bucket to serve them.
+gcloud storage buckets add-iam-policy-binding "gs://${GCS_PORTAL_BUCKET}" \
+  --member=allUsers --role=roles/storage.objectViewer
+# The cd-portal.yml workflow uploads the export. For a manual run:
+#   gcloud storage rsync portal/out "gs://${GCS_PORTAL_BUCKET}" --recursive
 gcloud compute backend-buckets create back-end-bucket-jor-mcp \
-  --gcs-bucket-name="$GCS_BUCKET" --enable-cdn
+  --gcs-bucket-name="$GCS_PORTAL_BUCKET" --enable-cdn
 
 # The heredoc is unquoted on purpose: ${PROJECT_ID} and ${DOMAIN} must expand.
 gcloud compute url-maps import lb-jor-mcp --global --quiet <<EOF
@@ -363,6 +367,36 @@ gcloud compute forwarding-rules create ip-lb-jor-mcp-forwarding-rule --global \
 ```
 
 Reference: [`addresses create`](https://cloud.google.com/sdk/gcloud/reference/compute/addresses/create) · [`network-endpoint-groups create`](https://cloud.google.com/sdk/gcloud/reference/compute/network-endpoint-groups/create) · [`backend-services create`](https://cloud.google.com/sdk/gcloud/reference/compute/backend-services/create) · [`backend-services add-backend`](https://cloud.google.com/sdk/gcloud/reference/compute/backend-services/add-backend) · [`backend-services update`](https://cloud.google.com/sdk/gcloud/reference/compute/backend-services/update) · [`security-policies create`](https://cloud.google.com/sdk/gcloud/reference/compute/security-policies/create) · [`security-policies rules create`](https://cloud.google.com/sdk/gcloud/reference/compute/security-policies/rules/create) · [`backend-buckets create`](https://cloud.google.com/sdk/gcloud/reference/compute/backend-buckets/create) · [`storage buckets create`](https://cloud.google.com/sdk/gcloud/reference/storage/buckets/create) · [`url-maps import`](https://cloud.google.com/sdk/gcloud/reference/compute/url-maps/import) · [`ssl-certificates create`](https://cloud.google.com/sdk/gcloud/reference/compute/ssl-certificates/create) · [`target-https-proxies create`](https://cloud.google.com/sdk/gcloud/reference/compute/target-https-proxies/create) · [`target-http-proxies create`](https://cloud.google.com/sdk/gcloud/reference/compute/target-http-proxies/create) · [`forwarding-rules create`](https://cloud.google.com/sdk/gcloud/reference/compute/forwarding-rules/create)
+
+**8.5 – Optional: overlay an existing site on the same host**
+
+Skip this section when the consent portal is the only site on the host.
+
+If another site already owns the default backend, keep it and add path rules for the consent routes. Build the portal with `PORTAL_ASSET_PREFIX=/authorize-static` so its asset tree does not collide with the other site's `/_next`.
+
+```bash
+gcloud compute url-maps export lb-jor-mcp --destination=lb-jor-mcp.yaml --global
+# add the path rules below to pathMatchers[0].pathRules
+gcloud compute url-maps import lb-jor-mcp --source=lb-jor-mcp.yaml --global
+```
+
+```yaml
+pathRules:
+  # the /mcp, /api/oauth and /.well-known rules stay unchanged
+  - paths:
+      - /authorize
+      - /authorize/*
+      - /pt/authorize
+      - /pt/authorize/*
+      - /en/authorize
+      - /en/authorize/*
+      - /authorize-static/*
+    service: projects/${PROJECT_ID}/global/backendBuckets/back-end-bucket-jor-mcp
+```
+
+Set the repository variable `PORTAL_ASSET_PREFIX=/authorize-static` and redeploy the portal. To roll back, remove the rules: the previous site's consent copy becomes reachable again.
+
+CDN invalidation stays scoped to `/authorize*`, `/pt/authorize*` and `/en/authorize*`. Never use `/*` here — it would flush the other site's cache.
 
 ## Step 9 – DNS and certificate
 

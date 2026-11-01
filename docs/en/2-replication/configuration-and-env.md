@@ -13,7 +13,7 @@ This document provides a comprehensive list of all environment variables and clo
 Jor-MCP is designed as a fully serverless platform on **Google Cloud Platform (GCP)**. The following primary resources must be configured:
 
 1.  **Google Cloud Run:** Hosts the stateless, containerized Python `jor-mcp` ASGI server.
-2.  **Google Cloud Storage (GCS):** Hosts the static web portal assets for the Next.js consent portal (`jor-mcp-site`).
+2.  **Google Cloud Storage (GCS):** Hosts the static web portal assets of the consent portal (`portal/`).
 3.  **Google Cloud Firestore:** A NoSQL document database in Native mode. It stores monthly rate limits, dynamically registered OAuth clients (DCR), and short-lived authorization codes.
 4.  **Google Cloud Identity Platform / Firebase Auth:** Handles Google SSO authentication and mints secure JSON Web Tokens (JWTs).
 5.  **External WordPress REST API:** The target CMS site where editorial articles are published.
@@ -50,6 +50,9 @@ otherwise let anyone flood Firestore through `POST /api/oauth/register`.
 *   `OAUTH_CODE_TTL_SECONDS` (Default: `"600"`): Lifetime of issued authorization codes.
 *   `ALLOWED_USERS_COLLECTION` (Default: `"allowed_users"`): Firestore whitelist collection of user emails.
 *   `FIREBASE_WEB_API_KEY` (Required in production): The Web API Key found in your Firebase project settings, used for secure token exchange.
+*   `OAUTH_ALLOWED_REDIRECT_HOSTS` (Default: empty → loopback only): Comma-separated hosts that clients may register as a redirect target besides `localhost`. Remote connectors (Claude web, ChatGPT, Braintrust) need their host here. Non-loopback hosts must use `https`; loopback may use `http`. Registration and consent approval both reject anything else with `invalid_redirect_uri` / `invalid_request`.
+
+`OAUTH_SERVER_BASE_URL`, `OAUTH_PORTAL_BASE_URL`, `CORS_ALLOWED_ORIGINS` and `OAUTH_ALLOWED_REDIRECT_HOSTS` are set from `${DOMAIN}` and a fixed client list in `service.yaml`, so a replicated deployment advertises its own domain instead of the reference one.
 
 ### 2.3 External Content Source Configurations
 *   `WORDPRESS_API_URL` (Default: `"https://ambiental.media/wp-json"`): Base URL of the target WordPress CMS API.
@@ -64,6 +67,17 @@ otherwise let anyone flood Firestore through `POST /api/oauth/register`.
 *   `OTEL_EXPORTER_OTLP_ENDPOINT` (Optional): Collector endpoint used when `OTEL_TRACES_EXPORTER=otlp`.
 *   `OTEL_SERVICE_NAME` (Default: `"jor-mcp"`): Registered service name in spans.
 *   `GCP_PROJECT_ID` (Optional on Cloud Run, required elsewhere): GCP Project ID used to link log entries with Cloud Logging traces. On Cloud Run it is read from the ambient credentials when unset. Anywhere else it must be provided, otherwise the trace correlation fields are omitted from every log entry.
+
+### 2.5 Consent Portal Build (`portal/`)
+
+The consent UI is a static Next.js export. These values are inlined at build time by the portal deployment workflow, not read at runtime:
+
+*   `NEXT_PUBLIC_FIREBASE_API_KEY`: same value as `FIREBASE_WEB_API_KEY`.
+*   `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`: Firebase Auth domain of the project.
+*   `NEXT_PUBLIC_FIREBASE_PROJECT_ID`: Firebase project id.
+*   `NEXT_PUBLIC_FIREBASE_APP_ID`: Firebase web app id.
+*   `NEXT_PUBLIC_OAUTH_BACKEND_URL` (Default: same origin): backend origin used by the consent page.
+*   `PORTAL_ASSET_PREFIX` (Default: empty): leave empty in the standalone profile; set to a path such as `/authorize-static` only when another site shares the host and owns `/_next`.
 
 ---
 
