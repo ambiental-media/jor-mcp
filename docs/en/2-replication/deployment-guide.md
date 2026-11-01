@@ -196,6 +196,8 @@ For a comprehensive guide detailing every environment variable and resource conf
 
 > **Upgrading an existing deployment:** set the `DOMAIN` repository variable before the next backend deploy; `cd.yml` now refuses to render the manifest without it. The manifest also replaces the previous CORS default with `https://${DOMAIN}` and adds `OAUTH_ALLOWED_REDIRECT_HOSTS`.
 
+> **CDN and HTML caching:** backend-bucket responses are cached using the object's `Cache-Control`; the default is up to one hour. Every portal deploy, and every change to the consent path rules, must be followed by invalidation of `/authorize*`, `/pt/authorize*` and `/en/authorize*`. On a shared host never use `/*`, which would flush the other site's cache. `cd-portal.yml` performs the scoped invalidation.
+
 ---
 
 ## 7. Dockerization Strategy
