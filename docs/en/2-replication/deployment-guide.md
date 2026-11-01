@@ -250,6 +250,16 @@ Our repository contains pre-configured workflows that you can adapt:
 
 For detailed documentation on the internal testing gates, versioning mechanisms, and detailed pipeline jobs, please refer to the **[Contributing Guide](../../../CONTRIBUTING.md#continuous-integration-ci)**.
 
+### 8.3 Rolling Back the Portal
+
+The consent portal has no legacy copy to fall back to. Roll back by redeploying the last known-good build:
+
+```bash
+gh workflow run cd-portal.yml --repo <owner>/<repo> -f ref=vX.Y.Z
+```
+
+The workflow re-syncs `GCS_PORTAL_BUCKET` and invalidates `/authorize*`, `/pt/authorize*` and `/en/authorize*`. Removing the load balancer path rules is not a rollback: those routes then return 404.
+
 ---
 
 ## 9. Declarative Service Manifest

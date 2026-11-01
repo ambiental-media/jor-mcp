@@ -63,4 +63,4 @@ Historical documents under `docs/*/3-history-and-specs/` keep their original ref
 ## 7. Migration and Rollback
 New deployments follow the standalone provisioning steps and never create a second site.
 
-Existing deployments that serve another site apply the overlay appendix: create the portal bucket, add the path rules, set `PORTAL_ASSET_PREFIX` and deploy. Rollback removes the four path rules; the previous site's consent copy becomes reachable again.
+Existing deployments that serve another site apply the overlay appendix: create the portal bucket, add the path rules, set `PORTAL_ASSET_PREFIX` and deploy. Once the external consent copy has been removed, rollback no longer restores it: redeploy the last known-good portal build with the `cd-portal` workflow (pass its tag as `ref`), which re-syncs the bucket and invalidates `/authorize*`, `/pt/authorize*` and `/en/authorize*`. Removing the four path rules is not a rollback to the old page — those objects were deleted from the site bucket — it only takes the consent routes offline.

@@ -63,4 +63,4 @@ Documentos históricos em `docs/*/3-history-and-specs/` mantêm as referências 
 ## 7. Migração e Reversão
 Novas implantações seguem os passos standalone e nunca criam um segundo site.
 
-Implantações existentes que servem outro site aplicam o apêndice de sobreposição: criar o bucket do portal, adicionar as regras de caminho, definir `PORTAL_ASSET_PREFIX` e implantar. A reversão remove as quatro regras de caminho; a cópia de consentimento do site anterior volta a ficar acessível.
+Implantações existentes que servem outro site aplicam o apêndice de sobreposição: criar o bucket do portal, adicionar as regras de caminho, definir `PORTAL_ASSET_PREFIX` e implantar. Depois que a cópia externa de consentimento é removida, a reversão não a restaura mais: reimplante o último build bom do portal com o workflow `cd-portal` (passando a tag em `ref`), que ressincroniza o bucket e invalida `/authorize*`, `/pt/authorize*` e `/en/authorize*`. Remover as quatro regras de caminho não é reversão para a página antiga — esses objetos foram apagados do bucket do site — apenas tira as rotas de consentimento do ar.
