@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v0.14.0 (2026-11-01)
+
+### Documentation
+
+- Legal framework ([#87](https://github.com/ambiental-media/jor-mcp/pull/87),
+  [`92782c2`](https://github.com/ambiental-media/jor-mcp/commit/92782c2e6001b7e35d1ac47c6222e42b175c143c))
+
+### Features
+
+- **portal**: Move OAuth consent UI in-repo and allowlist redirect hosts
+  ([#88](https://github.com/ambiental-media/jor-mcp/pull/88),
+  [`47617ac`](https://github.com/ambiental-media/jor-mcp/commit/47617ac3834a223c7a331355cceefcb9bb75d854))
+
+
 ## v0.13.2 (2026-10-30)
 
 ### Bug Fixes
