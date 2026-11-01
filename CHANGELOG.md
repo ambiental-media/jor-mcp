@@ -2,6 +2,21 @@
 
 <!-- version list -->
 
+## v0.15.0 (2026-11-01)
+
+### Documentation
+
+- Close replication gaps for the consent portal
+  ([#89](https://github.com/ambiental-media/jor-mcp/pull/89),
+  [`b15f148`](https://github.com/ambiental-media/jor-mcp/commit/b15f148fe34537176a63c373d8d4572e9ec2c822))
+
+### Features
+
+- **portal**: Move OAuth consent UI in-repo and allowlist redirect hosts
+  ([#89](https://github.com/ambiental-media/jor-mcp/pull/89),
+  [`b15f148`](https://github.com/ambiental-media/jor-mcp/commit/b15f148fe34537176a63c373d8d4572e9ec2c822))
+
+
 ## v0.14.0 (2026-11-01)
 
 ### Documentation
