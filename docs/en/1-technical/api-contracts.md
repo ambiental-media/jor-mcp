@@ -130,7 +130,7 @@ and returns more posts, only the first `limit` entries are normalised.
 
 ## 4. OAuth 2.1 Proxy Endpoints (Internal API)
 
-These endpoints are used internally to facilitate the Native MCP OAuth 2.1 flow between Claude Desktop, the `jor-mcp-site` Next.js portal, and the `jor-mcp` backend.
+These endpoints are used internally to facilitate the Native MCP OAuth 2.1 flow between Claude Desktop, the consent portal (`portal/`, Next.js), and the `jor-mcp` backend.
 
 ### Consistent Error Semantics
 All OAuth endpoints follow this standard error schema for non-2xx responses:
@@ -143,7 +143,7 @@ All OAuth endpoints follow this standard error schema for non-2xx responses:
 
 ### CORS Policy
 All `/api/oauth/*` routes are served behind a CORS middleware so the browser-based
-consent portal (`jor-mcp-site`) can call them via AJAX. They also bypass Firebase
+consent portal can call them via AJAX. They also bypass Firebase
 authentication and the per-user monthly quota — they are the mechanism through which
 clients obtain Firebase tokens in the first place. In their place, a per-IP limit
 applies (see below).
@@ -231,6 +231,7 @@ load balancer must route `/.well-known/*` to the backend NEG.
 *   `redirect_uris` is required (non-empty); unknown client metadata fields are ignored.
 *   **Force public client:** `token_endpoint_auth_method` is always overwritten to `"none"`.
 *   **Loopback normalization:** any `127.0.0.1` host in `redirect_uris` is rewritten to `localhost`.
+*   **Redirect host allowlist:** loopback hosts are always accepted and may use `http`; any other host must be listed in `OAUTH_ALLOWED_REDIRECT_HOSTS` and must use `https`. A rejected host returns `400 invalid_redirect_uri`, which is what prevents open registration from sending a victim's code to an attacker's callback.
 *   A `client_id` (UUID) is generated and the client persisted to the `oauth_clients` Firestore collection.
 *   Invalid JSON returns `400 invalid_request`; invalid metadata returns `400 invalid_client_metadata`.
 
@@ -257,13 +258,13 @@ load balancer must route `/.well-known/*` to the backend NEG.
 
 ### 4.2 Consent Approval
 **Endpoint:** `POST /api/oauth/approve`
-**Purpose:** Called by the `jor-mcp-site` (Next.js) after the user clicks "Allow". Requires CORS.
+**Purpose:** Called by the consent portal (`portal/`, Next.js) after the user clicks "Allow". Requires CORS.
 
 **Server-side behavior:**
 *   **Authentication:** requires `Authorization: Bearer <Firebase_ID_Token>`, verified via `firebase-admin`. Missing/invalid token returns `401 invalid_token`.
 *   `client_id` and `code_challenge` are required; only `code_challenge_method = "S256"` is accepted.
 *   The `client_id` must exist in `oauth_clients`, otherwise `400 invalid_client`.
-*   `redirect_uri` is optional: when present it is loopback-normalized and must match a registered URI (else `400 invalid_request`); when absent the client's first registered URI is used.
+*   `redirect_uri` is optional: when present it is loopback-normalized and must match a registered URI (else `400 invalid_request`); when absent the client's first registered URI is used. The resolved URI is re-checked against `OAUTH_ALLOWED_REDIRECT_HOSTS`, so a client registered before the allowlist existed cannot receive a code for a disallowed host.
 *   **Allow-list and role:** the user's email (from the JWT) must exist in the `allowed_users` collection with `status == "active"` **and** a valid `tier` (`"basic"` or `"pro"`). A valid token whose email is missing/not whitelisted/not active, or whose document carries no assigned role, returns `403 access_denied`. The list is curated manually by Ambiental Media (e.g. Firebase console); access is Google-SSO only.
 *   **Role sync:** on success the Firestore role is mirrored into the user's `tier` custom claim on Firebase Auth, which is where the middlewares read it from on every request.
 *   A random `authorization_code` is generated and stored in `oauth_codes` together with the `code_challenge`, `uid`, `redirect_uri` and a short expiry (`OAUTH_CODE_TTL_SECONDS`, default 600s).

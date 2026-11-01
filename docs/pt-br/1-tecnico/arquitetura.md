@@ -85,7 +85,7 @@ sequenceDiagram
 
 ## 3. Tecnologias Principais
 
-- **Hospedagem Frontend:** `Google Cloud Storage` e `Cloud CDN` para cache global na borda (edge) dos ativos estáticos do Next.js.
+- **Hospedagem do Portal de Consentimento:** `Google Cloud Storage` e `Cloud CDN` para a exportação estática Next.js em `portal/`.
 - **Framework:** `fastmcp` (Servidor ASGI impulsionado pelo `uvicorn`).
 - **Cliente HTTP:** `httpx` (Pool de conexões assíncronas).
 - **Segurança:** `firebase-admin` (validação de JWT) e `google-cloud-firestore` (limitação de taxa).

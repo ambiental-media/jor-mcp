@@ -1,0 +1,49 @@
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/Figtree-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/Figtree-SemiBold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/Figtree-Bold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('../fonts/Figtree-ExtraBold.ttf') format('truetype');
+}
+
+/* The consent page sizes everything in rem, assuming a 10px root. */
+html {
+  font-size: 62.5%;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Figtree', sans-serif;
+  font-size: 1.6rem;
+  color: #5c5c5c;
+  background: #fff6ea;
+}

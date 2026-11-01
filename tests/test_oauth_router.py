@@ -211,7 +211,7 @@ def test_register_forces_public_client_and_normalizes_loopback(
             "client_name": "Claude Desktop",
             "redirect_uris": [
                 "http://127.0.0.1:54321/callback",
-                "https://example.com/cb",
+                "http://localhost:9000/callback",
             ],
             "token_endpoint_auth_method": "client_secret_basic",
         },
@@ -222,7 +222,7 @@ def test_register_forces_public_client_and_normalizes_loopback(
     assert data["token_endpoint_auth_method"] == "none"
     assert data["redirect_uris"] == [
         "http://localhost:54321/callback",
-        "https://example.com/cb",
+        "http://localhost:9000/callback",
     ]
     assert data["client_id"]
 
@@ -234,7 +234,7 @@ def test_register_forces_public_client_and_normalizes_loopback(
     assert saved["token_endpoint_auth_method"] == "none"
     assert saved["redirect_uris"] == [
         "http://localhost:54321/callback",
-        "https://example.com/cb",
+        "http://localhost:9000/callback",
     ]
 
 
@@ -294,6 +294,67 @@ def test_register_rejects_invalid_redirect_uris(mock_get_db: MagicMock) -> None:
     )
     assert resp.status_code == 400
     assert resp.json()["error"] == "invalid_client_metadata"
+
+
+@patch("src.server.get_firestore_client")
+def test_register_rejects_redirect_host_outside_allowlist(
+    mock_get_db: MagicMock,
+) -> None:
+    """A mixed list is rejected as a whole: one bad host blocks registration."""
+    resp = _client().post(
+        "/api/oauth/register",
+        json={
+            "client_name": "Attacker",
+            "redirect_uris": [
+                "http://localhost:9000/callback",
+                "https://evil.example/cb",
+            ],
+        },
+    )
+
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_redirect_uri"
+    mock_get_db.assert_not_called()
+
+
+@patch("src.api.oauth.OAUTH_ALLOWED_REDIRECT_HOSTS", ["claude.ai"])
+@patch("src.server.get_firestore_client")
+def test_register_rejects_plain_http_for_non_loopback_host(
+    mock_get_db: MagicMock,
+) -> None:
+    """An allowlisted host must use https; only loopback may use plain http."""
+    resp = _client().post(
+        "/api/oauth/register",
+        json={
+            "client_name": "Claude",
+            "redirect_uris": ["http://claude.ai/api/mcp/auth_callback"],
+        },
+    )
+
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_redirect_uri"
+    mock_get_db.assert_not_called()
+
+
+@patch("src.api.oauth.OAUTH_ALLOWED_REDIRECT_HOSTS", ["claude.ai"])
+@patch("src.server.get_firestore_client")
+def test_register_accepts_allowlisted_redirect_host(
+    mock_get_db: MagicMock,
+) -> None:
+    """A host listed in OAUTH_ALLOWED_REDIRECT_HOSTS is accepted."""
+    db, _ = _fake_firestore()
+    mock_get_db.return_value = db
+
+    resp = _client().post(
+        "/api/oauth/register",
+        json={
+            "client_name": "Claude",
+            "redirect_uris": ["https://CLAUDE.AI/api/mcp/auth_callback"],
+        },
+    )
+
+    assert resp.status_code == 201
+    assert resp.json()["redirect_uris"] == ["https://CLAUDE.AI/api/mcp/auth_callback"]
 
 
 # ---------------------------------------------------------------------------
@@ -399,6 +460,68 @@ def test_approve_unregistered_redirect_returns_400(
     )
     assert resp.status_code == 400
     assert resp.json()["error"] == "invalid_request"
+
+
+@patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.verify_id_token", return_value={"uid": "u"})
+def test_approve_rejects_legacy_client_with_disallowed_host(
+    _mock_verify: MagicMock, mock_get_db: MagicMock
+) -> None:
+    """A client registered before the allowlist existed cannot exfiltrate a code."""
+    db, _ = _fake_firestore_for_approve(["https://evil.example/cb"])
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "Bearer ok"},
+        json={"client_id": "legacy", "code_challenge": "ch"},
+    )
+
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_request"
+
+
+@patch("src.api.oauth.OAUTH_ALLOWED_REDIRECT_HOSTS", ["claude.ai"])
+@patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.verify_id_token", return_value={"uid": "u"})
+def test_approve_rejects_legacy_client_with_plain_http(
+    _mock_verify: MagicMock, mock_get_db: MagicMock
+) -> None:
+    """A legacy allowlisted host registered over http is refused at approval."""
+    db, _ = _fake_firestore_for_approve(["http://claude.ai/api/mcp/auth_callback"])
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "Bearer ok"},
+        json={"client_id": "legacy", "code_challenge": "ch"},
+    )
+
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_request"
+
+
+@patch("src.api.oauth.OAUTH_ALLOWED_REDIRECT_HOSTS", ["claude.ai"])
+@patch("src.server.get_firestore_client")
+@patch("src.api.oauth.auth.set_custom_user_claims")
+@patch(
+    "src.api.oauth.auth.verify_id_token",
+    return_value={"uid": "u", "email": "user@ambiental.media"},
+)
+def test_approve_accepts_allowlisted_remote_client(
+    _mock_verify: MagicMock,
+    _mock_set_claims: MagicMock,
+    mock_get_db: MagicMock,
+) -> None:
+    """A remote client whose host is allowlisted still completes consent."""
+    db, _ = _fake_firestore_for_approve(["https://claude.ai/api/mcp/auth_callback"])
+    mock_get_db.return_value = db
+    resp = _client().post(
+        "/api/oauth/approve",
+        headers={"Authorization": "Bearer ok"},
+        json={"client_id": "c", "code_challenge": "ch"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["redirect_uri"].startswith("https://claude.ai/api/mcp/auth_callback?code=")
 
 
 @patch("src.server.get_firestore_client")

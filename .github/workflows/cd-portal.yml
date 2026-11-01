@@ -1,0 +1,135 @@
+# =============================================================================
+# Jor-MCP — Consent Portal Deployment
+# Builds the static export and syncs it to the portal bucket.
+#
+# Standalone profile (default): the bucket is the load balancer default backend
+# and assets stay under /_next.
+# Overlay profile: set the PORTAL_ASSET_PREFIX repository variable (e.g.
+# /authorize-static) when another site shares the host.
+# =============================================================================
+
+name: CD Portal
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build (branch, tag or SHA)"
+        required: false
+        default: main
+        type: string
+
+env:
+  GCS_PORTAL_BUCKET: ${{ vars.GCS_PORTAL_BUCKET }}
+  GCP_LB_URL_MAP: ${{ vars.GCP_LB_URL_MAP || 'lb-jor-mcp' }}
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID || 'jor-mcp' }}
+
+# Queue overlapping portal deploys instead of cancelling a partial sync.
+concurrency:
+  group: cd-portal
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy consent portal
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Validate deployment target
+        env:
+          PORTAL_BUCKET: ${{ vars.GCS_PORTAL_BUCKET }}
+          SITE_BUCKET: ${{ vars.GCS_SITE_BUCKET }}
+          FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          FIREBASE_APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PORTAL_BUCKET}" ]; then
+            echo "::error::GCS_PORTAL_BUCKET is empty"; exit 1
+          fi
+          if [ "${PORTAL_BUCKET}" != "${PORTAL_BUCKET,,}" ]; then
+            echo "::error::GCS_PORTAL_BUCKET must be lowercase (got: ${PORTAL_BUCKET})"; exit 1
+          fi
+          case "${PORTAL_BUCKET}" in
+            gs://*) echo "::error::set the bucket name, not a gs:// URI"; exit 1 ;;
+          esac
+          case "${PORTAL_BUCKET}" in
+            *portal*) ;;
+            *) echo "::error::GCS_PORTAL_BUCKET must contain 'portal' (got: ${PORTAL_BUCKET})"; exit 1 ;;
+          esac
+          if [ -n "${SITE_BUCKET}" ] && [ "${PORTAL_BUCKET}" = "${SITE_BUCKET}" ]; then
+            echo "::error::the portal bucket must differ from GCS_SITE_BUCKET"; exit 1
+          fi
+
+          for name in FIREBASE_API_KEY FIREBASE_AUTH_DOMAIN FIREBASE_PROJECT_ID FIREBASE_APP_ID; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::NEXT_PUBLIC_FIREBASE_${name#FIREBASE_} is empty"; exit 1
+            fi
+          done
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: portal/package-lock.json
+
+      - name: Install dependencies
+        working-directory: portal
+        run: npm ci
+
+      - name: Build static export
+        working-directory: portal
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+          NEXT_PUBLIC_OAUTH_BACKEND_URL: ${{ vars.NEXT_PUBLIC_OAUTH_BACKEND_URL }}
+          PORTAL_ASSET_PREFIX: ${{ vars.PORTAL_ASSET_PREFIX }}
+        run: npm run build
+
+      - name: Prepare sync tree
+        working-directory: portal
+        env:
+          PORTAL_ASSET_PREFIX: ${{ vars.PORTAL_ASSET_PREFIX }}
+        run: bash scripts/prepare-dist.sh out dist "${PORTAL_ASSET_PREFIX:-}"
+
+      - name: Decode credentials
+        id: decode_si
+        run: |
+          DECODED_CREDENTIALS="$(echo -n ${{ secrets.GCP_SA_KEY }} | base64 --decode)"
+          echo "::add-mask::$DECODED_CREDENTIALS"
+          echo "creds=$DECODED_CREDENTIALS" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: '${{ steps.decode_si.outputs.creds }}'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3.0.1
+
+      - name: Sync to the portal bucket
+        run: |
+          gcloud storage rsync portal/dist "gs://${GCS_PORTAL_BUCKET}" \
+            --recursive \
+            --delete-unmatched-destination-objects
+
+      - name: Invalidate consent routes
+        run: |
+          for path in "/authorize*" "/pt/authorize*" "/en/authorize*"; do
+            gcloud compute url-maps invalidate-cdn-cache "${GCP_LB_URL_MAP}" \
+              --path "$path" \
+              --project "${PROJECT_ID}" \
+              --global
+          done

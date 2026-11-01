@@ -5,6 +5,8 @@
 
 # ADR 006: Estratégia de Implementação do MCP OAuth 2.1
 
+> **Substituído, para a interface de consentimento, pelo [ADR 008](008-portal-de-consentimento-autocontido.md).**
+
 ## 1. O "Porquê" (Contexto)
 *   **Objetivo:** Fornecer uma experiência de login "zero-configuração" para jornalistas não técnicos usando o Claude Desktop.
 *   **Problema:** O Claude Desktop não suporta logins interativos via navegador nativamente, a menos que o servidor implemente o protocolo estrito MCP OAuth 2.1 (PKCE + Registro Dinâmico de Cliente).

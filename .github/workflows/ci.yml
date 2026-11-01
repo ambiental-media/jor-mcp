@@ -68,6 +68,9 @@ jobs:
       - name: Format check (Ruff)
         run: uv run ruff format --check .
 
+      - name: Living docs reference check
+        run: make check-docs
+
       - name: Type check (Mypy)
         run: uv run mypy .
 
@@ -104,10 +107,73 @@ jobs:
           uv export --no-hashes --all-groups -o requirements-ci.txt
           uv run pip-audit -r requirements-ci.txt --no-deps --disable-pip
 
+  portal-check:
+    name: Portal Quality
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: portal
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: portal/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Format check (Prettier)
+        run: npm run format:check
+
+      - name: Tests & Coverage (Vitest)
+        run: npm run test:coverage
+
+      - name: Dependency audit (npm)
+        run: npm audit --audit-level=high
+
+      - name: Build (standalone profile)
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: dummy
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: dummy.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: dummy
+          NEXT_PUBLIC_FIREBASE_APP_ID: dummy
+        run: npm run build
+
+      - name: Prepare standalone sync tree
+        run: bash scripts/prepare-dist.sh out dist
+
+      - name: Reject malformed asset prefix
+        run: |
+          if bash scripts/prepare-dist.sh out dist bad-prefix; then
+            echo "::error::prepare-dist.sh accepted a malformed asset prefix"
+            exit 1
+          fi
+
+      - name: Build (overlay profile)
+        env:
+          PORTAL_ASSET_PREFIX: /authorize-static
+          NEXT_PUBLIC_FIREBASE_API_KEY: dummy
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: dummy.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: dummy
+          NEXT_PUBLIC_FIREBASE_APP_ID: dummy
+        run: npm run build
+
+      - name: Prepare overlay sync tree
+        run: bash scripts/prepare-dist.sh out dist /authorize-static
+
   build-and-push:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
-    needs: check
+    needs: [check, portal-check]
     env:
       IMAGE_TAG: pr-${{ github.event.pull_request.number }}
 

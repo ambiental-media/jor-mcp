@@ -54,7 +54,7 @@ The `"basic"` default is the crux of every finding below: since the claim is nev
 | # | Step | Where | What happens to the role |
 | :--- | :--- | :--- | :--- |
 | 1 | Admin registers the user | Firebase Console → `allowed_users/{email}` | Writes `status: "active"` and, optionally, `tier` |
-| 2 | User signs in with Google on the portal | [page.jsx:131-136](../../../../../jor-mcp-site/src/app/[locale]/authorize/page.jsx#L131-L136) | Reads `status` only; `tier` is not read |
+| 2 | User signs in with Google on the portal | [page.jsx:131-136](../../../../../portal/src/app/[locale]/authorize/page.jsx#L131-L136) | Reads `status` only; `tier` is not read |
 | 3 | Portal calls `/api/oauth/approve` | [oauth.py:342-346](../../../../src/api/oauth.py#L342-L346) | `_is_email_allowed()` only checks `status == "active"`; `tier` is not read |
 | 4 | Backend mints the tokens | [oauth.py:402](../../../../src/api/oauth.py#L402) | `auth.create_custom_token(uid)` — **no `developer_claims`** |
 | 5 | MCP client calls `/mcp` | [auth.py:74-83](../../../../src/middleware/auth.py#L74-L83) | Token carries no `tier` → Pydantic applies the `"basic"` default |

@@ -54,7 +54,7 @@ O valor default `"basic"` é o ponto central de todos os achados abaixo: como a 
 | # | Etapa | Onde | O que acontece com a role |
 | :--- | :--- | :--- | :--- |
 | 1 | Admin cadastra o usuário | Console do Firebase → `allowed_users/{email}` | Grava `status: "active"` e, opcionalmente, `tier` |
-| 2 | Usuário faz login Google no portal | [page.jsx:131-136](../../../../../jor-mcp-site/src/app/[locale]/authorize/page.jsx#L131-L136) | Lê apenas `status`; `tier` não é lido |
+| 2 | Usuário faz login Google no portal | [page.jsx:131-136](../../../../../portal/src/app/[locale]/authorize/page.jsx#L131-L136) | Lê apenas `status`; `tier` não é lido |
 | 3 | Portal chama `/api/oauth/approve` | [oauth.py:342-346](../../../../src/api/oauth.py#L342-L346) | `_is_email_allowed()` valida apenas `status == "active"`; `tier` não é lido |
 | 4 | Backend emite os tokens | [oauth.py:402](../../../../src/api/oauth.py#L402) | `auth.create_custom_token(uid)` — **sem `developer_claims`** |
 | 5 | Cliente MCP chama `/mcp` | [auth.py:74-83](../../../../src/middleware/auth.py#L74-L83) | Token não contém `tier` → Pydantic aplica o default `"basic"` |

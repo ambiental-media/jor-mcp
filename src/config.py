@@ -93,7 +93,7 @@ the discovery metadata. Override in dev (e.g. ``http://localhost:8080``).
 OAUTH_PORTAL_BASE_URL: str = os.environ.get(
     "OAUTH_PORTAL_BASE_URL", "https://jormcp.ambiental.media"
 ).rstrip("/")
-"""Public base URL of the Next.js consent portal (``jor-mcp-site``).
+"""Public base URL of the consent portal served by ``portal/``.
 
 Used to build the ``authorization_endpoint`` advertised in the discovery
 metadata. Override in dev (e.g. ``http://localhost:3000``).
@@ -107,6 +107,21 @@ OAUTH_CODES_COLLECTION: str = os.environ.get("OAUTH_CODES_COLLECTION", "oauth_co
 
 OAUTH_CODE_TTL_SECONDS: int = int(os.environ.get("OAUTH_CODE_TTL_SECONDS", "600"))
 """Lifetime of an issued authorization code before it is considered expired."""
+
+OAUTH_ALLOWED_REDIRECT_HOSTS: list[str] = [
+    host.strip().lower()
+    for host in os.environ.get("OAUTH_ALLOWED_REDIRECT_HOSTS", "").split(",")
+    if host.strip()
+]
+"""Non-loopback hosts a client may register as a redirect target.
+
+Loopback hosts (``localhost``, ``127.0.0.1``, ``::1``) are always allowed. Any
+other host must be listed here, otherwise registration is rejected and an
+existing client's consent request is refused at approval time. This is what
+stops an attacker from registering their own callback through open Dynamic
+Client Registration. Comma-separated via the environment variable of the same
+name; an empty list allows loopback clients only.
+"""
 
 ALLOWED_USERS_COLLECTION: str = os.environ.get("ALLOWED_USERS_COLLECTION", "allowed_users")
 """Firestore collection whitelisting who may complete consent.

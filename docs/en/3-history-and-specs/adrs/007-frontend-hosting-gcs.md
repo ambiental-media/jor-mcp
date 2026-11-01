@@ -5,6 +5,8 @@
 
 # ADR 007: Frontend Hosting Strategy (GCS Bucket)
 
+> **Superseded for the consent UI by [ADR 008](008-self-contained-consent-portal.md). The bucket split described here no longer applies to the consent portal.**
+
 ## 1. Context
 The Jor-MCP project requires hosting the `jor-mcp-site` (Next.js) landing page and the interactive OAuth 2.1 consent UI (`/authorize`) on the same custom domain (`jormcp.ambiental.media`) as the Python FastMCP backend API. We utilize a Google Cloud Global External Application Load Balancer as the primary entry point to handle TLS and URL routing.
 

@@ -34,6 +34,7 @@ from src.config import (
     ALLOWED_USERS_COLLECTION,
     FIREBASE_WEB_API_KEY,
     IDENTITY_TOOLKIT_BASE_URL,
+    OAUTH_ALLOWED_REDIRECT_HOSTS,
     OAUTH_CLIENTS_COLLECTION,
     OAUTH_CODE_TTL_SECONDS,
     OAUTH_CODES_COLLECTION,
@@ -155,6 +156,25 @@ def _normalize_loopback(uri: str) -> str:
     netloc = "localhost" if parts.port is None else f"localhost:{parts.port}"
     normalized: SplitResult = parts._replace(netloc=netloc)
     return urlunsplit(normalized)
+
+
+def _is_allowed_redirect_uri(uri: str) -> bool:
+    """Return True when *uri* may receive an authorization code.
+
+    Loopback hosts are always allowed and may use plain ``http``: the request
+    never leaves the device (RFC 8252). Any other host must be listed in
+    :data:`~src.config.OAUTH_ALLOWED_REDIRECT_HOSTS` and use ``https``.
+
+    This is what prevents open Dynamic Client Registration from handing a code
+    to a host the operator does not control.
+    """
+    parts = urlsplit(uri)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        return False
+    normalized_host = (urlsplit(_normalize_loopback(uri)).hostname or "").lower()
+    if normalized_host == "localhost":
+        return True
+    return parts.scheme == "https" and normalized_host in OAUTH_ALLOWED_REDIRECT_HOSTS
 
 
 def _extract_bearer_token(request: Request) -> str | None:
@@ -283,6 +303,18 @@ async def oauth_register(request: Request) -> JSONResponse:
         return _error_response("invalid_client_metadata", str(exc), 400)
 
     redirect_uris = [_normalize_loopback(uri) for uri in metadata.redirect_uris]
+    rejected = [uri for uri in redirect_uris if not _is_allowed_redirect_uri(uri)]
+    if rejected:
+        rejected_host = urlsplit(rejected[0]).hostname
+        logger.warning(
+            "Rejected client registration for a disallowed redirect host",
+            extra={"host": rejected_host},
+        )
+        return _error_response(
+            "invalid_redirect_uri",
+            "redirect_uri host is not allowed for this deployment",
+            400,
+        )
     client_id = str(uuid.uuid4())
     document: dict[str, Any] = {
         "client_id": client_id,
@@ -366,6 +398,14 @@ async def oauth_approve(request: Request) -> JSONResponse:
     if redirect_uri is None:
         return _error_response(
             "invalid_request", "redirect_uri is not registered for this client", 400
+        )
+    if not _is_allowed_redirect_uri(redirect_uri):
+        logger.warning(
+            "Refusing consent for a disallowed redirect host",
+            extra={"host": urlsplit(redirect_uri).hostname},
+        )
+        return _error_response(
+            "invalid_request", "redirect_uri host is not allowed for this deployment", 400
         )
 
     role = await _resolve_user_role(db, email)

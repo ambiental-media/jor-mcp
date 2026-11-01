@@ -15,7 +15,7 @@ Este documento descreve a arquitetura de implantação do servidor Jor-MCP no Go
 O sistema foi projetado para ser totalmente serverless, altamente disponível e stateless na camada de aplicação.
 
 *   **Ponto de Entrada (Entrypoint):** Load Balancer de Aplicação Externo Global (Gerencia domínios personalizados, SSL e streaming SSE). [Consulte o guia de configuração detalhado](configuracao-load-balancer.md).
-*   **Hospedagem Frontend:** Google Cloud Storage (GCS) Bucket configurado como Backend Bucket no Load Balancer, com Cloud CDN ativado.
+*   **Hospedagem do Portal de Consentimento:** Bucket do Google Cloud Storage (GCS) com a exportação estática de `portal/`, configurado como Backend Bucket no Load Balancer com Cloud CDN ativado.
 *   **Camada de Computação:** Google Cloud Run (Containerizado, auto-scaling). Bloqueado para "Tráfego interno e de Load Balancer apenas." O serviço é configurado para **permitir invocações não autenticadas** (binding IAM `roles/run.invoker` para `allUsers`), pois o load balancer encaminha HTTP puro; identidade e autorização são validadas exclusivamente na camada de aplicação (JWT do Firebase + allow-list).
 *   **Banco de Dados/Estado:** Google Cloud Firestore (Gerencia limites de taxa distribuídos, clientes OAuth DCR e códigos autorizativos).
 *   **Identidade:** Google Cloud Identity Platform / Firebase Auth (Valida tokens JWT).
@@ -183,6 +183,8 @@ Adicione um documento na coleção `allowed_users` respeitando os seguintes camp
 
 > **Propagação e revogação:** a role é espelhada na custom claim `tier` do usuário no Firebase Auth no momento do consentimento e reconferida a cada renovação de token. Alterar o `tier`, definir `status: "disabled"` ou remover o documento passa a valer em até uma hora — o tempo de vida do ID token emitido — sem qualquer ação do usuário. Quem perde a autorização tem os refresh tokens revogados na renovação seguinte, o que encerra o acesso em vez de apenas negar aquela requisição.
 
+> **Regras do Firestore:** o portal de consentimento lê `allowed_users/{email}` no navegador para decidir se exibe o formulário. As regras de segurança precisam permitir que um usuário autenticado leia o próprio documento. Essa checagem é apenas de experiência — o backend reconfere o mesmo documento antes de emitir o código, então regras que negam a leitura degradam a experiência, não a autorização.
+
 ---
 
 ## 6. Variáveis de Ambiente e Recursos
@@ -191,7 +193,7 @@ O servidor depende estritamente de variáveis de ambiente para configuração. N
 
 Para uma lista detalhada e abrangente de todas as variáveis de ambiente e recursos de nuvem, consulte o **[Guia de Configuração e Ambiente](configuracao-e-env.md)**.
 
-> **Nota sobre Roteamento:** Certifique-se de que seu Load Balancer Global esteja configurado para rotear o tráfego destinado a `/mcp/*` e `/api/oauth/*` para o Serverless NEG (serviço Cloud Run), e todo o outro tráfego (`/*`) para o Backend Bucket (GCS).
+> **Nota sobre Roteamento:** Certifique-se de que seu Load Balancer Global roteie `/mcp/*`, `/api/oauth/*` e `/.well-known/*` para o Serverless NEG (Cloud Run) e todo o restante (`/*`) para o Backend Bucket do portal de consentimento (GCS).
 
 ---
 
@@ -224,11 +226,24 @@ Para habilitar os workflows de implantação no seu repositório, navegue até *
 | Variable | `MCP_GITHUB_REPOS` | Lista de `owner/repo` separada por vírgulas. | `org/repo-a,org/repo-b` |
 | Variable | `OTEL_EXPORTER_OTLP_ENDPOINT` | Endpoint do coletor OTLP. Deixe vazio, a menos que você rode um. | *(vazio)* |
 | Variable | `FIREBASE_WEB_API_KEY` | Chave Web API do Firebase usada na troca de tokens. | `AIza...` |
+| Variable | `DOMAIN` | Hostname público servido pelo load balancer. Alimenta `OAUTH_SERVER_BASE_URL`, `OAUTH_PORTAL_BASE_URL` e `CORS_ALLOWED_ORIGINS`. | `jormcp.exemplo.org` |
+| Variable | `GCS_PORTAL_BUCKET` | Bucket GCS que recebe a exportação estática do portal de consentimento. O nome precisa conter `portal`; o `cd-portal.yml` recusa qualquer outro. | `jor-mcp-portal-meu-projeto` |
+| Variable | `GCP_LB_URL_MAP` | URL map usado na invalidação de CDN após um deploy do portal. | `lb-jor-mcp` |
+| Variable | `NEXT_PUBLIC_FIREBASE_API_KEY` | Chave do app web Firebase embutida no build do portal. | `AIza...` |
+| Variable | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Domínio do Firebase Auth embutido no build do portal. | `meu-projeto.firebaseapp.com` |
+| Variable | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Id do projeto Firebase embutido no build do portal. | `meu-projeto-mcp-123` |
+| Variable | `NEXT_PUBLIC_FIREBASE_APP_ID` | Id do app web Firebase embutido no build do portal. | `1:123:web:abc` |
+| Variable | `NEXT_PUBLIC_OAUTH_BACKEND_URL` | Origem do backend usada pelo portal. Deixe vazio para a mesma origem. | *(vazio)* |
+| Variable | `PORTAL_ASSET_PREFIX` | Deixe vazio no perfil standalone. Defina apenas quando outro site compartilhar o host. | *(vazio)* ou `/authorize-static` |
+| Variable | `GCS_SITE_BUCKET` | Opcional. Quando definido, o `cd-portal.yml` recusa implantar o portal no mesmo bucket. | `landing-page-bucket` |
+
+O `OAUTH_ALLOWED_REDIRECT_HOSTS` do backend é literal no `service.yaml`, não uma variável de repositório. Edite a lista com todos os hosts para os quais seus clientes suportados redirecionam; loopback é sempre permitido. Remova `chatgpt.com` ou `www.braintrust.dev` se não pretende suportar esses conectores.
 
 ### 8.2 Workflows Disponíveis
 Nosso repositório contém workflows pré-configurados que você pode adaptar:
 *   **`ci.yml`**: Compila, executa testes, realiza varreduras de segurança e constrói/envia o container para o seu próprio Google Artifact Registry.
 *   **`cd.yml`**: Dispara um fluxo de implantação manual via `workflow_dispatch` do GitHub (permitindo que você selecione exatamente qual tag de imagem deseja implantar no Cloud Run, sem fazer deploy automático de cada merge).
+*   **`cd-portal.yml`**: Compila a exportação estática do portal de consentimento, sincroniza com `GCS_PORTAL_BUCKET` e invalida as rotas de consentimento no CDN. Execute após qualquer mudança em `portal/`.
 
 Para obter a documentação detalhada sobre os critérios de teste internos, mecanismos de versionamento e detalhes de cada job da pipeline, consulte o **[Guia de Contribuição](../../../CONTRIBUTING_pt-br.md#integracao-continua-ci)**.
 

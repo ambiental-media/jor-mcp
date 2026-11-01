@@ -40,6 +40,7 @@ Antes de contribuir para o `jor-mcp`, certifique-se de ter o seguinte instalado 
 *   **uv:** Usamos o `uv` como nosso gerenciador de pacotes e projetos extremamente rápido. Siga as [instruções de instalação aqui](https://docs.astral.sh/uv/getting-started/installation/).
 *   **Docker / Container Runtime:** (Opcional, mas recomendado) Útil para executar instâncias locais de teste de dependências ou iniciar o servidor em um ambiente conteinerizado. Você pode usar Docker Desktop, Docker Community Edition ou alternativas de código aberto como [Colima](https://github.com/abiosoft/colima) ou [Podman](https://podman.io/).
 *   **Trivy:** Necessário para rodar a suíte completa de validação local (`make check` e `make check-container`). Siga as [instruções de instalação aqui](https://aquasecurity.github.io/trivy/latest/getting-started/installation/).
+*   **Node.js 24+ e npm:** Necessários apenas para o portal de consentimento em `portal/`. A suíte Python (`make check`) não os utiliza.
 
 ---
 
@@ -90,7 +91,20 @@ Para agilizar o desenvolvimento local, este projeto fornece um `Makefile` com co
 *   **`make check-sast`**: Executa testes de segurança estáticos de aplicação no código-fonte usando `bandit`.
 *   **`make check-deps`**: Audita as dependências do projeto para vulnerabilidades conhecidas usando `pip-audit`.
 *   **`make check-container`**: Constrói a imagem Docker e a escaneia para vulnerabilidades críticas usando `trivy`.
+*   **`make check-portal`**: Instala as dependências do portal, executa ESLint, Prettier, Vitest com cobertura e compila os dois perfis de implantação. Execute após qualquer mudança em `portal/`.
+*   **`make check-docs`**: Falha quando a documentação viva referencia o repositório externo descontinuado.
 *   **`make run`**: Constrói a imagem Docker localmente e inicia o contêiner na porta 8080, lendo as configurações do seu arquivo `.env`.
+
+### Portal de Consentimento (`portal/`)
+
+A interface de consentimento OAuth é uma exportação estática Next.js em `portal/`. É um projeto npm separado, para que a imagem Python e o `make check` continuem sem Node.
+
+*   **Instalar dependências:** `cd portal && npm ci`
+*   **Desenvolvimento local:** `cd portal && npm run dev` (veja `portal/README.md` para os valores `NEXT_PUBLIC_*`)
+*   **Testes:** `cd portal && npm run test:coverage`
+*   **Build:** `cd portal && npm run build`
+
+Valores `NEXT_PUBLIC_*` são embutidos no build. Nunca faça commit de arquivos `.env.local` reais.
 
 ### Linting e Formatação
 

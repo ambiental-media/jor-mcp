@@ -39,6 +39,7 @@ Before contributing to `jor-mcp`, ensure you have the following installed on you
 *   **uv:** We use `uv` as our extremely fast Python package and project manager. Follow the [installation instructions here](https://docs.astral.sh/uv/getting-started/installation/).
 *   **Docker / Container Runtime:** (Optional but recommended) Useful for running local test instances of dependencies or spinning up the server in a containerized environment. You can use Docker Desktop, Docker community edition, or open-source alternatives like [Colima](https://github.com/abiosoft/colima) or [Podman](https://podman.io/).
 *   **Trivy:** Required to run the full local validation suite (`make check` and `make check-container`). Follow the [installation instructions here](https://aquasecurity.github.io/trivy/latest/getting-started/installation/).
+*   **Node.js 24+ and npm:** Required only for the consent portal in `portal/`. The Python test suite (`make check`) does not use them.
 
 ---
 
@@ -89,7 +90,20 @@ To streamline local development, this project provides a `Makefile` with bundled
 *   **`make check-sast`**: Runs static application security testing on the source code using `bandit`.
 *   **`make check-deps`**: Audits project dependencies for known vulnerabilities using `pip-audit`.
 *   **`make check-container`**: Builds the Docker image and scans it for critical vulnerabilities using `trivy`.
+*   **`make check-portal`**: Installs the portal dependencies, runs ESLint, Prettier, Vitest with coverage, and builds both deployment profiles. Run it after any change under `portal/`.
+*   **`make check-docs`**: Fails when living documentation references the retired external repository.
 *   **`make run`**: Builds the Docker image locally and starts the container on port 8080, reading configuration from your `.env` file.
+
+### Consent Portal (`portal/`)
+
+The OAuth consent UI is a static Next.js export in `portal/`. It is a separate npm project so the Python image and `make check` stay Node-free.
+
+*   **Install dependencies:** `cd portal && npm ci`
+*   **Local development:** `cd portal && npm run dev` (see `portal/README.md` for the `NEXT_PUBLIC_*` values)
+*   **Tests:** `cd portal && npm run test:coverage`
+*   **Build:** `cd portal && npm run build`
+
+`NEXT_PUBLIC_*` values are inlined at build time. Never commit real `.env.local` files.
 
 ### Linting & Formatting
 

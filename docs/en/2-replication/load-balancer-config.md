@@ -12,7 +12,7 @@
 ## 1. Overview
 The Global External Application Load Balancer acts as the single entry point for `jormcp.ambiental.media`. It serves two critical functions:
 1.  **SSL/TLS Termination:** Manages the Google-managed SSL certificate.
-2.  **Path-Based Routing:** Splits traffic between the Python API (Cloud Run) and the Next.js Frontend (Cloud Storage).
+2.  **Path-Based Routing:** Splits traffic between the Python API (Cloud Run) and the Consent Portal (Next.js static export on Cloud Storage).
 
 *Note: These instructions assume manual provisioning via the Google Cloud Console.*
 
@@ -26,9 +26,9 @@ To route traffic correctly, you must create two distinct Backend Services in GCP
 *   **Timeout:** Ensure the backend timeout is set high enough (e.g., 3600 seconds) so that Server-Sent Events (SSE) connections do not drop prematurely.
 *   **Authentication:** The Cloud Run target must allow unauthenticated invocations (IAM binding `roles/run.invoker` for `allUsers`) while keeping ingress restricted to "Internal and Cloud Load Balancing traffic only." Otherwise the Serverless NEG receives HTTP 401/403 before requests reach the application. Identity is enforced by the application itself (Firebase JWT + allow-list).
 
-### 2.2 Backend Bucket: Frontend (GCS)
+### 2.2 Backend Bucket: Consent Portal (GCS)
 *   **Type:** Backend Bucket.
-*   **Target:** The GCS bucket containing the Next.js static export (`gs://your-bucket-name`).
+*   **Target:** The GCS bucket containing the `portal/` static export (`gs://your-bucket-name`).
 *   **Cloud CDN:** Enable Cloud CDN on this backend bucket to cache static assets globally.
 
 ## 3. URL Map (Routing Rules)
@@ -39,9 +39,25 @@ The core of the load balancer is the URL Map. Configure the Host and Path rules 
 | `jormcp.ambiental.media` | `/mcp/*` | API (Serverless NEG) |
 | `jormcp.ambiental.media` | `/api/oauth/*` | API (Serverless NEG) |
 | `jormcp.ambiental.media` | `/.well-known/*` | API (Serverless NEG) |
-| `jormcp.ambiental.media` | `/*` (Default) | Frontend (Backend Bucket) |
+| `jormcp.ambiental.media` | `/*` (Default) | Consent Portal (Backend Bucket) |
 
 ## 4. Security Policies & CORS
 *   **CORS:** Ensure that the Load Balancer is configured to allow `OPTIONS` preflight requests to reach the Cloud Run service, so the Python backend can respond with the correct `Access-Control-Allow-Origin` headers for the `/api/oauth/approve` endpoint.
 *   **Cloud Armor (Optional / Advanced):** You may attach a Google Cloud Armor WAF policy to the API Backend Service to block malicious IPs before they hit Cloud Run. 
     *   *FinOps Warning:* Unlike Cloud Run and Firestore which scale to zero, Cloud Armor introduces fixed monthly costs (approximately $5-$10/month base fee). Because Jor-MCP includes application-level rate limiting via Firestore, Cloud Armor is only necessary if you expect severe volumetric DDoS attacks.
+
+## 5. Overlay on an Existing Site
+
+The routing above is the standalone profile: the consent portal bucket is the default backend and there is nothing else on the host.
+
+If another site already owns the default backend, keep it and add path rules for the consent routes, plus the `/authorize-static/*` prefix used by the overlay build:
+
+| Host | Path | Backend |
+| :--- | :--- | :--- |
+| `jormcp.ambiental.media` | `/authorize`, `/authorize/*` | Consent Portal (Backend Bucket) |
+| `jormcp.ambiental.media` | `/pt/authorize`, `/pt/authorize/*` | Consent Portal (Backend Bucket) |
+| `jormcp.ambiental.media` | `/en/authorize`, `/en/authorize/*` | Consent Portal (Backend Bucket) |
+| `jormcp.ambiental.media` | `/authorize-static/*` | Consent Portal (Backend Bucket) |
+| `jormcp.ambiental.media` | `/_next/*` and everything else | Existing site (Backend Bucket) |
+
+The overlay build sets `PORTAL_ASSET_PREFIX=/authorize-static`; without it, both Next.js builds would compete for `/_next`. See the provisioning guide, step 8.5, for the URL map commands.

@@ -85,7 +85,7 @@ sequenceDiagram
 
 ## 3. Core Technologies
 
-- **Frontend Hosting:** `Google Cloud Storage` and `Cloud CDN` for global edge caching of static Next.js assets.
+- **Consent Portal Hosting:** `Google Cloud Storage` and `Cloud CDN` for the static Next.js export in `portal/`.
 - **Framework:** `fastmcp` (ASGI server powered by `uvicorn`).
 - **HTTP Client:** `httpx` (Asynchronous connection pooling).
 - **Security:** `firebase-admin` (JWT validation) and `google-cloud-firestore` (Rate limiting).

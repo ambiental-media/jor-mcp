@@ -130,7 +130,7 @@ O parâmetro `limit` também limita o processamento: mesmo que o WordPress ignor
 
 ## 4. Endpoints do Proxy OAuth 2.1 (API Interna)
 
-Estes endpoints são usados internamente para facilitar o fluxo Native MCP OAuth 2.1 entre o Claude Desktop, o portal Next.js `jor-mcp-site` e o backend `jor-mcp`.
+Estes endpoints são usados internamente para facilitar o fluxo Native MCP OAuth 2.1 entre o Claude Desktop, o portal de consentimento (`portal/`, Next.js) e o backend `jor-mcp`.
 
 ### Semântica de Erro Consistente
 Todos os endpoints OAuth seguem este esquema de erro padrão para respostas não-2xx:
@@ -143,7 +143,7 @@ Todos os endpoints OAuth seguem este esquema de erro padrão para respostas não
 
 ### Política de CORS
 Todas as rotas `/api/oauth/*` são servidas atrás de um middleware de CORS para que
-o portal de consentimento no navegador (`jor-mcp-site`) possa chamá-las via AJAX.
+o portal de consentimento no navegador possa chamá-las via AJAX.
 Elas também ignoram a autenticação Firebase e a cota mensal por usuário — são o
 mecanismo pelo qual os clientes obtêm os tokens Firebase em primeiro lugar. Em
 lugar dela, aplica-se um limite por IP (veja abaixo).
@@ -231,6 +231,7 @@ então o load balancer deve rotear `/.well-known/*` para o NEG do backend.
 *   `redirect_uris` é obrigatório (não-vazio); campos de metadados desconhecidos são ignorados.
 *   **Forçar cliente público:** `token_endpoint_auth_method` é sempre sobrescrito para `"none"`.
 *   **Normalização de loopback:** qualquer host `127.0.0.1` em `redirect_uris` é reescrito para `localhost`.
+*   **Allowlist de host de redirecionamento:** hosts de loopback são sempre aceitos e podem usar `http`; qualquer outro host precisa estar em `OAUTH_ALLOWED_REDIRECT_HOSTS` e usar `https`. Um host rejeitado retorna `400 invalid_redirect_uri`, o que impede que o registro aberto envie o código da vítima para o callback de um atacante.
 *   Um `client_id` (UUID) é gerado e o cliente é persistido na coleção `oauth_clients` do Firestore.
 *   JSON inválido retorna `400 invalid_request`; metadados inválidos retornam `400 invalid_client_metadata`.
 
@@ -257,13 +258,13 @@ então o load balancer deve rotear `/.well-known/*` para o NEG do backend.
 
 ### 4.2 Aprovação de Consentimento
 **Endpoint:** `POST /api/oauth/approve`
-**Objetivo:** Chamado pelo `jor-mcp-site` (Next.js) após o usuário clicar em "Permitir". Requer CORS.
+**Objetivo:** Chamado pelo portal de consentimento (`portal/`, Next.js) após o usuário clicar em "Permitir". Requer CORS.
 
 **Comportamento no servidor:**
 *   **Autenticação:** exige `Authorization: Bearer <Firebase_ID_Token>`, verificado via `firebase-admin`. Token ausente/inválido retorna `401 invalid_token`.
 *   `client_id` e `code_challenge` são obrigatórios; apenas `code_challenge_method = "S256"` é aceito.
 *   O `client_id` deve existir em `oauth_clients`, caso contrário `400 invalid_client`.
-*   `redirect_uri` é opcional: quando presente é normalizado (loopback) e deve corresponder a uma URI registrada (senão `400 invalid_request`); quando ausente, usa-se a primeira URI registrada do cliente.
+*   `redirect_uri` é opcional: quando presente é normalizado (loopback) e deve corresponder a uma URI registrada (senão `400 invalid_request`); quando ausente, usa-se a primeira URI registrada do cliente. A URI resolvida é reconferida contra `OAUTH_ALLOWED_REDIRECT_HOSTS`, então um cliente registrado antes da allowlist existir não recebe código para um host não permitido.
 *   **Whitelist e role:** o email do usuário (extraído do JWT) deve existir na coleção `allowed_users` com `status == "active"` **e** com um `tier` válido (`"basic"` ou `"pro"`). Um token válido cujo email esteja ausente/fora da whitelist/inativo, ou cujo documento não tenha role atribuída, retorna `403 access_denied`. A lista é curada manualmente pela Ambiental Media (ex: console do Firebase); o acesso é só via Google SSO.
 *   **Sincronização da role:** no sucesso, a role do Firestore é espelhada na custom claim `tier` do usuário no Firebase Auth, de onde os middlewares a leem em cada requisição.
 *   Um `authorization_code` aleatório é gerado e salvo em `oauth_codes` junto com o `code_challenge`, o `uid`, o `redirect_uri` e uma expiração curta (`OAUTH_CODE_TTL_SECONDS`, padrão 600s).

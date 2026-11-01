@@ -1,0 +1,22 @@
+{
+  "authorize": {
+    "title": "Authorize access",
+    "consentIntro": "An application ({clientName}) is requesting access to your Ambiental Media account to query Jor-MCP journalistic content.",
+    "loginTitle": "Sign in to continue",
+    "signInWithGoogle": "Sign in with Google",
+    "loggedInAs": "Signed in as {email}",
+    "authorizeButton": "Allow access",
+    "cancel": "Cancel",
+    "useAnotherAccount": "Use another account",
+    "accessDeniedTitle": "Access denied",
+    "accessDenied": "This account is not authorized to access Jor-MCP. Please contact Ambiental Media.",
+    "accessErrorTitle": "Connection error",
+    "accessError": "We could not verify your authorization right now. Check your connection and try again.",
+    "retry": "Try again",
+    "missingParams": "Invalid request: missing authorization parameters.",
+    "errors": {
+      "signIn": "Could not sign in with Google. Please try again.",
+      "authorize": "Failed to authorize access. Please try again."
+    }
+  }
+}

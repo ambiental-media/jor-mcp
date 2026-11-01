@@ -14,3 +14,5 @@ This directory contains records of significant architectural decisions made duri
 - [005: Mentorship Outcomes](005-mentorship-outcomes.md)
 - [006: OAuth 2.1 Implementation Strategy](006-oauth2-1-implementation-strategy.md)
 - [007: Frontend Hosting Strategy (GCS Bucket)](007-frontend-hosting-gcs.md)
+- [008: Self-Contained Consent Portal](008-self-contained-consent-portal.md)
+- [009: OAuth Redirect Host Allowlist](009-oauth-redirect-host-allowlist.md)

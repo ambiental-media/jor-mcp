@@ -50,6 +50,7 @@ By deploying your own instance of `jor-mcp`, your newsroom can empower AI workfl
 *   **GitHub Integration:** Query internal repositories, research data, and codebases associated with your journalistic investigations.
 *   **Secure Access:** Token-based authentication (JWT) ensures only authorized AI agents or internal systems can access your data.
 *   **Containerized:** Easy to deploy anywhere using Docker.
+*   **Bundled Consent Portal:** The OAuth 2.1 consent UI ships in `portal/`, so the repository is enough to provision a working server.
 *   **Easily Forkable:** Designed to be easily cloned, configured via environment variables, and deployed on standard cloud infrastructure.
 
 ## Documentation
@@ -64,8 +65,10 @@ Comprehensive documentation for all audiences is available in the [`docs/`](docs
 
 ### Prerequisites
 
-To run your own instance of `jor-mcp`, you only need a container runtime:
+To run your own instance of `jor-mcp`, you need a container runtime:
 *   [Docker](https://www.docker.com/) (or open-source alternatives like [Colima](https://github.com/abiosoft/colima) or [Podman](https://podman.io/)).
+
+To build the bundled consent portal, you additionally need [Node.js 24+ and npm](https://nodejs.org/).
 
 ### Installation via Docker (Recommended)
 

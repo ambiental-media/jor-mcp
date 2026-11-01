@@ -15,7 +15,7 @@ This document outlines the deployment architecture for the Jor-MCP server on Goo
 The system is designed to be fully serverless, highly available, and stateless at the application layer.
 
 *   **Entrypoint:** Global External Application Load Balancer (Handles custom domains, SSL, and SSE streaming). [See detailed configuration guide](load-balancer-config.md).
-*   **Frontend Hosting:** Google Cloud Storage (GCS) Bucket configured as a Backend Bucket on the Load Balancer, with Cloud CDN enabled.
+*   **Consent Portal Hosting:** Google Cloud Storage (GCS) bucket holding the `portal/` static export, configured as a Backend Bucket on the Load Balancer with Cloud CDN enabled.
 *   **Compute:** Google Cloud Run (Containerized, auto-scaling). Locked down to "Internal and Cloud Load Balancing traffic only." The service is set to **allow unauthenticated invocations** (IAM binding `roles/run.invoker` for `allUsers`), because the load balancer forwards plain HTTP to it; identity and authorization are enforced exclusively at the application layer (Firebase JWT + allow-list).
 *   **Database/State:** Google Cloud Firestore (Handles distributed rate-limiting, OAuth DCR clients, and codes).
 *   **Identity:** Google Cloud Identity Platform / Firebase Auth (Validates JWTs).
@@ -180,6 +180,8 @@ Add a document under the `allowed_users` collection with the following specifica
 
 > **Propagation and revocation:** the role is mirrored into the user's `tier` custom claim on Firebase Auth at consent time and re-checked on every token renewal. Changing `tier`, setting `status: "disabled"` or deleting the document takes effect within one hour — the lifetime of the issued ID token — with no action required from the user. A user who loses authorization has their refresh tokens revoked on the next renewal, which ends their access rather than merely denying that one request.
 
+> **Firestore rules:** the consent portal reads `allowed_users/{email}` from the browser to decide whether to show the consent form. Security rules must allow an authenticated user to read their own document. This check is UX only — the backend re-checks the same document before issuing a code, so rules that deny the read degrade the experience, not the authorization.
+
 ---
 
 ## 6. Environment Variables & Resources
@@ -188,7 +190,7 @@ The server relies strictly on environment variables for configuration. No secret
 
 For a comprehensive guide detailing every environment variable and resource configuration, please refer to the **[Configuration & Environment Guide](configuration-and-env.md)**.
 
-> **Note on Routing:** Ensure your Global Load Balancer is configured to route traffic destined for `/mcp/*` and `/api/oauth/*` to the Serverless NEG (Cloud Run service), and all other traffic (`/*`) to the Backend Bucket (GCS).
+> **Note on Routing:** Ensure your Global Load Balancer routes `/mcp/*`, `/api/oauth/*` and `/.well-known/*` to the Serverless NEG (Cloud Run) and everything else (`/*`) to the consent portal's Backend Bucket (GCS).
 
 ---
 
@@ -221,11 +223,24 @@ To enable the deployment workflows in your repository, navigate to **Settings > 
 | Variable | `MCP_GITHUB_REPOS` | Comma-separated `owner/repo` list. | `org/repo-a,org/repo-b` |
 | Variable | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP collector endpoint. Leave empty unless you run one. | *(empty)* |
 | Variable | `FIREBASE_WEB_API_KEY` | Firebase Web API key used for token exchange. | `AIza...` |
+| Variable | `DOMAIN` | Public hostname served by the load balancer. Feeds `OAUTH_SERVER_BASE_URL`, `OAUTH_PORTAL_BASE_URL` and `CORS_ALLOWED_ORIGINS`. | `jormcp.example.org` |
+| Variable | `GCS_PORTAL_BUCKET` | GCS bucket that receives the consent portal static export. The name must contain `portal`; `cd-portal.yml` refuses anything else. | `jor-mcp-portal-my-project` |
+| Variable | `GCP_LB_URL_MAP` | URL map used for CDN invalidation after a portal deploy. | `lb-jor-mcp` |
+| Variable | `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase web app key baked into the portal build. | `AIza...` |
+| Variable | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Firebase Auth domain baked into the portal build. | `my-project.firebaseapp.com` |
+| Variable | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Firebase project id baked into the portal build. | `my-mcp-project-123` |
+| Variable | `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase web app id baked into the portal build. | `1:123:web:abc` |
+| Variable | `NEXT_PUBLIC_OAUTH_BACKEND_URL` | Backend origin used by the portal. Leave empty for same origin. | *(empty)* |
+| Variable | `PORTAL_ASSET_PREFIX` | Leave empty in the standalone profile. Set only when another site shares the host. | *(empty)* or `/authorize-static` |
+| Variable | `GCS_SITE_BUCKET` | Optional. When set, `cd-portal.yml` refuses to deploy the portal to the same bucket. | `landing-page-bucket` |
+
+The backend's `OAUTH_ALLOWED_REDIRECT_HOSTS` is a literal in `service.yaml`, not a repository variable. Edit it to list every host your supported clients redirect to; loopback is always allowed. Drop `chatgpt.com` or `www.braintrust.dev` if you do not intend to support those connectors.
 
 ### 8.2 Available Workflows
 Our repository contains pre-configured workflows that you can adapt:
 *   **`ci.yml`**: Compiles, runs tests, performs security scans, and builds/pushes the container to your own Google Artifact Registry.
 *   **`cd.yml`**: Triggers a manual deployment flow via GitHub's `workflow_dispatch` (allowing you to select exactly which image tag to deploy to Cloud Run without auto-deploying every merge).
+*   **`cd-portal.yml`**: Builds the consent portal static export and syncs it to `GCS_PORTAL_BUCKET`, then invalidates the consent routes on the CDN. Run it after any change under `portal/`.
 
 For detailed documentation on the internal testing gates, versioning mechanisms, and detailed pipeline jobs, please refer to the **[Contributing Guide](../../../CONTRIBUTING.md#continuous-integration-ci)**.
 
