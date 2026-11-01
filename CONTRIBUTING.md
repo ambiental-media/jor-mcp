@@ -186,7 +186,7 @@ We have automations in place that parse merged Pull Requests to automatically bu
 
 ## Continuous Integration (CI)
 
-Every Pull Request automatically triggers the CI pipeline configured in `.github/workflows/ci.yml`. The pipeline is divided into two jobs that must pass before any code can be merged.
+Every Pull Request automatically triggers the CI pipeline configured in `.github/workflows/ci.yml`. The pipeline is divided into four jobs; `check` and `portal-check` must both pass before an image is built or any code is merged.
 
 ### Job: `check`
 
@@ -196,14 +196,29 @@ Runs all code quality and security validations. This job mirrors the local `make
 |---|---|---|
 | Lint | `ruff check .` | Reports issues, never auto-fixes |
 | Format check | `ruff format --check .` | Reports issues, never auto-fixes |
+| Living docs check | `make check-docs` | Fails if living docs reference the retired external repository |
 | Type check | `mypy .` | Fails the job on any type error |
 | Tests & Coverage | `pytest --cov=src --cov-fail-under=90` | Fails if coverage drops below 90% |
 | SAST | `bandit -c pyproject.toml -r src/` | Fails on medium or higher severity findings |
 | Dependency audit | `pip-audit` | Fails on known vulnerabilities |
 
+### Job: `portal-check`
+
+Runs the consent portal checks. It mirrors `make check-portal` and does not touch the Python image.
+
+| Step | Tool | Behavior |
+|---|---|---|
+| Install | `npm ci` | Reproducible install from `portal/package-lock.json` |
+| Lint | `eslint .` | Fails on lint errors |
+| Format check | `prettier --check .` | Reports issues, never auto-fixes |
+| Tests & Coverage | `vitest run --coverage` | Fails below the `src/lib` thresholds |
+| Dependency audit | `npm audit --audit-level=high` | Fails on high or critical advisories |
+| Build (standalone + overlay) | `next build` | Both profiles must compile |
+| Dist preparation | `scripts/prepare-dist.sh` | Validates the asset prefix and rejects bad paths |
+
 ### Job: `build-and-push`
 
-Only runs if the `check` job completes successfully. Builds the Docker image, scans it for vulnerabilities with Trivy, and pushes it to the Artifact Registry tagged `:pr-<PR_NUMBER>` (e.g. `:pr-44`). This per-PR tag is what the release pipeline later promotes to a versioned tag (see [Release & Versioning](#release--versioning)).
+Only runs if `check` and `portal-check` complete successfully. Builds the Docker image, scans it for vulnerabilities with Trivy, and pushes it to the Artifact Registry tagged `:pr-<PR_NUMBER>` (e.g. `:pr-44`). This per-PR tag is what the release pipeline later promotes to a versioned tag (see [Release & Versioning](#release--versioning)).
 
 | Step | Detail |
 |---|---|
@@ -240,7 +255,7 @@ For the `build-and-push` job to authenticate with Google Cloud, the following se
 
 | Secret | Description |
 |---|---|
-| `GCP_SA_KEY` | JSON key of a GCP Service Account with `roles/artifactregistry.writer` permission |
+| `GCP_SA_KEY` | JSON key of a GCP Service Account with permission to push images, deploy to Cloud Run, write the portal bucket (`roles/storage.objectAdmin` on that bucket) and invalidate the CDN (`compute.urlMaps.invalidateCache`) |
 
 ### Interpreting CI Failures
 
@@ -249,18 +264,22 @@ For the `build-and-push` job to authenticate with Google Cloud, the following se
 *   **Test/Coverage failure:** Run `uv run pytest --cov=src --cov-fail-under=90` locally. Ensure new code has corresponding tests.
 *   **SAST/Dependency failure:** Run `make check-sast` or `make check-deps` locally to inspect the findings.
 *   **Container scan failure:** A critical vulnerability was found in the Docker image. Review the Trivy report in the CI logs and update the affected dependency or base image.
+*   **Portal failure:** Run `make check-portal` locally. It repeats lint, Prettier, audit, tests and both builds, and prints the failing step.
+*   **Docs failure:** Run `make check-docs`. It lists the living docs that still mention the external repository.
 
 ---
 
 ## Security Scanning
 
-This project integrates three open-source security scanning tools to mitigate vulnerabilities before any code is published. All three tools run automatically in the CI pipeline, and two of them (`bandit` and `pip-audit`) can be run locally via the `Makefile`.
+This project integrates four open-source security scanning tools to mitigate vulnerabilities before any code is published. All four run automatically in the CI pipeline, and three of them (`bandit`, `pip-audit` and `npm audit`) can be run locally via the `Makefile`.
 
 ### Tools
 
 *   **Bandit** — Static Application Security Testing (SAST). Analyzes the Python source code in `src/` for common security issues such as hardcoded credentials, unsafe function calls, and injection risks.
 
 *   **pip-audit** — Software Composition Analysis (SCA). Audits all project dependencies (including dev dependencies) against known vulnerability databases (PyPA Advisory Database and OSV) to detect packages with published CVEs.
+
+*   **npm audit** — Dependency audit for the consent portal (`portal/`). Fails on high or critical advisories; run it with `cd portal && npm audit --audit-level=high`.
 
 *   **Trivy** — Container vulnerability scanner. Scans the built Docker image for critical vulnerabilities in OS packages and application dependencies. Trivy runs in the CI pipeline via a GitHub Action and **must also be installed locally** to run `make check` and `make check-container` on your machine.
 
@@ -275,6 +294,9 @@ make check-deps
 # Container scan only (requires Docker and Trivy installed locally)
 make check-container
 
+# Portal dependency audit only
+cd portal && npm audit --audit-level=high
+
 # Full suite including all security scans
 make check
 ```
@@ -287,6 +309,7 @@ Trivy is the only security tool that requires a separate local installation (Ban
 
 The CI pipeline fails the build on:
 - **Trivy:** `CRITICAL` and `HIGH` library vulnerabilities (`--severity CRITICAL,HIGH`).
+- **npm audit:** `high` and `critical` advisories (`--audit-level=high`).
 - **Bandit:** `MEDIUM` and `HIGH` severity findings. Bandit's severity scale is `LOW`/`MEDIUM`/`HIGH` (there is no "critical" level), and the `-ll` flag in `ci.yml` sets the threshold to medium-and-above.
 
 Findings below these thresholds are reported in the logs for awareness but do not block the pipeline. These thresholds can be adjusted in the `ci.yml` workflow file and in `pyproject.toml` (`[tool.bandit]`).

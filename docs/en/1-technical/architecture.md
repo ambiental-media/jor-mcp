@@ -85,7 +85,7 @@ sequenceDiagram
 
 ## 3. Core Technologies
 
-- **Consent Portal Hosting:** `Google Cloud Storage` and `Cloud CDN` for the static Next.js export in `portal/`.
+- **Consent Portal Hosting:** `Google Cloud Storage` and `Cloud CDN` for the static Next.js export in `portal/`. Standalone deployments serve it as the load balancer's default backend; deployments that also serve another site use the overlay path rules (see the load balancer guide, §5).
 - **Framework:** `fastmcp` (ASGI server powered by `uvicorn`).
 - **HTTP Client:** `httpx` (Asynchronous connection pooling).
 - **Security:** `firebase-admin` (JWT validation) and `google-cloud-firestore` (Rate limiting).

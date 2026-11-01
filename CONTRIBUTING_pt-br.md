@@ -187,7 +187,7 @@ Temos automações configuradas que analisam os Pull Requests mesclados para inc
 
 ## Integração Contínua (CI)
 
-Todo Pull Request dispara automaticamente o pipeline de CI configurado em `.github/workflows/ci.yml`. O pipeline é dividido em dois jobs que devem passar antes que qualquer código possa ser mesclado.
+Todo Pull Request dispara automaticamente o pipeline de CI configurado em `.github/workflows/ci.yml`. O pipeline é dividido em quatro jobs; `check` e `portal-check` precisam passar antes que uma imagem seja construída ou qualquer código seja mesclado.
 
 ### Job: `check`
 
@@ -197,14 +197,29 @@ Executa todas as validações de qualidade de código e segurança. Este job esp
 |---|---|---|
 | Lint | `ruff check .` | Relata problemas, nunca corrige automaticamente |
 | Verificação de Formato | `ruff format --check .` | Relata problemas, nunca faz correções |
+| Verificação de docs | `make check-docs` | Falha se a documentação viva referenciar o repositório externo descontinuado |
 | Verificação de Tipagem | `mypy .` | Falha o job em caso de qualquer erro de tipo |
 | Testes e Cobertura | `pytest --cov=src --cov-fail-under=90` | Falha se a cobertura cair abaixo de 90% |
 | SAST | `bandit -c pyproject.toml -r src/` | Falha em descobertas de severidade média ou alta |
 | Auditoria de Deps | `pip-audit` | Falha em caso de vulnerabilidades conhecidas |
 
+### Job: `portal-check`
+
+Executa as verificações do portal de consentimento. Espelha `make check-portal` e não toca na imagem Python.
+
+| Etapa | Ferramenta | Comportamento |
+|---|---|---|
+| Instalação | `npm ci` | Instalação reproduzível a partir de `portal/package-lock.json` |
+| Lint | `eslint .` | Falha em erros de lint |
+| Verificação de formato | `prettier --check .` | Relata problemas, nunca corrige automaticamente |
+| Testes e cobertura | `vitest run --coverage` | Falha abaixo dos limites de `src/lib` |
+| Auditoria de dependências | `npm audit --audit-level=high` | Falha em avisos high ou critical |
+| Build (standalone + overlay) | `next build` | Os dois perfis precisam compilar |
+| Preparação do dist | `scripts/prepare-dist.sh` | Valida o prefixo de ativos e recusa caminhos indevidos |
+
 ### Job: `build-and-push`
 
-Só é executado se o job `check` for concluído com sucesso. Constrói a imagem Docker, escaneia vulnerabilidades com o Trivy e envia para o Artifact Registry com a tag `:pr-<NUMERO_DO_PR>` (ex: `:pr-44`). Esta tag por PR é o que o pipeline de lançamento promove posteriormente para uma tag versionada (consulte [Lançamento e Versionamento](#lancamento-e-versionamento)).
+Só é executado se `check` e `portal-check` forem concluídos com sucesso. Constrói a imagem Docker, escaneia vulnerabilidades com o Trivy e envia para o Artifact Registry com a tag `:pr-<NUMERO_DO_PR>` (ex: `:pr-44`). Esta tag por PR é o que o pipeline de lançamento promove posteriormente para uma tag versionada (consulte [Lançamento e Versionamento](#lancamento-e-versionamento)).
 
 | Etapa | Detalhe |
 |---|---|
@@ -241,7 +256,7 @@ Para que o job `build-and-push` se autentique no Google Cloud, o seguinte segred
 
 | Segredo | Descrição |
 |---|---|
-| `GCP_SA_KEY` | Chave JSON de uma Conta de Serviço do GCP com permissão de gravação (`roles/artifactregistry.writer`) |
+| `GCP_SA_KEY` | Chave JSON de uma Conta de Serviço do GCP com permissão para enviar imagens, implantar no Cloud Run, gravar o bucket do portal (`roles/storage.objectAdmin` nesse bucket) e invalidar o CDN (`compute.urlMaps.invalidateCache`) |
 
 ### Interpretando Falhas no CI
 
@@ -250,18 +265,22 @@ Para que o job `build-and-push` se autentique no Google Cloud, o seguinte segred
 *   **Falha de Teste/Cobertura:** Execute `uv run pytest --cov=src --cov-fail-under=90` localmente. Garanta que o código novo possua testes correspondentes.
 *   **Falha de SAST/Dependências:** Execute `make check-sast` ou `make check-deps` localmente para inspecionar os problemas.
 *   **Falha de Varredura de Contêiner:** Uma vulnerabilidade crítica foi encontrada na imagem Docker. Revise o relatório do Trivy nos logs do CI e atualize a dependência ou imagem base afetada.
+*   **Falha do portal:** Execute `make check-portal` localmente. Ele repete lint, Prettier, auditoria, testes e os dois builds, e mostra a etapa que falhou.
+*   **Falha de docs:** Execute `make check-docs`. Ele lista os documentos vivos que ainda mencionam o repositório externo.
 
 ---
 
 ## Segurança SAST e Análise de Dependências
 
-Este projeto integra três ferramentas de análise de segurança de código aberto para mitigar vulnerabilidades antes que qualquer código seja publicado. Todas as três ferramentas são executadas automaticamente no pipeline do CI, e duas delas (`bandit` e `pip-audit`) podem ser executadas localmente via o `Makefile`.
+Este projeto integra quatro ferramentas de análise de segurança de código aberto para mitigar vulnerabilidades antes que qualquer código seja publicado. Todas as quatro são executadas automaticamente no pipeline do CI, e três delas (`bandit`, `pip-audit` e `npm audit`) podem ser executadas localmente via o `Makefile`.
 
 ### Ferramentas
 
 *   **Bandit** — Análise Estática de Segurança de Aplicação (SAST). Analisa o código-fonte Python em `src/` em busca de problemas comuns de segurança, como credenciais codificadas diretamente, chamadas de função inseguras e riscos de injeção.
 
 *   **pip-audit** — Análise de Composição de Software (SCA). Audita todas as dependências do projeto (incluindo as dependências de desenvolvimento) contra bancos de dados de vulnerabilidades conhecidos (PyPA Advisory Database e OSV) para detectar pacotes com CVEs publicados.
+
+*   **npm audit** — Auditoria de dependências do portal de consentimento (`portal/`). Falha em avisos high ou critical; execute com `cd portal && npm audit --audit-level=high`.
 
 *   **Trivy** — Varredor de vulnerabilidades de contêiner. Escaneia a imagem Docker construída em busca de vulnerabilidades críticas em pacotes de sistema operacional e dependências de aplicação. O Trivy é executado no pipeline de CI e **também deve ser instalado localmente** para executar `make check` e `make check-container` na sua máquina.
 
@@ -276,6 +295,9 @@ make check-deps
 # Apenas Varredura de Contêiner (requer Docker e Trivy instalados localmente)
 make check-container
 
+# Auditoria de dependências do portal apenas
+cd portal && npm audit --audit-level=high
+
 # Suíte completa de verificação (incluindo segurança)
 make check
 ```
@@ -288,6 +310,7 @@ O Trivy é a única ferramenta de segurança que requer uma instalação local s
 
 O pipeline de CI falha a compilação em caso de:
 - **Trivy:** Vulnerabilidades de biblioteca com severidade `CRITICAL` e `HIGH` (`--severity CRITICAL,HIGH`).
+- **npm audit:** Avisos `high` e `critical` (`--audit-level=high`).
 - **Bandit:** Descobertas de severidade `MEDIUM` e `HIGH`. A escala de severidade do Bandit é `LOW`/`MEDIUM`/`HIGH` (não há nível crítico), e a flag `-ll` no `ci.yml` define o limite como médio ou superior.
 
 Descobertas abaixo desses limites são relatadas nos logs para conscientização, mas não bloqueiam o pipeline. Esses limites podem ser ajustados no arquivo de workflow `ci.yml` e no `pyproject.toml` (`[tool.bandit]`).

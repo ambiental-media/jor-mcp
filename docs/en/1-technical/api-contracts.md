@@ -150,7 +150,9 @@ applies (see below).
 
 *   **Allowed Origins:** configured via the `CORS_ALLOWED_ORIGINS` environment
     variable (comma-separated). Defaults to `http://localhost:3000` (dev portal)
-    and `https://jormcp.ambiental.media` (prod portal).
+    and `https://jormcp.ambiental.media` (prod portal). The application default
+    keeps the local portal; `service.yaml` overrides it to `https://${DOMAIN}`
+    only, so production does not accept a localhost origin.
 *   **Allowed Methods:** `GET`, `POST`, `OPTIONS`.
 *   **Allowed Headers:** `Authorization`, `Content-Type`.
 

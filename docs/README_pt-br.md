@@ -19,6 +19,7 @@ Este projeto está atualmente na fase **Beta**. O foco principal é validar a ex
 
 - **1-tecnico** (`docs/pt-br/1-tecnico/`): Arquitetura, contratos de API, ferramentas disponíveis, melhores práticas de prompt e instruções para conexão de clientes.
 - **2-replicacao** (`docs/pt-br/2-replicacao/`): Pré-requisitos, provisionamento GCP passo a passo, variáveis de ambiente, configuração de load balancer e implantação.
+- **Portal de consentimento** (`portal/`): A interface estática Next.js de consentimento OAuth, implantada no Google Cloud Storage atrás do load balancer.
 - **3-historico-e-specs** (`docs/pt-br/3-historico-e-specs/`): Trajetória do projeto, especificações (RFCs) e registros de decisões de arquitetura (ADRs).
 - **4-legal** (`docs/pt-br/4-legal/`): Termos da Licença Apache 2.0, política de marca e nome, e os modelos de Termos de Uso e Política de Privacidade para organizações que operam a própria instância.
 

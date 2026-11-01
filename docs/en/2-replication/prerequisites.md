@@ -21,6 +21,7 @@
 - [Firebase CLI](https://firebase.google.com/docs/cli)
 - [Docker](https://docs.docker.com/get-started/get-docker/)
 - [Node.js 24+ with npm](https://nodejs.org/) — only needed to build or deploy the consent portal in `portal/`
+- [`realpath`](https://www.gnu.org/software/coreutils/) (coreutils) — used by `portal/scripts/prepare-dist.sh`
 - [`envsubst`](https://www.gnu.org/software/gettext/manual/html_node/envsubst-Invocation.html) (`gettext` package)
 - `curl` and `openssl`
 

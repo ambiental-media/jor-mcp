@@ -5,6 +5,8 @@
 
 # SPEC-002: Estratégia de Implementação do OAuth 2.1
 
+> **Substituído, para a interface de consentimento, pelo [ADR 008](../adrs/008-portal-de-consentimento-autocontido.md): o portal agora vive em `portal/`, não em um repositório externo.**
+
 ## 1. Objetivo
 Transição do `jor-mcp` de um Servidor de Recursos básico para um Proxy Defensivo OAuth 2.1, desacoplando a interface de consentimento do usuário para o export estático do `jor-mcp-site`.
 

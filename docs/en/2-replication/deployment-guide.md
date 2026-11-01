@@ -115,7 +115,9 @@ These are two different accounts and must not be confused:
   It needs the roles listed above and no deployment permissions.
 * **Deployment identity** — the account the CI/CD pipeline authenticates with
   (see `GCP_SA_KEY` in section 8.1). It needs permission to push images to
-  Artifact Registry and to deploy to Cloud Run.
+  Artifact Registry and to deploy to Cloud Run, plus object write on the portal
+  bucket (`roles/storage.objectAdmin` on that bucket) and CDN invalidation
+  (`compute.urlMaps.invalidateCache`, or a custom role containing it).
 
 The deployment identity must also hold `roles/iam.serviceAccountUser` over the
 runtime service account, otherwise `gcloud run services replace` fails with
@@ -191,6 +193,8 @@ The server relies strictly on environment variables for configuration. No secret
 For a comprehensive guide detailing every environment variable and resource configuration, please refer to the **[Configuration & Environment Guide](configuration-and-env.md)**.
 
 > **Note on Routing:** Ensure your Global Load Balancer routes `/mcp/*`, `/api/oauth/*` and `/.well-known/*` to the Serverless NEG (Cloud Run) and everything else (`/*`) to the consent portal's Backend Bucket (GCS).
+
+> **Upgrading an existing deployment:** set the `DOMAIN` repository variable before the next backend deploy; `cd.yml` now refuses to render the manifest without it. The manifest also replaces the previous CORS default with `https://${DOMAIN}` and adds `OAUTH_ALLOWED_REDIRECT_HOSTS`.
 
 ---
 

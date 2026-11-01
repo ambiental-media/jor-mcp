@@ -5,6 +5,8 @@
 
 # SPEC-002: OAuth 2.1 Implementation Strategy
 
+> **Superseded for the consent UI by [ADR 008](../adrs/008-self-contained-consent-portal.md): the portal now lives in `portal/`, not in an external repository.**
+
 ## 1. Objective
 Transition `jor-mcp` from a basic Resource Server to an OAuth 2.1 Defensive Proxy, decoupling the user consent UI to the `jor-mcp-site` static export.
 
