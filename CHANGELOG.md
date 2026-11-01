@@ -2,6 +2,29 @@
 
 <!-- version list -->
 
+## v0.17.0 (2026-11-01)
+
+### Documentation
+
+- Close replication gaps for the consent portal
+  ([#91](https://github.com/ambiental-media/jor-mcp/pull/91),
+  [`6b4a6d1`](https://github.com/ambiental-media/jor-mcp/commit/6b4a6d14d10246470194f39501243ca296071c37))
+
+- Document portal bucket index and CDN invalidation
+  ([#91](https://github.com/ambiental-media/jor-mcp/pull/91),
+  [`6b4a6d1`](https://github.com/ambiental-media/jor-mcp/commit/6b4a6d14d10246470194f39501243ca296071c37))
+
+- Update portal rollback after legacy consent removal
+  ([#91](https://github.com/ambiental-media/jor-mcp/pull/91),
+  [`6b4a6d1`](https://github.com/ambiental-media/jor-mcp/commit/6b4a6d14d10246470194f39501243ca296071c37))
+
+### Features
+
+- **portal**: Move OAuth consent UI in-repo and allowlist redirect hosts
+  ([#91](https://github.com/ambiental-media/jor-mcp/pull/91),
+  [`6b4a6d1`](https://github.com/ambiental-media/jor-mcp/commit/6b4a6d14d10246470194f39501243ca296071c37))
+
+
 ## v0.16.0 (2026-11-01)
 
 ### Documentation
