@@ -417,7 +417,15 @@ pathRules:
     service: projects/${PROJECT_ID}/global/backendBuckets/back-end-bucket-portal
 ```
 
-Defina a variável de repositório `PORTAL_ASSET_PREFIX=/authorize-static` e reimplante o portal. Para reverter, remova as regras: a cópia de consentimento do site anterior volta a ficar acessível.
+Defina a variável de repositório `PORTAL_ASSET_PREFIX=/authorize-static` e reimplante o portal.
+
+Para reverter, reimplante o último build bom do portal:
+
+```bash
+gh workflow run cd-portal.yml --repo <owner>/<repo> -f ref=vX.Y.Z
+```
+
+O workflow sincroniza `GCS_PORTAL_BUCKET` e invalida os caminhos de consentimento. Remover as regras de caminho não é reversão: os objetos de consentimento do site anterior foram apagados, então essas rotas retornam 404.
 
 Mudar regras de caminho não invalida entradas já cacheadas pelo Cloud CDN. Após a importação, execute o workflow `cd-portal` novamente ou invalide `/authorize*`, `/pt/authorize*` e `/en/authorize*`. Nunca use `/*` aqui — isso limparia o cache do outro site.
 

@@ -253,6 +253,16 @@ Nosso repositório contém workflows pré-configurados que você pode adaptar:
 
 Para obter a documentação detalhada sobre os critérios de teste internos, mecanismos de versionamento e detalhes de cada job da pipeline, consulte o **[Guia de Contribuição](../../../CONTRIBUTING_pt-br.md#integracao-continua-ci)**.
 
+### 8.3 Revertendo o Portal
+
+O portal de consentimento não tem cópia legada para a qual voltar. Reverta reimplantando o último build bom:
+
+```bash
+gh workflow run cd-portal.yml --repo <owner>/<repo> -f ref=vX.Y.Z
+```
+
+O workflow ressincroniza `GCS_PORTAL_BUCKET` e invalida `/authorize*`, `/pt/authorize*` e `/en/authorize*`. Remover as regras de caminho do load balancer não é reversão: essas rotas passam a retornar 404.
+
 ---
 
 ## 9. Manifesto de Serviço Declarativo
