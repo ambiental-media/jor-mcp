@@ -85,7 +85,7 @@ sequenceDiagram
 
 ## 3. Tecnologias Principais
 
-- **Hospedagem do Portal de Consentimento:** `Google Cloud Storage` e `Cloud CDN` para a exportação estática Next.js em `portal/`.
+- **Hospedagem do Portal de Consentimento:** `Google Cloud Storage` e `Cloud CDN` para a exportação estática Next.js em `portal/`. Implantações standalone o servem como backend padrão do load balancer; implantações que também servem outro site usam as regras de caminho do perfil de sobreposição (veja o guia do load balancer, §5).
 - **Framework:** `fastmcp` (Servidor ASGI impulsionado pelo `uvicorn`).
 - **Cliente HTTP:** `httpx` (Pool de conexões assíncronas).
 - **Segurança:** `firebase-admin` (validação de JWT) e `google-cloud-firestore` (limitação de taxa).

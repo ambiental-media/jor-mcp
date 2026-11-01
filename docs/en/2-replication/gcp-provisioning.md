@@ -296,6 +296,8 @@ gcloud compute backend-services update back-end-jor-mcp --global \
 
 **8.3 – Portal bucket, URL map, certificate and HTTPS frontend**
 
+> **Standalone profile only.** If another site already owns the default backend, skip the URL map import below and follow step 8.5 instead. Running both replaces the existing default with the portal bucket.
+
 The URL map splits traffic: `/mcp/*`, `/api/oauth/*` and `/.well-known/*` go to
 Cloud Run, everything else is served by the static portal in the GCS bucket
 (see [Load Balancer Configuration](load-balancer-config.md) §3).
@@ -304,7 +306,8 @@ Cloud Run, everything else is served by the static portal in the GCS bucket
 # Static portal bucket, served through Cloud CDN
 gcloud storage buckets create "gs://${GCS_PORTAL_BUCKET}" \
   --location="$REGION" --uniform-bucket-level-access
-# Objects must be publicly readable for the backend bucket to serve them.
+# Public read is intentional: the bucket holds only generated static assets
+# (HTML/JS/CSS/fonts), never user data or secrets.
 gcloud storage buckets add-iam-policy-binding "gs://${GCS_PORTAL_BUCKET}" \
   --member=allUsers --role=roles/storage.objectViewer
 # The cd-portal.yml workflow uploads the export. For a manual run:
@@ -374,6 +377,19 @@ Skip this section when the consent portal is the only site on the host.
 
 If another site already owns the default backend, keep it and add path rules for the consent routes. Build the portal with `PORTAL_ASSET_PREFIX=/authorize-static` so its asset tree does not collide with the other site's `/_next`.
 
+Create the portal bucket and its own backend bucket first (the default backend stays untouched):
+
+```bash
+gcloud storage buckets create "gs://${GCS_PORTAL_BUCKET}" \
+  --location="$REGION" --uniform-bucket-level-access
+gcloud storage buckets add-iam-policy-binding "gs://${GCS_PORTAL_BUCKET}" \
+  --member=allUsers --role=roles/storage.objectViewer
+gcloud compute backend-buckets create back-end-bucket-portal \
+  --gcs-bucket-name="$GCS_PORTAL_BUCKET" --enable-cdn
+```
+
+Then export the existing URL map, add the rules, and import it back. Do **not** run the URL map import in step 8.3: it would replace the other site as the default backend.
+
 ```bash
 gcloud compute url-maps export lb-jor-mcp --destination=lb-jor-mcp.yaml --global
 # add the path rules below to pathMatchers[0].pathRules
@@ -391,7 +407,7 @@ pathRules:
       - /en/authorize
       - /en/authorize/*
       - /authorize-static/*
-    service: projects/${PROJECT_ID}/global/backendBuckets/back-end-bucket-jor-mcp
+    service: projects/${PROJECT_ID}/global/backendBuckets/back-end-bucket-portal
 ```
 
 Set the repository variable `PORTAL_ASSET_PREFIX=/authorize-static` and redeploy the portal. To roll back, remove the rules: the previous site's consent copy becomes reachable again.

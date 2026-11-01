@@ -118,7 +118,9 @@ São duas contas distintas e não devem ser confundidas:
   implantação.
 * **Identidade de implantação** — a conta com a qual o pipeline de CI/CD se
   autentica (veja `GCP_SA_KEY` na seção 8.1). Precisa de permissão para enviar
-  imagens ao Artifact Registry e implantar no Cloud Run.
+  imagens ao Artifact Registry e implantar no Cloud Run, além de escrita no
+  bucket do portal (`roles/storage.objectAdmin` nesse bucket) e invalidação de
+  CDN (`compute.urlMaps.invalidateCache`, ou um papel customizado que a inclua).
 
 A identidade de implantação também precisa da permissão
 `roles/iam.serviceAccountUser` sobre a conta de serviço de execução, caso
@@ -194,6 +196,8 @@ O servidor depende estritamente de variáveis de ambiente para configuração. N
 Para uma lista detalhada e abrangente de todas as variáveis de ambiente e recursos de nuvem, consulte o **[Guia de Configuração e Ambiente](configuracao-e-env.md)**.
 
 > **Nota sobre Roteamento:** Certifique-se de que seu Load Balancer Global roteie `/mcp/*`, `/api/oauth/*` e `/.well-known/*` para o Serverless NEG (Cloud Run) e todo o restante (`/*`) para o Backend Bucket do portal de consentimento (GCS).
+
+> **Atualizando uma implantação existente:** defina a variável de repositório `DOMAIN` antes do próximo deploy do backend; o `cd.yml` agora recusa renderizar o manifesto sem ela. O manifesto também substitui o padrão anterior de CORS por `https://${DOMAIN}` e adiciona `OAUTH_ALLOWED_REDIRECT_HOSTS`.
 
 ---
 

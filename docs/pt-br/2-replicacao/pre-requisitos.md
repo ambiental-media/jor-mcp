@@ -21,6 +21,7 @@ Papel `Owner` no projeto, ou `Editor` + `Project IAM Admin` (`roles/resourcemana
 - [Firebase CLI](https://firebase.google.com/docs/cli)
 - [Docker](https://docs.docker.com/get-started/get-docker/)
 - [Node.js 24+ com npm](https://nodejs.org/) — necessário apenas para compilar ou implantar o portal de consentimento em `portal/`
+- [`realpath`](https://www.gnu.org/software/coreutils/) (coreutils) — usado por `portal/scripts/prepare-dist.sh`
 - [`envsubst`](https://www.gnu.org/software/gettext/manual/html_node/envsubst-Invocation.html) (pacote `gettext`)
 - `curl` e `openssl`
 

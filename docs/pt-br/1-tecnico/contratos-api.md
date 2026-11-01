@@ -150,7 +150,9 @@ lugar dela, aplica-se um limite por IP (veja abaixo).
 
 *   **Origens Permitidas:** configuradas pela variável de ambiente
     `CORS_ALLOWED_ORIGINS` (separadas por vírgula). Padrão: `http://localhost:3000`
-    (portal de dev) e `https://jormcp.ambiental.media` (portal de prod).
+    (portal de dev) e `https://jormcp.ambiental.media` (portal de prod). O padrão
+    da aplicação mantém o portal local; o `service.yaml` substitui por apenas
+    `https://${DOMAIN}`, então produção não aceita origem localhost.
 *   **Métodos Permitidos:** `GET`, `POST`, `OPTIONS`.
 *   **Cabeçalhos Permitidos:** `Authorization`, `Content-Type`.
 
