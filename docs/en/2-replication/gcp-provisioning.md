@@ -310,6 +310,11 @@ gcloud storage buckets create "gs://${GCS_PORTAL_BUCKET}" \
 # (HTML/JS/CSS/fonts), never user data or secrets.
 gcloud storage buckets add-iam-policy-binding "gs://${GCS_PORTAL_BUCKET}" \
   --member=allUsers --role=roles/storage.objectViewer
+# Next static export relies on directory indexes: /pt/authorize/ must serve
+# pt/authorize/index.html. A backend bucket returns 404 for directory URLs
+# unless the bucket has a main page suffix.
+gcloud storage buckets update "gs://${GCS_PORTAL_BUCKET}" \
+  --web-main-page-suffix=index.html --web-error-page=404.html
 # The cd-portal.yml workflow uploads the export. For a manual run:
 #   gcloud storage rsync portal/out "gs://${GCS_PORTAL_BUCKET}" --recursive
 gcloud compute backend-buckets create back-end-bucket-jor-mcp \
@@ -384,6 +389,8 @@ gcloud storage buckets create "gs://${GCS_PORTAL_BUCKET}" \
   --location="$REGION" --uniform-bucket-level-access
 gcloud storage buckets add-iam-policy-binding "gs://${GCS_PORTAL_BUCKET}" \
   --member=allUsers --role=roles/storage.objectViewer
+gcloud storage buckets update "gs://${GCS_PORTAL_BUCKET}" \
+  --web-main-page-suffix=index.html --web-error-page=404.html
 gcloud compute backend-buckets create back-end-bucket-portal \
   --gcs-bucket-name="$GCS_PORTAL_BUCKET" --enable-cdn
 ```
@@ -412,7 +419,7 @@ pathRules:
 
 Set the repository variable `PORTAL_ASSET_PREFIX=/authorize-static` and redeploy the portal. To roll back, remove the rules: the previous site's consent copy becomes reachable again.
 
-CDN invalidation stays scoped to `/authorize*`, `/pt/authorize*` and `/en/authorize*`. Never use `/*` here — it would flush the other site's cache.
+Changing path rules does not invalidate entries already cached by Cloud CDN. After the import, run the `cd-portal` workflow again or invalidate `/authorize*`, `/pt/authorize*` and `/en/authorize*`. Never use `/*` here — it would flush the other site's cache.
 
 ## Step 9 – DNS and certificate
 

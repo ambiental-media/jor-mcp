@@ -199,6 +199,8 @@ Para uma lista detalhada e abrangente de todas as variáveis de ambiente e recur
 
 > **Atualizando uma implantação existente:** defina a variável de repositório `DOMAIN` antes do próximo deploy do backend; o `cd.yml` agora recusa renderizar o manifesto sem ela. O manifesto também substitui o padrão anterior de CORS por `https://${DOMAIN}` e adiciona `OAUTH_ALLOWED_REDIRECT_HOSTS`.
 
+> **CDN e cache de HTML:** respostas de backend bucket são cacheadas conforme o `Cache-Control` do objeto; o padrão pode chegar a uma hora. Todo deploy do portal, e toda mudança nas regras de caminho de consentimento, precisa ser seguida de invalidação de `/authorize*`, `/pt/authorize*` e `/en/authorize*`. Em host compartilhado nunca use `/*`, que limparia o cache do outro site. O `cd-portal.yml` faz a invalidação restrita.
+
 ---
 
 ## 7. Estratégia de Dockerização

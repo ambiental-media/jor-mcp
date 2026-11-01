@@ -84,4 +84,10 @@ Moderate findings are reported but not blocking.
   send the consent routes here. Set `PORTAL_ASSET_PREFIX=/authorize-static` so
   this build does not collide with the other site's `/_next` tree.
 
+The bucket must be configured with `--web-main-page-suffix=index.html`; without
+it, requests to `/pt/authorize/` return 404 because Next static export relies on
+directory indexes. After every deploy, and after any change to the consent path
+rules, invalidate `/authorize*`, `/pt/authorize*` and `/en/authorize*` — Cloud
+CDN keeps HTML for up to an hour.
+
 See `docs/en/2-replication/gcp-provisioning.md` for the infrastructure steps.
