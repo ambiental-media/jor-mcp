@@ -201,6 +201,8 @@ Para uma lista detalhada e abrangente de todas as variáveis de ambiente e recur
 
 > **CDN e cache de HTML:** respostas de backend bucket são cacheadas conforme o `Cache-Control` do objeto; o padrão pode chegar a uma hora. Todo deploy do portal, e toda mudança nas regras de caminho de consentimento, precisa ser seguida de invalidação de `/authorize*`, `/pt/authorize*` e `/en/authorize*`. Em host compartilhado nunca use `/*`, que limparia o cache do outro site. O `cd-portal.yml` faz a invalidação restrita.
 
+> **Orientação relacionada:** [Bloqueio de Bots](bloqueio-de-bots.md) cobre a política opcional de crawlers para o site público e como um bloqueio amplo pode afetar o acesso MCP.
+
 ---
 
 ## 7. Estratégia de Dockerização
