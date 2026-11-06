@@ -9,3 +9,6 @@
 
 ## Decisão Arquitetural: Por que API REST?
 Utilizamos a API REST do WordPress em vez de GraphQL ou conexões diretas de banco de dados para garantir compatibilidade com implantações padrão de redação. Os dados são intensamente limpos (removendo HTML e shortcodes) no lado do servidor porque enviar HTML bruto para um LLM desperdiça tokens da janela de contexto e degrada a qualidade de sumarização do modelo.
+
+## Política de Crawlers e Acesso REST
+O bloqueio de bots no site é uma decisão editorial opcional, mas pode afetar esta integração: o servidor MCP acessa o WordPress pela API REST, então regras que bloqueiam IPs de datacenter ou user agents que não são navegador também podem bloquear o MCP. Veja [Bloqueio de Bots](../../2-replicacao/bloqueio-de-bots.md) para os trade-offs e referências autoritativas.

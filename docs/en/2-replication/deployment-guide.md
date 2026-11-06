@@ -198,6 +198,8 @@ For a comprehensive guide detailing every environment variable and resource conf
 
 > **CDN and HTML caching:** backend-bucket responses are cached using the object's `Cache-Control`; the default is up to one hour. Every portal deploy, and every change to the consent path rules, must be followed by invalidation of `/authorize*`, `/pt/authorize*` and `/en/authorize*`. On a shared host never use `/*`, which would flush the other site's cache. `cd-portal.yml` performs the scoped invalidation.
 
+> **Related guidance:** [Bot Blocking](bot-blocking.md) covers the optional crawler policy for the public site and how a broad block can affect MCP access.
+
 ---
 
 ## 7. Dockerization Strategy
